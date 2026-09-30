@@ -124,6 +124,56 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
   }
 
+  Widget _buildErrorState() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.screenPadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.receipt_long_outlined,
+                size: 36,
+                color: colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: AppDimensions.spacingLg),
+            const Text(
+              'Unable to load expenses',
+              style: AppTextStyles.heading2,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.spacingXs),
+            const Text(
+              'Something went wrong while loading your expenses.',
+              style: AppTextStyles.bodySecondary,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.spacingLg),
+            FilledButton.icon(
+              onPressed: () {
+                setState(() {
+                  _expensesStream = _expenseRepository.watchExpenses();
+                });
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -134,47 +184,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               stream: _expensesStream,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(
-                        AppDimensions.screenPadding,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 48,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          const SizedBox(height: AppDimensions.spacingMd),
-                          const Text(
-                            'Unable to load expenses',
-                            style: AppTextStyles.heading2,
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: AppDimensions.spacingSm),
-                          const Text(
-                            'Something went wrong while loading your expenses. '
-                            'Please try again.',
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.bodySecondary,
-                          ),
-                          const SizedBox(height: AppDimensions.spacingLg),
-                          FilledButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _expensesStream = _expenseRepository
-                                    .watchExpenses();
-                              });
-                            },
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Try Again'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  return _buildErrorState();
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -341,14 +351,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       child: Padding(
         padding: const EdgeInsets.all(AppDimensions.screenPadding),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               width: 72,
               height: 72,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary
-                    .withValues(alpha: 0.1),
+                    .withValues(alpha: 0.10),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -358,12 +368,28 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ),
             ),
             const SizedBox(height: AppDimensions.spacingLg),
-            const Text('No expenses yet', style: AppTextStyles.heading2),
-            const SizedBox(height: AppDimensions.spacingSm),
             const Text(
-              'Your recorded expenses will appear here.',
+              'No expenses yet',
+              style: AppTextStyles.heading2,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.spacingXs),
+            const Text(
+              'Record your first expense to start tracking business costs.',
               textAlign: TextAlign.center,
               style: AppTextStyles.bodySecondary,
+            ),
+            const SizedBox(height: AppDimensions.spacingLg),
+            FilledButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AddExpenseScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Add Expense'),
             ),
           ],
         ),

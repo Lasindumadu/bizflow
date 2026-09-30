@@ -69,6 +69,52 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return '$_currency ${value.toStringAsFixed(2)}';
   }
 
+  Widget _buildErrorState() {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppDimensions.screenPadding),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.bar_chart_rounded,
+                size: 36,
+                color: colorScheme.error,
+              ),
+            ),
+            const SizedBox(height: AppDimensions.spacingLg),
+            const Text(
+              'Unable to load reports',
+              style: AppTextStyles.heading2,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.spacingXs),
+            const Text(
+              'Something went wrong while loading your reports.',
+              style: AppTextStyles.bodySecondary,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.spacingLg),
+            FilledButton.icon(
+              onPressed: _refresh,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -104,40 +150,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 }
 
                 if (snapshot.hasError) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(
-                        AppDimensions.screenPadding,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.error_outline,
-                            size: 48,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          const SizedBox(height: AppDimensions.spacingMd),
-                          const Text(
-                            'Unable to load reports.',
-                            style: AppTextStyles.heading2,
-                          ),
-                          const SizedBox(height: AppDimensions.spacingSm),
-                          Text(
-                            '${snapshot.error}',
-                            textAlign: TextAlign.center,
-                            style: AppTextStyles.bodySecondary,
-                          ),
-                          const SizedBox(height: AppDimensions.spacingLg),
-                          FilledButton.icon(
-                            onPressed: _refresh,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Try Again'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  return _buildErrorState();
                 }
 
                 final summary = snapshot.data;

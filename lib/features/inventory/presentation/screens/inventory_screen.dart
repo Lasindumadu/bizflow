@@ -80,15 +80,20 @@ class _InventoryScreenState extends State<InventoryScreen> {
   List<Product> get _filteredProducts {
     final query = _searchQuery.trim().toLowerCase();
 
-    if (query.isEmpty) {
-      return _products;
-    }
+    final filtered = query.isEmpty
+        ? [..._products]
+        : _products.where((product) {
+            return product.name.toLowerCase().contains(query) ||
+                product.sku.toLowerCase().contains(query) ||
+                product.category.toLowerCase().contains(query);
+          }).toList();
 
-    return _products.where((product) {
-      return product.name.toLowerCase().contains(query) ||
-          product.sku.toLowerCase().contains(query) ||
-          product.category.toLowerCase().contains(query);
-    }).toList();
+    filtered.sort(
+      (a, b) =>
+          a.name.trim().toLowerCase().compareTo(b.name.trim().toLowerCase()),
+    );
+
+    return filtered;
   }
 
   int get _totalUnits {
@@ -215,34 +220,43 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildErrorState() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppDimensions.screenPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Theme.of(context).colorScheme.error,
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.inventory_2_outlined,
+                size: 36,
+                color: colorScheme.error,
+              ),
             ),
-            const SizedBox(height: AppDimensions.spacingMd),
+            const SizedBox(height: AppDimensions.spacingLg),
             const Text(
-              'Unable to load inventory.',
+              'Unable to load inventory',
               style: AppTextStyles.heading2,
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: AppDimensions.spacingSm),
+            const SizedBox(height: AppDimensions.spacingXs),
             const Text(
-              'Something went wrong while loading your inventory. '
-              'Please try again.',
+              'Something went wrong while loading your inventory.',
               style: AppTextStyles.bodySecondary,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppDimensions.spacingLg),
             FilledButton.icon(
               onPressed: _watchProducts,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded),
               label: const Text('Try Again'),
             ),
           ],

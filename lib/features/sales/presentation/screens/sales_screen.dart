@@ -350,21 +350,47 @@ class SalesScreenState extends State<SalesScreen> {
   }
 
   Widget _buildErrorState() {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppDimensions.screenPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Theme.of(context).colorScheme.error,
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 36,
+                color: colorScheme.error,
+              ),
             ),
-            const SizedBox(height: AppDimensions.spacingMd),
-            const Text('Unable to load sales.', style: AppTextStyles.heading2),
+            const SizedBox(height: AppDimensions.spacingLg),
+            const Text(
+              'Unable to load sales',
+              style: AppTextStyles.heading2,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppDimensions.spacingXs),
-            const Text('Please try again.', style: AppTextStyles.bodySecondary),
+            const Text(
+              'Something went wrong while loading your sales.',
+              style: AppTextStyles.bodySecondary,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.spacingLg),
+            FilledButton.icon(
+              onPressed: () {
+                setState(() {});
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
+            ),
           ],
         ),
       ),
@@ -452,6 +478,32 @@ class _SaleCard extends StatelessWidget {
     }
   }
 
+  String _formatStatus(String status) {
+    switch (status.toUpperCase()) {
+      case 'CANCELLED':
+        return 'Cancelled';
+      case 'REFUNDED':
+        return 'Refunded';
+      case 'COMPLETED':
+      default:
+        return 'Completed';
+    }
+  }
+
+  Color _getStatusColor(BuildContext context, String status) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    switch (status.toUpperCase()) {
+      case 'CANCELLED':
+        return colorScheme.error;
+      case 'REFUNDED':
+        return colorScheme.tertiary;
+      case 'COMPLETED':
+      default:
+        return colorScheme.primary;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final customerName = customer == null ? 'Walk-in Customer' : customer!.name;
@@ -485,11 +537,41 @@ class _SaleCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      SaleReference.format(sale),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            SaleReference.format(sale),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getStatusColor(
+                              context,
+                              sale.status,
+                            ).withValues(alpha: 0.10),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            _formatStatus(sale.status),
+                            style: TextStyle(
+                              color: _getStatusColor(context, sale.status),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: AppDimensions.spacingXs),
                     Row(

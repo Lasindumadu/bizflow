@@ -38,6 +38,11 @@ class _CustomersScreenState extends State<CustomersScreen> {
     _loadBusinessSettings();
   }
 
+  void _openAddCustomer() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const AddCustomerScreen()));
+  }
+
   Future<void> _loadBusinessSettings() async {
     final settings = await _businessSettingsRepository.getSettings();
 
@@ -195,19 +200,26 @@ class _CustomersScreenState extends State<CustomersScreen> {
                   return _buildErrorState(snapshot.error.toString());
                 }
 
+                // final query = _searchController.text.trim().toLowerCase();
+
                 final customers = snapshot.data ?? [];
 
-                final query = _searchController.text.trim().toLowerCase();
+                final filteredCustomers =
+                    customers.where((customer) {
+                      final query = _searchController.text.trim().toLowerCase();
 
-                final filteredCustomers = customers.where((customer) {
-                  if (query.isEmpty) {
-                    return true;
-                  }
+                      if (query.isEmpty) {
+                        return true;
+                      }
 
-                  return customer.name.toLowerCase().contains(query) ||
-                      customer.phone.toLowerCase().contains(query) ||
-                      customer.email.toLowerCase().contains(query);
-                }).toList();
+                      return customer.name.toLowerCase().contains(query) ||
+                          customer.phone.toLowerCase().contains(query) ||
+                          customer.email.toLowerCase().contains(query);
+                    }).toList()..sort(
+                      (a, b) => a.name.trim().toLowerCase().compareTo(
+                        b.name.trim().toLowerCase(),
+                      ),
+                    );
 
                 return Column(
                   children: [
@@ -295,22 +307,34 @@ class _CustomersScreenState extends State<CustomersScreen> {
               height: 72,
               decoration: BoxDecoration(
                 color: Theme.of(context).colorScheme.primary
-                    .withValues(alpha: 0.1),
+                    .withValues(alpha: 0.10),
                 shape: BoxShape.circle,
               ),
               child: Icon(
-                Icons.people_outline,
+                Icons.people_outline_rounded,
                 size: 36,
                 color: Theme.of(context).colorScheme.primary,
               ),
             ),
             const SizedBox(height: AppDimensions.spacingLg),
-            const Text('No customers yet', style: AppTextStyles.heading2),
+            const Text(
+              'No customers yet',
+              style: AppTextStyles.heading2,
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: AppDimensions.spacingXs),
             const Text(
-              'Add customers to keep track of their purchases.',
+              'Add your first customer to start tracking customer details and outstanding balances.',
               style: AppTextStyles.bodySecondary,
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppDimensions.spacingLg),
+            FilledButton.icon(
+              onPressed: () {
+                _openAddCustomer();
+              },
+              icon: const Icon(Icons.person_add_alt_1_rounded),
+              label: const Text('Add Customer'),
             ),
           ],
         ),
@@ -340,33 +364,46 @@ class _CustomersScreenState extends State<CustomersScreen> {
   }
 
   Widget _buildErrorState(String error) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppDimensions.screenPadding),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Theme.of(context).colorScheme.error,
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: colorScheme.error.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 36,
+                color: colorScheme.error,
+              ),
             ),
-            const SizedBox(height: AppDimensions.spacingMd),
+            const SizedBox(height: AppDimensions.spacingLg),
             const Text(
-              'Unable to load customers.',
+              'Unable to load customers',
               style: AppTextStyles.heading2,
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: AppDimensions.spacingXs),
             const Text(
-              'Please try again.',
+              'Something went wrong while loading your customers.',
               style: AppTextStyles.bodySecondary,
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: AppDimensions.spacingMd),
-            Text(
-              error,
-              style: AppTextStyles.caption,
-              textAlign: TextAlign.center,
+            const SizedBox(height: AppDimensions.spacingLg),
+            FilledButton.icon(
+              onPressed: () {
+                setState(() {});
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try Again'),
             ),
           ],
         ),
