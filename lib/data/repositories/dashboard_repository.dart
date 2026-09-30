@@ -1,0 +1,200 @@
+import 'dart:async';
+
+import 'package:drift/drift.dart';
+
+import '../../models/sale.dart' as model;
+import '../database/app_database.dart';
+
+class DashboardStats {
+  final double todaySales;
+  final double todayProfit;
+  final int todayTransactions;
+  final int totalProducts;
+  final int lowStockProducts;
+
+  const DashboardStats({
+    required this.todaySales,
+    required this.todayProfit,
+    required this.todayTransactions,
+    required this.totalProducts,
+    required this.lowStockProducts,
+  });
+}
+
+class DashboardRepository {
+  final AppDatabase database;
+
+  DashboardRepository(this.database);
+
+  Stream<DashboardStats> watchStats() {
+    late StreamController<DashboardStats> controller;
+
+    StreamSubscription<List<Sale>>? salesSubscription;
+    StreamSubscription<List<ProductRow>>? productsSubscription;
+
+    Future<void> refresh() async {
+      try {
+        final stats = await _loadStats();
+
+        if (!controller.isClosed) {
+          controller.add(stats);
+        }
+      } catch (error, stackTrace) {
+        if (!controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      }
+    }
+
+    controller = StreamController<DashboardStats>(
+      onListen: () {
+        salesSubscription = database.select(database.sales).watch().listen((_) {
+          refresh();
+        });
+
+        productsSubscription = database
+            .select(database.products)
+            .watch()
+            .listen((_) {
+              refresh();
+            });
+
+        refresh();
+      },
+      onCancel: () async {
+        await salesSubscription?.cancel();
+        await productsSubscription?.cancel();
+      },
+    );
+
+    return controller.stream;
+  }
+
+  Stream<List<model.Sale>> watchRecentSales({int limit = 5}) {
+    final query = database.select(database.sales)
+      ..where((table) => table.status.equals('completed'))
+      ..orderBy([(table) => OrderingTerm.desc(table.createdAt)])
+      ..limit(limit);
+
+    return query.watch().map((rows) => rows.map(_toSaleModel).toList());
+  }
+
+  Future<DashboardStats> getStats() {
+    return _loadStats();
+  }
+
+  Future<DashboardStats> _loadStats() async {
+    final products = await database.select(database.products).get();
+
+    final todaySales = await _getTodaySales();
+    final todayProfit = await _getTodayProfit();
+    final todayTransactions = await _getTodayTransactions();
+
+    final lowStockProducts = products.where((product) {
+      return product.stockQuantity <= product.lowStockThreshold;
+    }).length;
+
+    return DashboardStats(
+      todaySales: todaySales,
+      todayProfit: todayProfit,
+      todayTransactions: todayTransactions,
+      totalProducts: products.length,
+      lowStockProducts: lowStockProducts,
+    );
+  }
+
+  Future<double> _getTodaySales() async {
+    final now = DateTime.now();
+
+    final startOfDay = DateTime(now.year, now.month, now.day);
+
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final query = database.select(database.sales)
+      ..where(
+        (table) =>
+            table.createdAt.isBiggerOrEqualValue(startOfDay) &
+            table.createdAt.isSmallerThanValue(endOfDay) &
+            table.status.equals('completed'),
+      );
+
+    final sales = await query.get();
+
+    return sales.fold<double>(0.0, (sum, sale) => sum + sale.total);
+  }
+
+  Future<double> _getTodayProfit() async {
+    final now = DateTime.now();
+
+    final startOfDay = DateTime(now.year, now.month, now.day);
+
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final salesQuery = database.select(database.sales)
+      ..where(
+        (table) =>
+            table.createdAt.isBiggerOrEqualValue(startOfDay) &
+            table.createdAt.isSmallerThanValue(endOfDay) &
+            table.status.equals('completed'),
+      );
+
+    final sales = await salesQuery.get();
+
+    if (sales.isEmpty) {
+      return 0.0;
+    }
+
+    double totalProfit = 0.0;
+
+    for (final sale in sales) {
+      final itemsQuery = database.select(database.saleItems)
+        ..where((table) => table.saleId.equals(sale.id));
+
+      final items = await itemsQuery.get();
+
+      final saleProfit = items.fold<double>(
+        0.0,
+        (sum, item) =>
+            sum + ((item.unitPrice - item.purchasePrice) * item.quantity),
+      );
+
+      totalProfit += saleProfit - sale.discount;
+    }
+
+    return totalProfit;
+  }
+
+  Future<int> _getTodayTransactions() async {
+    final now = DateTime.now();
+
+    final startOfDay = DateTime(now.year, now.month, now.day);
+
+    final endOfDay = startOfDay.add(const Duration(days: 1));
+
+    final query = database.select(database.sales)
+      ..where(
+        (table) =>
+            table.createdAt.isBiggerOrEqualValue(startOfDay) &
+            table.createdAt.isSmallerThanValue(endOfDay) &
+            table.status.equals('completed'),
+      );
+
+    final sales = await query.get();
+
+    return sales.length;
+  }
+
+  model.Sale _toSaleModel(Sale row) {
+    return model.Sale(
+      id: row.id,
+      customerId: row.customerId,
+      subtotal: row.subtotal,
+      discount: row.discount,
+      total: row.total,
+      paidAmount: row.paidAmount,
+      paymentMethod: row.paymentMethod,
+      status: row.status,
+      createdAt: row.createdAt,
+    );
+  }
+}

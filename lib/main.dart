@@ -1,0 +1,30 @@
+import 'package:flutter/material.dart';
+
+import 'core/theme/app_theme.dart';
+import 'core/theme/theme_controller.dart';
+import 'core/widgets/app_shell.dart';
+
+void main() {
+  runApp(const BizFlowApp());
+}
+
+class BizFlowApp extends StatelessWidget {
+  const BizFlowApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: themeController,
+      builder: (context, child) {
+        return MaterialApp(
+          title: 'BizFlow',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: themeController.themeMode,
+          home: const AppShell(),
+        );
+      },
+    );
+  }
+}
