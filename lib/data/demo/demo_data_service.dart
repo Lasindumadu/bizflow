@@ -24,9 +24,7 @@ class DemoDataService {
   }
 
   Future<void> clearDemoData() async {
-    await _database.transaction(() async {
-      await _clearDemoData();
-    });
+    await _clearDemoData();
   }
 
   Future<void> _clearDemoData() async {

@@ -36,6 +36,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoadingSettings = true;
   bool _isSavingSettings = false;
   bool _isLoadingDemoData = false;
+  bool _isClearingDemoData = false;
 
   String _currency = 'USD';
 
@@ -83,6 +84,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load business settings: $error')),
       );
+    }
+  }
+
+  Future<void> _clearDemoData() async {
+    if (_isClearingDemoData ||
+        _isLoadingDemoData ||
+        _isBackingUp ||
+        _isRestoring ||
+        _isExporting ||
+        _isSavingSettings) {
+      return;
+    }
+
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Clear Demo Data?'),
+          content: const Text(
+            'This will remove all BizFlow demo products, sales, customers, '
+            'categories, expenses, and stock movements.\n\n'
+            'Your real business data will not be removed.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Clear Demo Data'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldClear != true) {
+      return;
+    }
+
+    setState(() {
+      _isClearingDemoData = true;
+    });
+
+    try {
+      await _demoDataService.clearDemoData();
+
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Demo data cleared successfully.')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to clear demo data: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isClearingDemoData = false;
+        });
+      }
     }
   }
 
@@ -983,6 +1057,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _isSavingSettings
                 ? null
                 : _loadDemoData,
+          ),
+
+          const SizedBox(height: AppDimensions.spacingMd),
+
+          _buildActionCard(
+            context: context,
+            icon: Icons.delete_sweep_outlined,
+            title: 'Clear Demo Data',
+            subtitle: 'Remove sample data without removing your real data',
+            isLoading: _isClearingDemoData,
+            onTap:
+                _isClearingDemoData ||
+                    _isLoadingDemoData ||
+                    _isBackingUp ||
+                    _isRestoring ||
+                    _isExporting ||
+                    _isSavingSettings
+                ? null
+                : _clearDemoData,
           ),
         ],
       ),

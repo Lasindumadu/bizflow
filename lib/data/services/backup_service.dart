@@ -208,179 +208,177 @@ class BackupService {
     final stockMovements = data['stockMovements'] as List;
     final businessSettings = data['businessSettings'] as List;
 
-    await _database.transaction(() async {
-      await _database.delete(_database.saleItems).go();
-      await _database.delete(_database.sales).go();
-      await _database.delete(_database.stockMovements).go();
-      await _database.delete(_database.expenses).go();
-      await _database.delete(_database.customers).go();
-      await _database.delete(_database.products).go();
-      await _database.delete(_database.categories).go();
-      await _database.delete(_database.businessSettings).go();
+    await _database.delete(_database.saleItems).go();
+    await _database.delete(_database.sales).go();
+    await _database.delete(_database.stockMovements).go();
+    await _database.delete(_database.expenses).go();
+    await _database.delete(_database.customers).go();
+    await _database.delete(_database.products).go();
+    await _database.delete(_database.categories).go();
+    await _database.delete(_database.businessSettings).go();
 
-      // Restore categories.
-      await _database.batch((batch) {
-        batch.insertAll(
-          _database.categories,
-          categories.map((category) {
-            final item = Map<String, dynamic>.from(category as Map);
+    // Restore categories.
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.categories,
+        categories.map((category) {
+          final item = Map<String, dynamic>.from(category as Map);
 
-            return CategoriesCompanion.insert(
-              id: item['id'] as String,
-              name: item['name'] as String,
-            );
-          }).toList(),
-        );
-      });
+          return CategoriesCompanion.insert(
+            id: item['id'] as String,
+            name: item['name'] as String,
+          );
+        }).toList(),
+      );
+    });
 
-      // Restore products.
-      await _database.batch((batch) {
-        batch.insertAll(
-          _database.products,
-          products.map((product) {
-            final item = Map<String, dynamic>.from(product as Map);
+    // Restore products.
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.products,
+        products.map((product) {
+          final item = Map<String, dynamic>.from(product as Map);
 
-            return ProductsCompanion.insert(
-              id: item['id'] as String,
-              name: item['name'] as String,
-              sku: item['sku'] as String,
-              category: item['category'] as String,
-              purchasePrice: (item['purchasePrice'] as num).toDouble(),
-              sellingPrice: (item['sellingPrice'] as num).toDouble(),
-              stockQuantity: item['stockQuantity'] as int,
-              lowStockThreshold: item['lowStockThreshold'] as int,
-              barcode: Value(item['barcode'] as String),
-            );
-          }).toList(),
-        );
-      });
+          return ProductsCompanion.insert(
+            id: item['id'] as String,
+            name: item['name'] as String,
+            sku: item['sku'] as String,
+            category: item['category'] as String,
+            purchasePrice: (item['purchasePrice'] as num).toDouble(),
+            sellingPrice: (item['sellingPrice'] as num).toDouble(),
+            stockQuantity: item['stockQuantity'] as int,
+            lowStockThreshold: item['lowStockThreshold'] as int,
+            barcode: Value(item['barcode'] as String),
+          );
+        }).toList(),
+      );
+    });
 
-      // Restore customers.
-      await _database.batch((batch) {
-        batch.insertAll(
-          _database.customers,
-          customers.map((customer) {
-            final item = Map<String, dynamic>.from(customer as Map);
+    // Restore customers.
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.customers,
+        customers.map((customer) {
+          final item = Map<String, dynamic>.from(customer as Map);
 
-            return CustomersCompanion.insert(
-              id: item['id'] as String,
-              name: item['name'] as String,
-              phone: Value(item['phone'] as String),
-              email: Value(item['email'] as String),
-              address: Value(item['address'] as String),
-              outstandingBalance: Value(
-                (item['outstandingBalance'] as num).toDouble(),
-              ),
-            );
-          }).toList(),
-        );
-      });
+          return CustomersCompanion.insert(
+            id: item['id'] as String,
+            name: item['name'] as String,
+            phone: Value(item['phone'] as String),
+            email: Value(item['email'] as String),
+            address: Value(item['address'] as String),
+            outstandingBalance: Value(
+              (item['outstandingBalance'] as num).toDouble(),
+            ),
+          );
+        }).toList(),
+      );
+    });
 
-      // Restore sales.
-      await _database.batch((batch) {
-        batch.insertAll(
-          _database.sales,
-          sales.map((sale) {
-            final item = Map<String, dynamic>.from(sale as Map);
+    // Restore sales.
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.sales,
+        sales.map((sale) {
+          final item = Map<String, dynamic>.from(sale as Map);
 
-            final customerId = item['customerId'];
+          final customerId = item['customerId'];
 
-            return SalesCompanion.insert(
-              id: item['id'] as String,
-              customerId: customerId == null
-                  ? const Value.absent()
-                  : Value(customerId as String),
-              subtotal: (item['subtotal'] as num).toDouble(),
-              discount: Value((item['discount'] as num).toDouble()),
-              total: (item['total'] as num).toDouble(),
-              paidAmount: (item['paidAmount'] as num).toDouble(),
-              paymentMethod: Value(item['paymentMethod'] as String),
-              status: Value(item['status'] as String),
-              createdAt: DateTime.parse(item['createdAt'] as String),
-            );
-          }).toList(),
-        );
-      });
+          return SalesCompanion.insert(
+            id: item['id'] as String,
+            customerId: customerId == null
+                ? const Value.absent()
+                : Value(customerId as String),
+            subtotal: (item['subtotal'] as num).toDouble(),
+            discount: Value((item['discount'] as num).toDouble()),
+            total: (item['total'] as num).toDouble(),
+            paidAmount: (item['paidAmount'] as num).toDouble(),
+            paymentMethod: Value(item['paymentMethod'] as String),
+            status: Value(item['status'] as String),
+            createdAt: DateTime.parse(item['createdAt'] as String),
+          );
+        }).toList(),
+      );
+    });
 
-      // Restore sale items.
-      await _database.batch((batch) {
-        batch.insertAll(
-          _database.saleItems,
-          saleItems.map((saleItem) {
-            final item = Map<String, dynamic>.from(saleItem as Map);
+    // Restore sale items.
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.saleItems,
+        saleItems.map((saleItem) {
+          final item = Map<String, dynamic>.from(saleItem as Map);
 
-            return SaleItemsCompanion.insert(
-              id: item['id'] as String,
-              saleId: item['saleId'] as String,
-              productId: item['productId'] as String,
-              productName: item['productName'] as String,
-              quantity: item['quantity'] as int,
-              unitPrice: (item['unitPrice'] as num).toDouble(),
-              purchasePrice: (item['purchasePrice'] as num).toDouble(),
-              total: (item['total'] as num).toDouble(),
-            );
-          }).toList(),
-        );
-      });
+          return SaleItemsCompanion.insert(
+            id: item['id'] as String,
+            saleId: item['saleId'] as String,
+            productId: item['productId'] as String,
+            productName: item['productName'] as String,
+            quantity: item['quantity'] as int,
+            unitPrice: (item['unitPrice'] as num).toDouble(),
+            purchasePrice: (item['purchasePrice'] as num).toDouble(),
+            total: (item['total'] as num).toDouble(),
+          );
+        }).toList(),
+      );
+    });
 
-      // Restore expenses.
-      await _database.batch((batch) {
-        batch.insertAll(
-          _database.expenses,
-          expenses.map((expense) {
-            final item = Map<String, dynamic>.from(expense as Map);
+    // Restore expenses.
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.expenses,
+        expenses.map((expense) {
+          final item = Map<String, dynamic>.from(expense as Map);
 
-            return ExpensesCompanion.insert(
-              id: item['id'] as String,
-              title: item['title'] as String,
-              category: item['category'] as String,
-              amount: (item['amount'] as num).toDouble(),
-              date: DateTime.parse(item['date'] as String),
-              note: Value(item['note'] as String),
-            );
-          }).toList(),
-        );
-      });
+          return ExpensesCompanion.insert(
+            id: item['id'] as String,
+            title: item['title'] as String,
+            category: item['category'] as String,
+            amount: (item['amount'] as num).toDouble(),
+            date: DateTime.parse(item['date'] as String),
+            note: Value(item['note'] as String),
+          );
+        }).toList(),
+      );
+    });
 
-      // Restore stock movements.
-      await _database.batch((batch) {
-        batch.insertAll(
-          _database.stockMovements,
-          stockMovements.map((movement) {
-            final item = Map<String, dynamic>.from(movement as Map);
+    // Restore stock movements.
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.stockMovements,
+        stockMovements.map((movement) {
+          final item = Map<String, dynamic>.from(movement as Map);
 
-            return StockMovementsCompanion.insert(
-              id: item['id'] as String,
-              productId: item['productId'] as String,
-              type: item['type'] as String,
-              quantity: item['quantity'] as int,
-              previousStock: item['previousStock'] as int,
-              newStock: item['newStock'] as int,
-              note: Value(item['note'] as String),
-              createdAt: DateTime.parse(item['createdAt'] as String),
-            );
-          }).toList(),
-        );
-      });
+          return StockMovementsCompanion.insert(
+            id: item['id'] as String,
+            productId: item['productId'] as String,
+            type: item['type'] as String,
+            quantity: item['quantity'] as int,
+            previousStock: item['previousStock'] as int,
+            newStock: item['newStock'] as int,
+            note: Value(item['note'] as String),
+            createdAt: DateTime.parse(item['createdAt'] as String),
+          );
+        }).toList(),
+      );
+    });
 
-      // Restore business settings.
-      await _database.batch((batch) {
-        batch.insertAll(
-          _database.businessSettings,
-          businessSettings.map((settings) {
-            final item = Map<String, dynamic>.from(settings as Map);
+    // Restore business settings.
+    await _database.batch((batch) {
+      batch.insertAll(
+        _database.businessSettings,
+        businessSettings.map((settings) {
+          final item = Map<String, dynamic>.from(settings as Map);
 
-            return BusinessSettingsCompanion.insert(
-              id: item['id'] as String,
-              businessName: Value(item['businessName'] as String),
-              address: Value(item['address'] as String),
-              phone: Value(item['phone'] as String),
-              email: Value(item['email'] as String),
-              currency: Value(item['currency'] as String),
-            );
-          }).toList(),
-        );
-      });
+          return BusinessSettingsCompanion.insert(
+            id: item['id'] as String,
+            businessName: Value(item['businessName'] as String),
+            address: Value(item['address'] as String),
+            phone: Value(item['phone'] as String),
+            email: Value(item['email'] as String),
+            currency: Value(item['currency'] as String),
+          );
+        }).toList(),
+      );
     });
   }
 
