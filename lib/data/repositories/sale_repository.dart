@@ -241,7 +241,11 @@ class SaleRepository {
         productQuantities[item.productId] = currentQuantity + item.quantity;
       }
 
-      // Restore stock for every product.
+      // Restore stock for products that still exist.
+      //
+      // A product may have been deleted after the sale was created.
+      // In that case, the historical sale item is retained, but there
+      // is no product record available to restore stock to.
       for (final entry in productQuantities.entries) {
         final productQuery = database.select(database.products)
           ..where((table) => table.id.equals(entry.key));
@@ -249,7 +253,7 @@ class SaleRepository {
         final product = await productQuery.getSingleOrNull();
 
         if (product == null) {
-          throw StateError('Product not found: ${entry.key}.');
+          continue;
         }
 
         final previousStock = product.stockQuantity;

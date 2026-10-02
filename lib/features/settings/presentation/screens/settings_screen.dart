@@ -37,6 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isSavingSettings = false;
   bool _isLoadingDemoData = false;
   bool _isClearingDemoData = false;
+  bool _isResettingData = false;
 
   String _currency = 'USD';
 
@@ -659,6 +660,96 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _resetAllData() async {
+    if (_isResettingData ||
+        _isLoadingDemoData ||
+        _isClearingDemoData ||
+        _isBackingUp ||
+        _isRestoring ||
+        _isExporting ||
+        _isSavingSettings) {
+      return;
+    }
+
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Reset All Data?'),
+          content: const Text(
+            'This will permanently delete all BizFlow data from this device.\n\n'
+            'This includes products, categories, sales, customers, expenses, '
+            'stock movements, and business settings.\n\n'
+            'This action cannot be undone. Create a backup before continuing.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false);
+              },
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              onPressed: () {
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Reset All Data'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldReset != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isResettingData = true;
+    });
+
+    try {
+      await _backupService.resetAllData();
+
+      _businessNameController.clear();
+      _addressController.clear();
+      _phoneController.clear();
+      _emailController.clear();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currency = 'USD';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('All BizFlow data has been reset successfully.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to reset data: $error')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResettingData = false;
+        });
+      }
+    }
+  }
+
   Widget _buildThemeSection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -1076,6 +1167,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _isSavingSettings
                 ? null
                 : _clearDemoData,
+          ),
+
+          const SizedBox(height: AppDimensions.spacingMd),
+
+          _buildActionCard(
+            context: context,
+            icon: Icons.warning_amber_outlined,
+            title: 'Reset All Data',
+            subtitle: 'Permanently delete all data and start fresh',
+            isLoading: _isResettingData,
+            onTap:
+                _isResettingData ||
+                    _isLoadingDemoData ||
+                    _isClearingDemoData ||
+                    _isBackingUp ||
+                    _isRestoring ||
+                    _isExporting ||
+                    _isSavingSettings
+                ? null
+                : _resetAllData,
           ),
         ],
       ),

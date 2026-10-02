@@ -238,9 +238,12 @@ class ProductsScreenState extends State<ProductsScreen>
         return;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to delete product: $error')),
-      );
+      final message = error is StateError
+          ? error.message
+          : 'Failed to delete product. Please try again.';
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     }
   }
 

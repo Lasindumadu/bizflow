@@ -195,6 +195,17 @@ class BackupService {
     return decoded;
   }
 
+  Future<void> resetAllData() async {
+    await _database.delete(_database.saleItems).go();
+    await _database.delete(_database.sales).go();
+    await _database.delete(_database.stockMovements).go();
+    await _database.delete(_database.expenses).go();
+    await _database.delete(_database.customers).go();
+    await _database.delete(_database.products).go();
+    await _database.delete(_database.categories).go();
+    await _database.delete(_database.businessSettings).go();
+  }
+
   Future<void> restoreBackup(Uint8List bytes) async {
     final backup = await validateBackupJson(bytes);
     final data = backup['data'] as Map<String, dynamic>;
