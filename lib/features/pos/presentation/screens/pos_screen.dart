@@ -2133,7 +2133,7 @@ class PosScreenState extends State<PosScreen> {
                       builder: (context, constraints) {
                         int columns = 1;
 
-                        if (constraints.maxWidth >= 1000) {
+                        if (constraints.maxWidth >= 1250) {
                           columns = 3;
                         } else if (constraints.maxWidth >= 650) {
                           columns = 2;
@@ -2142,8 +2142,8 @@ class PosScreenState extends State<PosScreen> {
                         final childAspectRatio = columns == 1
                             ? 4.2
                             : columns == 2
-                            ? 1.85
-                            : 2.0;
+                            ? 2.15
+                            : 1.95;
 
                         return GridView.builder(
                           padding: const EdgeInsets.only(

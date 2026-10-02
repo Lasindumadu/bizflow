@@ -12,17 +12,15 @@ class DemoDataService {
   static const _demoPrefix = 'demo_';
 
   Future<void> loadDemoData() async {
-    await _database.transaction(() async {
-      await _clearDemoData();
+    await _clearDemoData();
 
-      await _insertBusinessSettings();
-      await _insertCategories();
-      await _insertCustomers();
-      await _insertProducts();
-      await _insertSales();
-      await _insertExpenses();
-      await _insertStockMovements();
-    });
+    await _insertBusinessSettings();
+    await _insertCategories();
+    await _insertCustomers();
+    await _insertProducts();
+    await _insertSales();
+    await _insertExpenses();
+    await _insertStockMovements();
   }
 
   Future<void> clearDemoData() async {

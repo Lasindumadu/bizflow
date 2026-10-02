@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
@@ -33,6 +35,12 @@ class AppDatabase extends _$AppDatabase {
               web: DriftWebOptions(
                 sqlite3Wasm: Uri.parse('sqlite3.wasm'),
                 driftWorker: Uri.parse('drift_worker.js'),
+                onResult: (result) {
+                  print(
+                    'BizFlow Drift web storage: '
+                    '${result.chosenImplementation}',
+                  );
+                },
               ),
             ),
       );
