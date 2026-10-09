@@ -2,7 +2,9 @@
 
 A professional, offline-first Flutter POS and inventory management template designed for small businesses, shops, kiosks, mini supermarkets, home businesses, and small retailers.
 
-BizFlow provides the essential tools needed to manage products, inventory, sales, customers, expenses, reports, and business settings without requiring a backend server for the basic application.
+BizFlow provides the essential tools needed to manage products, inventory, sales, customers, expenses, reports, and business settings without requiring a backend server for its core functionality.
+
+The application uses a local Drift/SQLite database and includes support for Flutter Web, with additional platform builds requiring the appropriate Flutter development toolchains and testing.
 
 ---
 
@@ -48,6 +50,19 @@ BizFlow provides the essential tools needed to manage products, inventory, sales
 * Customer selection
 * Responsive POS interface
 * Stock validation before checkout
+* Barcode submission through the existing POS search field
+* Exact matching against stored product barcodes
+* Repeated barcode submissions increase cart quantity when stock allows
+* Feedback for unknown or ambiguous barcode matches
+* Barcode values stored as strings, supporting leading zeros
+
+#### Barcode Scanning Compatibility
+
+The POS barcode workflow is designed to support compatible USB and Bluetooth barcode scanners that operate as keyboard input devices and submit the scanned value with Enter.
+
+A physical scanner is not required to test the basic workflow. In Flutter Web, a barcode can be typed into the POS search field and submitted with Enter.
+
+**Testing note:** The workflow has been manually tested in Flutter Web using typed barcode values followed by Enter. Physical scanner compatibility should be verified using the actual scanner and target device before deployment.
 
 ### Sales Management
 
@@ -118,7 +133,7 @@ BizFlow provides the essential tools needed to manage products, inventory, sales
 
 ### Backup & Restore
 
-* Export complete application data to JSON
+* Export application data to JSON
 * Restore data from a BizFlow backup
 * Includes products
 * Includes categories
@@ -129,7 +144,7 @@ BizFlow provides the essential tools needed to manage products, inventory, sales
 * Includes stock movements
 * Includes business settings
 * Backup validation before restoration
-* Restore replaces the current application data with the selected backup
+* Restore replaces the current application data with the data contained in the selected backup
 
 ### Data Reset & Recovery
 
@@ -154,28 +169,51 @@ After a reset, the application can be populated again with new business data or 
 
 ### CSV Export
 
-Export business data for use in spreadsheet applications and further analysis.
+Export supported business information for use in spreadsheet applications and further analysis.
 
-### Receipt PDF
+CSV files can be opened using Microsoft Excel, LibreOffice Calc, Google Sheets, and other compatible applications.
+
+### PDF Receipts
 
 Generate PDF receipts for completed sales.
 
+Receipt information can include:
+
+* Business details
+* Sale reference
+* Date and time
+* Customer information
+* Purchased products
+* Quantities
+* Unit prices
+* Discounts
+* Total
+* Payment information
+
 ### Demo Data
 
-A complete sample business dataset is included for demonstration and testing.
+A sample business dataset is included for demonstration and testing.
 
 The demo dataset includes:
 
 * Sample business information
-* Product categories
-* Products
-* Customers
-* Sales
-* Expenses
+* 6 product categories
+* 10 products
+* 4 customers
+* 8 sales
+* Sale items
+* 8 expense records
 * Stock movements
-* Customer balances
+* Customer outstanding balances
+* Business settings
 
-Demo data can be loaded from the application's development/demo section.
+Use **Load Demo Data** in Settings when you want to populate the application with sample information.
+
+Use **Clear Demo Data** to remove sample records while preserving non-demo data, according to the application's demo-data behavior.
+
+Use **Reset All Data** when you need to completely clear the local application database.
+
+Loading the demo dataset applies the included demo business settings. Review those settings before using the application for real business operations.
 
 ### Responsive UI
 
@@ -185,27 +223,32 @@ The application is designed to adapt to:
 * Tablet
 * Mobile-sized layouts
 
-Navigation and content layouts automatically adapt to available screen space.
+Navigation and content layouts adapt to available screen space. Verify the customized application on the target screen sizes and platforms.
 
 ### Offline-First
 
 BizFlow uses a local database and does not require a server or cloud backend for its core functionality.
 
-Your application data is stored locally on the device/browser.
+Application data is stored locally on the device or browser.
+
+Cloud synchronization, authentication, and server-based features can be added by developers as future customizations.
 
 ---
 
 # Technology Stack
 
-* **Flutter**
-* **Dart**
-* **Material 3**
-* **Drift**
-* **SQLite / SQLite WASM**
-* **Local persistent storage**
-* **PDF generation**
-* **CSV export**
-* **Responsive Flutter UI**
+* **Flutter** — application framework
+* **Dart** — programming language
+* **Material 3** — user interface system
+* **Drift** — local database layer
+* **SQLite** — local database
+* **SQLite WASM** — Web database support
+* **Local persistent storage** — application data persistence
+* **PDF generation** — receipt generation
+* **CSV export** — spreadsheet-compatible data export
+* **Responsive Flutter UI** — adaptive layouts
+
+The barcode workflow uses the existing POS text-field input flow and does not require a separate scanning package for compatible keyboard-emulating scanners.
 
 ---
 
@@ -215,23 +258,37 @@ Your application data is stored locally on the device/browser.
 
 Recommended environment:
 
-* Flutter 3.47.4 or compatible Flutter version
-* Dart 3.13.3 or compatible Dart version
+* Flutter 3.47.4 stable or a compatible Flutter version
+* Dart 3.13.3 or a compatible Dart version
 * Visual Studio Code or Android Studio
-* Git
-* A supported Flutter development device/browser
+* Flutter and Dart extensions or plugins
+* Git (optional)
+* A supported Flutter development device or browser
 
-For web development:
+Use versions compatible with the project's dependency constraints.
 
-* Google Chrome
-* Microsoft Edge or another supported browser
+## Web development
 
-Android development additionally requires:
+* Google Chrome or another supported browser
+* A compatible Flutter Web development environment
 
-* Android Studio
+## Android development
+
+* Android Studio or another suitable Android development environment
 * Android SDK
 * Android SDK command-line tools
+* Compatible Java/JDK toolchain
 * Android emulator or physical Android device
+
+## iOS development
+
+* macOS
+* Xcode
+* Flutter SDK
+* CocoaPods where required
+* Apple Developer account for relevant signing and distribution workflows
+
+iOS builds and App Store distribution require macOS and Xcode.
 
 ---
 
@@ -249,15 +306,21 @@ C:\Projects\bizflow
 
 ## 2. Open the project
 
-Open the project folder using Visual Studio Code or Android Studio.
+Open the Flutter project directory in Visual Studio Code or Android Studio.
+
+The project root is the directory containing `pubspec.yaml`.
+
+If the marketplace archive includes a `source_code` directory, open that directory or the relevant nested Flutter project directory.
 
 ## 3. Install dependencies
 
-Run:
+Open a terminal in the project root and run:
 
 ```bash
 flutter pub get
 ```
+
+Wait for dependency resolution to complete successfully.
 
 ## 4. Check the Flutter environment
 
@@ -267,7 +330,7 @@ Run:
 flutter doctor
 ```
 
-Resolve any environment-specific issues reported by Flutter.
+Resolve the toolchain issues relevant to your intended platform.
 
 ## 5. Run the application
 
@@ -277,11 +340,20 @@ For Chrome:
 flutter run -d chrome
 ```
 
-For an Android device:
+For an available Android device:
 
 ```bash
+flutter devices
 flutter run
 ```
+
+To select a particular device:
+
+```bash
+flutter run -d <device-id>
+```
+
+Replace `<device-id>` with a real device ID returned by Flutter.
 
 ---
 
@@ -296,10 +368,20 @@ flutter build web --release
 The production files will be generated in:
 
 ```text
-build/web
+build/web/
 ```
 
-The generated `build/web` folder can be deployed to a compatible web server.
+The generated `build/web` directory can be deployed to a compatible Web server.
+
+Before publishing:
+
+* Update the Web title and icons if required.
+* Verify the hosting configuration.
+* Test the production build.
+* Verify that application data persists after refreshing or reopening the application.
+* Confirm that the production server provides the resources and headers required by the project's Web database configuration.
+
+A successful local build does not, by itself, verify that the deployed application will work correctly on every hosting provider.
 
 ---
 
@@ -309,61 +391,36 @@ The project follows a feature-oriented structure designed to keep the applicatio
 
 ```text
 lib/
-
 ├── core/
-
 │   ├── theme/
-
 │   ├── utils/
-
 │   └── widgets/
-
 │
-
 ├── data/
-
 │   ├── database/
-
 │   │   ├── tables/
-
 │   │   ├── app_database.dart
-
 │   │   └── database_provider.dart
-
 │   ├── demo/
-
 │   └── repositories/
-
 │
-
 ├── features/
-
 │   ├── dashboard/
-
 │   ├── products/
-
 │   ├── pos/
-
 │   ├── sales/
-
 │   ├── customers/
-
 │   ├── inventory/
-
 │   ├── expenses/
-
 │   ├── reports/
-
 │   └── settings/
-
 │
-
 ├── models/
-
 │
-
 └── main.dart
 ```
+
+This is a high-level overview. The actual source tree may contain additional files, services, repositories, subdirectories, and presentation components.
 
 ---
 
@@ -382,7 +439,9 @@ The database contains information for:
 * Stock movements
 * Business settings
 
-The database schema is versioned to support future migrations.
+The database schema is versioned to support migrations.
+
+Product barcode values are stored with product information. The barcode-scanning workflow does not require a separate barcode database table.
 
 ---
 
@@ -400,13 +459,13 @@ When such a sale is cancelled:
 * Existing products included in the sale can have their stock restored.
 * A product that has already been deleted cannot have stock restored because its product record no longer exists.
 
-This keeps historical sales data independent from the current product catalog.
+This keeps historical sales data independent of the current product catalog.
 
 ---
 
 # Customization
 
-The source code is structured so that developers can customize the application according to their own requirements.
+The source code is structured so developers can customize the application according to their requirements.
 
 Common customization areas include:
 
@@ -425,12 +484,18 @@ Common customization areas include:
 * Dashboard cards
 * Database tables
 * Business logic
+* Barcode input behavior
+* POS workflow
+
+For detailed branding and customization instructions, refer to `CUSTOMIZATION.md` or the equivalent documentation file included in the source package.
+
+Back up important data before making changes to the database schema or business logic.
 
 ---
 
 # Demo Data
 
-BizFlow includes sample data to make it easier to demonstrate the application immediately after installation.
+BizFlow includes sample data to make it easier to demonstrate the application after installation.
 
 The sample business is:
 
@@ -438,7 +503,7 @@ The sample business is:
 
 The demo dataset contains products, customers, sales, expenses, inventory movements, and other related records.
 
-Use the **Load Demo Data** option in the development/demo section of Settings when you want to populate the application with sample information.
+Use **Load Demo Data** in Settings when you want to populate the application with sample information.
 
 Use **Clear Demo Data** when you want to remove the sample records.
 
@@ -446,7 +511,7 @@ Use **Reset All Data** when you need to completely clear the local application d
 
 > Always create a backup before experimenting with important business data.
 
-> Loading the demo dataset applies the included demo business settings. Review the business settings before using the application with real business data.
+> Loading the demo dataset applies the included demo business settings. Review the settings before using the application with real business data.
 
 ---
 
@@ -465,29 +530,30 @@ A backup contains:
 * Stock movements
 * Business settings
 
-To create a backup:
+## To create a backup
 
-1. Open **Settings**.
+1. Open Settings.
 2. Open the backup section.
 3. Select the backup option.
-4. Save the generated JSON file.
+4. Save the generated JSON file in a safe location.
 
-To restore a backup:
+## To restore a backup
 
-1. Open **Settings**.
+1. Open Settings.
 2. Select the restore option.
 3. Choose a valid BizFlow backup JSON file.
 4. Confirm the restoration.
+5. Verify the restored data.
 
 Restoring a backup replaces the current application data with the data contained in the backup.
 
-For important business data, keep recent backup files in a safe location before performing destructive operations such as a full data reset.
+Keep recent backup files in a safe location before performing destructive operations such as a full data reset.
 
 ---
 
 # Reset All Data
 
-The **Reset All Data** option is available in Settings under the development/data management area.
+The **Reset All Data** option is available in Settings under the data-management area.
 
 It permanently removes all local BizFlow data, including:
 
@@ -524,7 +590,7 @@ CSV files can be opened using applications such as:
 * Microsoft Excel
 * LibreOffice Calc
 * Google Sheets
-* Other spreadsheet applications
+* Other compatible spreadsheet applications
 
 ---
 
@@ -551,7 +617,9 @@ Receipt information can include:
 
 The application supports configurable business currency settings.
 
-The selected currency is used throughout the relevant sales, inventory, expense, dashboard, and report interfaces.
+The selected currency is used in supported financial interfaces, including relevant sales, inventory, expense, dashboard, and report views.
+
+Review currency formatting and financial calculations when adapting the application for a new market.
 
 ---
 
@@ -562,13 +630,13 @@ BizFlow supports:
 * Light mode
 * Dark mode
 
-The theme can be changed from **Settings**.
+The theme can be changed from Settings.
 
 ---
 
 # Validation & Error Handling
 
-The application includes validation and user feedback for common operations such as:
+The application includes validation and user feedback for common operations, such as:
 
 * Required fields
 * Invalid numerical values
@@ -581,7 +649,9 @@ The application includes validation and user feedback for common operations such
 * Operation failures
 * Confirmation dialogs for destructive actions
 
-Destructive operations such as backup restoration and full data reset require confirmation.
+The POS barcode workflow also provides feedback for unknown or ambiguous barcode matches and respects existing stock validation.
+
+Destructive operations, including backup restoration and full data reset, require confirmation.
 
 ---
 
@@ -593,13 +663,42 @@ Before distributing a customized version, run:
 flutter analyze
 ```
 
-A release web build can be generated with:
+Run the automated test suite:
+
+```bash
+flutter test
+```
+
+A release Web build can be generated with:
 
 ```bash
 flutter build web --release
 ```
 
-The reset and recovery workflow should also be tested after making significant database or business-logic changes.
+## Recommended barcode tests
+
+* Create a product with a barcode.
+* Submit the barcode using typed input followed by Enter.
+* Confirm the correct product is added to the cart.
+* Submit an unknown barcode.
+* Test repeated submissions of the same barcode.
+* Verify stock validation.
+* Verify barcode values with leading zeros.
+* Test a compatible physical scanner on the intended device, if required.
+
+The basic workflow has been tested in Flutter Web using typed input and Enter. Physical scanner testing remains necessary when a real scanner is part of the intended deployment.
+
+## Recommended data tests
+
+* Test product creation, editing, and deletion.
+* Verify historical sales remain after product deletion.
+* Test sale cancellation with existing and deleted products.
+* Test backup and restore.
+* Test Reset All Data.
+* Verify persistence after restarting or refreshing the application.
+* Test loading demo data after a reset.
+
+Repeat the relevant tests after significant database or business-logic changes.
 
 ---
 
@@ -618,6 +717,8 @@ Additional cloud functionality can be added by developers if required for a part
 
 Application data is stored locally, so regular backups are recommended for important business data.
 
+The barcode workflow targets compatible keyboard-emulating scanners. It does not automatically imply support for every camera-based scanner, scanner SDK, mobile device, or hardware configuration.
+
 ---
 
 # Recommended Customization Workflow
@@ -630,13 +731,16 @@ After purchasing the source code:
 4. Create a backup before making major changes.
 5. Customize branding and theme.
 6. Customize business requirements.
-7. Test database operations.
-8. Test product deletion and historical sales behavior.
-9. Test backup and restore.
-10. Test the Reset All Data workflow.
-11. Run `flutter analyze`.
-12. Create a release build.
-13. Test the customized application on the target platform.
+7. Configure product barcodes if barcode scanning is required.
+8. Test database operations.
+9. Test product deletion and historical sales behavior.
+10. Test barcode input and stock validation.
+11. Test backup and restore.
+12. Test the Reset All Data workflow.
+13. Run `flutter analyze`.
+14. Run `flutter test`.
+15. Create a release build.
+16. Test the customized application on the target platform.
 
 ---
 

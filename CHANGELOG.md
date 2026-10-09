@@ -245,3 +245,64 @@ The application supports product deletion while retaining historical sales recor
 A **Reset All Data** function is included for situations where the local application needs to be returned to a clean state. Users should create a backup before performing destructive data operations when the existing data may be needed later.
 
 Future versions may introduce additional features, improvements, platform-specific enhancements, and bug fixes.
+
+
+# BizFlow — Changelog
+
+All notable changes to the BizFlow source-code template are documented in this file.
+
+---
+
+## [Unreleased]
+
+### Added
+
+#### Point of Sale — Barcode Scanning
+
+* Barcode submission through the existing POS search field.
+* Support for USB and Bluetooth barcode scanners that operate as keyboard input devices.
+* Exact barcode matching against stored product barcodes.
+* Automatic addition of the matching product to the shopping cart when a barcode is submitted.
+* Automatic quantity increment when the same product is scanned repeatedly.
+* Integration with existing stock validation to prevent adding unavailable quantities.
+* Feedback when a submitted barcode does not match any product.
+* Feedback when multiple products share the same barcode.
+* Automatic clearing of the search field after a successful barcode addition.
+* Support for numeric and alphanumeric barcode values, including leading zeros.
+
+#### Testing
+
+* Added automated product repository tests for barcode persistence.
+* Added a test verifying that barcode values retain leading zeros.
+* Added a test verifying that product barcode updates are persisted.
+* Verified barcode submission behavior manually in the Flutter web application.
+
+### Validation
+
+* `flutter analyze` completed with no issues.
+* All 11 automated tests passed.
+* `git diff --check` completed without errors.
+* Barcode implementation and tests committed as `30cf974`.
+* Barcode feature commit pushed to `feature/bizflow-1.1.0-foundation`.
+
+---
+
+## [1.0.0] — Initial Release
+
+### Release Information
+
+* **Version:** 1.0.0
+* **Build:** 1
+* **Status:** Initial commercial release
+* **Technology:** Flutter / Dart
+* **Database:** Drift / SQLite
+
+The 1.0.0 release includes the core POS, inventory, customer, expense, reporting, backup, export, demo-data, and local data management workflows described below.
+
+### Notes
+
+The application supports product deletion while retaining historical sales records. Sale cancellation handles cases where a product associated with a historical sale has subsequently been deleted.
+
+A **Reset All Data** function is included for situations where the local application needs to be returned to a clean state. Users should create a backup before performing destructive data operations when the existing data may be needed later.
+
+Future versions may introduce additional features, improvements, platform-specific enhancements, and bug fixes.

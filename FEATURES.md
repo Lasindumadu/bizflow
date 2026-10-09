@@ -4,7 +4,9 @@
 
 **BizFlow** is an offline-first Flutter POS and inventory management application designed for small businesses.
 
-It provides a complete local workflow for managing products, inventory, point-of-sale transactions, customers, expenses, reports, business settings, backups, receipts, and local data recovery/reset operations.
+It provides a local workflow for managing products, inventory, point-of-sale transactions, customers, expenses, reports, business settings, backups, receipts, and local data recovery and reset operations.
+
+The POS supports barcode entry through compatible keyboard-emulating barcode scanners, alongside manual product search.
 
 ---
 
@@ -55,6 +57,8 @@ Products can be managed directly from the application.
 
 Deleting a product does not delete historical sales or sale-item records associated with that product.
 
+Product barcodes are stored as strings, allowing numeric or alphanumeric barcode values and preservation of leading zeros.
+
 ---
 
 # 3. Category Management
@@ -79,6 +83,11 @@ The POS module provides the main sales workflow.
 
 * Product search
 * Product selection
+* Barcode entry and scanning workflow
+* Exact barcode matching against stored product barcodes
+* Automatic addition of a matching product to the cart
+* Repeated scans to increase cart quantity, subject to stock availability
+* Feedback for unknown or ambiguous barcode matches
 * Cart management
 * Quantity adjustment
 * Remove cart items
@@ -91,6 +100,24 @@ The POS module provides the main sales workflow.
 * Stock availability validation
 * Sale completion
 * Sale reference generation
+
+### Barcode Scanning
+
+The POS search field supports barcode submission. A compatible USB or Bluetooth barcode scanner that operates as a keyboard and submits the scanned value with Enter can be used.
+
+The workflow is designed to:
+
+* Match the submitted barcode against product barcode values.
+* Add the matching product to the cart.
+* Increase the quantity when the same product is scanned repeatedly, provided sufficient stock is available.
+* Display feedback when no matching product is found.
+* Handle ambiguous matches with feedback rather than silently choosing a product.
+* Preserve existing cart and stock-validation behavior.
+* Clear the search field after a successful barcode addition.
+
+Barcode matching uses the stored barcode value. Numeric barcode values should be entered and stored as strings to preserve leading zeros.
+
+**Testing note:** The workflow has been manually tested in Flutter Web using typed barcode values followed by Enter. Compatibility with a physical barcode scanner should be verified using the intended hardware before deployment.
 
 ### Responsive POS
 
@@ -285,6 +312,8 @@ Backup validation checks:
 * Database schema version
 * Required data sections
 
+Create a backup before restoring another dataset or performing a destructive data operation.
+
 ---
 
 # 14. CSV Export
@@ -322,7 +351,7 @@ Receipt information can include:
 
 # 16. Demo Data
 
-The project includes a complete demonstration dataset.
+The project includes a demonstration dataset.
 
 ### Demo Business
 
@@ -340,7 +369,7 @@ The project includes a complete demonstration dataset.
 * Customer outstanding balances
 * Business settings
 
-The demo data is designed to populate the application with realistic information for demonstrations and screenshots.
+The demo data is designed to populate the application with sample information for demonstrations and screenshots.
 
 ### Demo Data Controls
 
@@ -386,6 +415,8 @@ The interface provides feedback for important operations.
 
 Destructive operations such as restoring a backup and resetting all data require confirmation.
 
+The POS barcode workflow also provides feedback for unknown or ambiguous barcode matches and respects existing stock validation.
+
 ---
 
 # 19. Responsive Design
@@ -399,6 +430,8 @@ BizFlow supports multiple screen sizes.
 * Mobile
 
 The navigation system adapts according to the available screen size.
+
+The customized application should be tested on the actual screen sizes and platforms targeted for release.
 
 ---
 
@@ -419,6 +452,8 @@ The application uses **Drift** for local database management.
 
 The database uses schema versioning and migration support.
 
+Product barcode values are stored with product information. The barcode-scanning workflow does not require a separate barcode database table.
+
 ---
 
 # 21. Offline-First Architecture
@@ -427,8 +462,8 @@ The core application is designed around local data storage.
 
 ### Core Characteristics
 
-* No custom backend required
-* No cloud database required
+* No custom backend required for core functionality
+* No cloud database required for core functionality
 * Local database
 * Local business data
 * Local backup and restore
@@ -452,6 +487,8 @@ Cloud synchronization or authentication can be added by developers as a future c
 | PDF generation | Receipt generation    |
 | CSV            | Data export           |
 
+Barcode input uses the existing POS text-field workflow and does not require a separate barcode-scanning package for compatible keyboard-emulating scanners.
+
 ---
 
 # 23. Architecture
@@ -460,53 +497,32 @@ The application uses a feature-oriented structure separating major responsibilit
 
 ```text
 lib/
-
 ├── core/
-
 │   ├── theme/
-
 │   ├── utils/
-
 │   └── widgets/
-
 │
-
 ├── data/
-
 │   ├── database/
-
 │   ├── demo/
-
 │   └── repositories/
-
 │
-
 ├── features/
-
 │   ├── dashboard/
-
 │   ├── products/
-
 │   ├── pos/
-
 │   ├── sales/
-
 │   ├── customers/
-
 │   ├── inventory/
-
 │   ├── expenses/
-
 │   ├── reports/
-
 │   └── settings/
-
 │
-
 ├── models/
-
 └── main.dart
 ```
+
+This is a high-level overview of the project structure. The actual source tree may contain additional files, subdirectories, repositories, services, and presentation components.
 
 This structure makes individual features easier to locate and customize.
 
@@ -531,16 +547,23 @@ Developers can customize:
 * Navigation
 * Database structure
 * Business rules
+* Barcode input behavior
+* Product barcode validation
+* POS workflow
+
+Changes to database fields or business rules should be accompanied by appropriate migration and regression testing where necessary.
 
 ---
 
 # 25. Platform
 
-The current project includes Flutter web support.
+The current project includes Flutter Web support.
 
 The same Flutter source architecture can be extended to supported Flutter platforms.
 
 Before deployment to a specific platform, developers should test the customized application on that target platform.
+
+Hardware compatibility, including physical barcode scanners, should be verified on the target device.
 
 ---
 
@@ -583,45 +606,25 @@ The exact contents of a marketplace package should be checked against the final 
 
 ```text
 Install Flutter
-
       ↓
-
 Open BizFlow
-
       ↓
-
 flutter pub get
-
       ↓
-
 Run application
-
       ↓
-
 Load demo data
-
       ↓
-
 Explore features
-
       ↓
-
 Customize branding
-
       ↓
-
 Customize business requirements
-
       ↓
-
 Test
-
       ↓
-
 Build release
-
       ↓
-
 Deploy
 ```
 
@@ -639,6 +642,8 @@ Start Fresh
 Load Demo Data if required
 ```
 
+For barcode scanning, configure products with barcode values and test the workflow using typed values before connecting a compatible physical scanner.
+
 ---
 
 # 30. Quality Checklist
@@ -654,6 +659,14 @@ Before releasing a customized version:
 * [ ] Test sale cancellation after deleting a related product
 * [ ] Test categories
 * [ ] Test POS
+* [ ] Test barcode entry using a typed value followed by Enter
+* [ ] Test a known barcode
+* [ ] Test an unknown barcode
+* [ ] Test ambiguous barcode matches where applicable
+* [ ] Test repeated scans and cart quantity increments
+* [ ] Verify stock validation when scanning products
+* [ ] Verify barcodes with leading zeros
+* [ ] Test a physical barcode scanner on the target hardware, if required
 * [ ] Test checkout
 * [ ] Test sales
 * [ ] Test customers
@@ -666,12 +679,13 @@ Before releasing a customized version:
 * [ ] Test CSV export
 * [ ] Test PDF receipt
 * [ ] Test Reset All Data
-* [ ] Verify data remains reset after restarting/refreshing the application
+* [ ] Verify data remains reset after restarting or refreshing the application
 * [ ] Test loading demo data after a reset
 * [ ] Test light mode
 * [ ] Test dark mode
 * [ ] Test responsive layouts
 * [ ] Test demo data
+* [ ] Run `flutter test`
 * [ ] Test the target platform
 * [ ] Create a release build
 

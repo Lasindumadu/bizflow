@@ -1,1098 +1,954 @@
-# BizFlow — Customization Guide
+# BizFlow — Customization & Reskin Guide
 
 ## 1. Overview
 
-BizFlow is provided as a Flutter source-code template so developers can adapt the application to their own business requirements.
+BizFlow is a Flutter POS and inventory management template designed to be customized and rebranded for your own business or application.
 
-This guide identifies the main areas that can be customized.
+This guide explains the main customization points, including:
 
-Before making major changes, create a backup of the original project.
-
----
-
-# 2. Project Structure
-
-The main source code is located under:
-
-```text
-lib/
-```
-
-The project is organized into several areas:
-
-```text
-lib/
-
-├── core/
-
-├── data/
-
-├── features/
-
-├── models/
-
-└── main.dart
-```
-
-### `core/`
-
-Contains reusable application-level functionality such as:
-
-* Theme
-* Utility functions
-* Shared widgets
-* Responsive UI helpers
-
-### `data/`
-
-Contains:
-
-* Database definitions
-* Database tables
-* Database provider
-* Repositories
+* Application name
+* Android application ID
+* iOS bundle identifier
+* Application icons
+* Splash screen
+* Application colors and theme
+* Business information
+* Currency
 * Demo data
-* Data services
+* Barcode scanning
+* Application text and labels
+* Android release preparation
+* iOS release preparation
 
-### `features/`
+> **Important:** Replace the BizFlow branding and identifiers with values belonging to your own application before distributing a customized production build.
 
-Contains the main application modules:
+The original application identifiers are:
 
-* Dashboard
-* Products
-* POS
-* Sales
-* Customers
-* Inventory
-* Expenses
-* Reports
-* Settings
+```text
+Android namespace:
+com.bizflow.app
 
-### `models/`
+Android application ID:
+com.bizflow.app
 
-Contains application data models where applicable.
+iOS Runner bundle identifier:
+com.bizflow.app
+```
 
-### `main.dart`
-
-Contains the application entry point and top-level application configuration.
+Do not publish an application using these identifiers if you are creating your own branded application.
 
 ---
 
-# 3. Application Branding
+## 2. Recommended Customization Order
 
-The application's visual identity can be customized through the theme configuration.
+For a new branded application, use this order:
 
-The main theme files are located under:
+1. Back up the original project.
+2. Change the application name.
+3. Change the Android application ID.
+4. Change the iOS bundle identifier.
+5. Replace the application icon.
+6. Replace the splash screen/launch assets.
+7. Update colors and theme.
+8. Update business information and currency.
+9. Review application text.
+10. Configure and test barcode scanning if required.
+11. Run the application and test the customized branding.
+12. Configure buyer-owned release signing.
+13. Create the release build.
+14. Test the release build before publishing.
 
-```text
-lib/core/theme/
-```
-
-The theme contains definitions for:
-
-* Primary colors
-* Background colors
-* Surface colors
-* Text colors
-* Borders
-* Dividers
-* Success states
-* Warning states
-* Error states
-* Information states
-* Typography
-* Dimensions
-* Light theme
-* Dark theme
+Keep the original source unchanged until the customized version has been verified.
 
 ---
 
-# 4. Changing the Primary Color
+## 3. Change the Application Name
 
-The application's primary color is defined in the theme configuration.
+The application display name is the name shown to users.
 
-Locate the `AppColors` definitions under:
+### Android
+
+Open:
 
 ```text
-lib/core/theme/
+android/app/src/main/AndroidManifest.xml
 ```
 
-Change the relevant color values to match the desired brand.
+Look for the application label.
+
+Depending on the Flutter project configuration, it may reference a string resource or contain the application name directly.
+
+If the manifest contains a value such as:
+
+```xml
+android:label="BizFlow"
+```
+
+change it to your application name:
+
+```xml
+android:label="My Business App"
+```
+
+If it references a string resource, for example:
+
+```xml
+android:label="@string/app_name"
+```
+
+open:
+
+```text
+android/app/src/main/res/values/strings.xml
+```
+
+and change the corresponding value:
+
+```xml
+<string name="app_name">My Business App</string>
+```
+
+If `strings.xml` does not contain an `app_name` value, keep the existing manifest configuration and follow the value already used by the project.
+
+### iOS
+
+Open:
+
+```text
+ios/Runner/Info.plist
+```
+
+The display name can be configured through the application's display-name entry.
+
+If the project contains:
+
+```xml
+<key>CFBundleDisplayName</key>
+```
+
+change its value to your application name.
 
 For example:
 
-```dart id="h4x8xq"
-static const Color primary = Color(0xFF2563EB);
+```xml
+<key>CFBundleDisplayName</key>
+<string>My Business App</string>
 ```
 
-A different brand color can be substituted.
+If the project uses another existing display-name configuration, update that existing value rather than adding duplicate keys.
 
-After changing the theme:
+### Flutter/Web
 
-```bash id="6nqz9m"
-flutter analyze
+Search the project for:
+
+```text
+BizFlow
 ```
 
-Then run the application and verify:
+Review the application title and visible branding locations.
 
-* Buttons
-* Navigation
-* Cards
-* Selected states
-* Inputs
-* Dialogs
-* Other interactive elements
+Do not blindly replace every occurrence of `BizFlow`, because some occurrences may belong to documentation, database/demo content, or package metadata.
 
 ---
 
-# 5. Typography
+## 4. Change the Android Application ID
 
-Typography is managed through the application's shared text-style definitions.
+The original Android application ID is:
 
-Locate:
+```text
+com.bizflow.app
+```
+
+The value is defined in:
+
+```text
+android/app/build.gradle.kts
+```
+
+The relevant configuration is similar to:
+
+```kotlin
+android {
+    namespace = "com.bizflow.app"
+
+    defaultConfig {
+        applicationId = "com.bizflow.app"
+    }
+}
+```
+
+### Step 1 — Choose your new ID
+
+Use a unique reverse-domain identifier.
+
+Example:
+
+```text
+com.mycompany.mybusiness
+```
+
+Avoid spaces, uppercase letters, and special characters.
+
+A common format is:
+
+```text
+com.companyname.appname
+```
+
+### Step 2 — Change the namespace
+
+In:
+
+```text
+android/app/build.gradle.kts
+```
+
+change:
+
+```kotlin
+namespace = "com.bizflow.app"
+```
+
+to your new namespace.
+
+Example:
+
+```kotlin
+namespace = "com.mycompany.mybusiness"
+```
+
+### Step 3 — Change the application ID
+
+In the same file, change:
+
+```kotlin
+applicationId = "com.bizflow.app"
+```
+
+to:
+
+```kotlin
+applicationId = "com.mycompany.mybusiness"
+```
+
+Use the same identifier consistently unless your project intentionally requires different values.
+
+### Step 4 — Check for additional references
+
+Search the entire project for:
+
+```text
+com.bizflow.app
+```
+
+Review every result.
+
+Do not change unrelated documentation examples automatically. Change project configuration references that identify the Android application.
+
+### Important
+
+Changing the application ID creates a different Android application identity.
+
+If you are publishing an update to an application that already exists in Google Play, the application ID must remain the same as the existing published application.
+
+---
+
+## 5. Change the iOS Bundle Identifier
+
+The original iOS Runner bundle identifier is:
+
+```text
+com.bizflow.app
+```
+
+The main iOS configuration is stored in:
+
+```text
+ios/Runner.xcodeproj/project.pbxproj
+```
+
+The existing Runner configuration uses:
+
+```text
+PRODUCT_BUNDLE_IDENTIFIER = com.bizflow.app;
+```
+
+### Recommended method — Xcode
+
+On macOS, open the iOS project:
+
+```text
+ios/Runner.xcworkspace
+```
+
+in Xcode.
+
+Select:
+
+```text
+Runner
+```
+
+in the project navigator.
+
+Then select the:
+
+```text
+Runner target
+```
+
+Open:
+
+```text
+Signing & Capabilities
+```
+
+Set the Team to your Apple Developer team.
+
+Set the Bundle Identifier to your own identifier.
+
+Example:
+
+```text
+com.mycompany.mybusiness
+```
+
+Xcode will maintain the appropriate project configuration.
+
+### Manual configuration
+
+The main Runner bundle identifier can also be found in:
+
+```text
+ios/Runner.xcodeproj/project.pbxproj
+```
+
+Search for:
+
+```text
+PRODUCT_BUNDLE_IDENTIFIER
+```
+
+Change the **Runner application** entries to your own bundle identifier.
+
+Do not change the separate RunnerTests identifier to the application's bundle identifier unless you specifically intend to rename the test target.
+
+### Important
+
+If you are updating an existing App Store application, keep the existing bundle identifier.
+
+A new bundle identifier represents a different iOS application identity.
+
+---
+
+## 6. Replace the Android Launcher Icon
+
+Android launcher icons are stored under:
+
+```text
+android/app/src/main/res/
+```
+
+Typical launcher resource directories include:
+
+```text
+mipmap-mdpi
+mipmap-hdpi
+mipmap-xhdpi
+mipmap-xxhdpi
+mipmap-xxxhdpi
+```
+
+Depending on the Flutter/Android project configuration, adaptive icons may also use:
+
+```text
+mipmap-anydpi-v26
+```
+
+and related drawable resources.
+
+### Recommended process
+
+1. Prepare your new application icon.
+2. Generate appropriately sized Android launcher assets.
+3. Replace the existing BizFlow launcher resources.
+4. Preserve the existing resource filenames referenced by the Android manifest.
+5. If adaptive icons are used, replace both the foreground/background resources and the adaptive icon definition as appropriate.
+6. Clean and rebuild the application.
+
+From the project root:
+
+```powershell
+flutter clean
+flutter pub get
+```
+
+Then test:
+
+```powershell
+flutter run
+```
+
+For production:
+
+```powershell
+flutter build appbundle --release
+```
+
+Do not replace the launcher icon with a single arbitrary image if the Android configuration expects multiple density resources.
+
+---
+
+## 7. Replace the iOS App Icon
+
+The iOS application icon assets are located under:
+
+```text
+ios/Runner/Assets.xcassets/
+```
+
+The application icon asset is normally:
+
+```text
+AppIcon.appiconset
+```
+
+### Using Xcode
+
+On macOS:
+
+1. Open `ios/Runner.xcworkspace`.
+2. Select `Runner`.
+3. Open `Assets.xcassets`.
+4. Select `AppIcon`.
+5. Replace the supplied icon images with your own correctly sized assets.
+6. Make sure all required icon slots are populated.
+7. Build and test the application.
+
+Do not remove the AppIcon asset itself unless you also update the project to use a different asset name.
+
+---
+
+## 8. Replace the Splash / Launch Screen
+
+### Android
+
+Flutter Android projects can use Android launch resources and/or Flutter launch configuration depending on the project version.
+
+Review:
+
+```text
+android/app/src/main/res/
+```
+
+for launch-screen resources.
+
+Also review:
+
+```text
+android/app/src/main/AndroidManifest.xml
+```
+
+for the activity and theme configuration.
+
+When replacing launch assets:
+
+* Preserve the existing resource names when possible.
+* Preserve the existing theme structure.
+* Replace only the branding/assets you need.
+* Test both cold launch and normal application startup.
+
+### iOS
+
+Review:
+
+```text
+ios/Runner/
+```
+
+and:
+
+```text
+ios/Runner/Assets.xcassets/
+```
+
+for the launch-screen resources used by the project.
+
+If a launch storyboard is used, it is commonly located at:
+
+```text
+ios/Runner/Base.lproj/LaunchScreen.storyboard
+```
+
+Open the project in Xcode and inspect the Runner target's launch-screen configuration.
+
+Replace the branding/images while preserving the existing launch-screen structure.
+
+### Important
+
+Do not remove the launch-screen configuration simply to change the logo.
+
+---
+
+## 9. Change Application Colors and Theme
+
+BizFlow's main theme files are under:
 
 ```text
 lib/core/theme/
 ```
 
-and identify the application's text-style configuration.
+Review:
 
-Centralizing text styles makes it easier to maintain a consistent visual design.
+```text
+lib/core/theme/app_colors.dart
+lib/core/theme/app_dimensions.dart
+lib/core/theme/app_text_styles.dart
+```
 
-When changing typography, test:
+The main BizFlow colors include:
+
+```text
+Primary:       #2563EB
+Primary Dark:  #1D4ED8
+Primary Light: #3B82F6
+Background:    #F6F8FC
+Text:          #0F172A
+Secondary:     #475569
+Muted:         #64748B
+Border:        #E2E8F0
+```
+
+Change the centralized color definitions rather than replacing colors throughout individual screens.
+
+This makes future branding changes easier to maintain.
+
+After changing the theme, test:
 
 * Dashboard
-* Tables
-* Forms
+* Products
 * POS
+* Sales
+* Customers
+* Expenses
+* Inventory
 * Reports
+* Settings
 * Dialogs
-* Mobile layouts
+* Buttons
+* Tables/cards
+* Light mode
+* Dark mode
 
 ---
 
-# 6. Responsive Dimensions
+## 10. Change Business Information
 
-Shared dimensions are defined in the core theme configuration.
+Open the application's Settings screen.
 
-These include:
+Business information can be customized through the application's business settings.
 
-* Screen padding
-* Spacing
-* Border radii
-* Input heights
-* Button heights
-* Card dimensions
-
-Using shared dimensions rather than hard-coded values helps maintain consistent layouts.
-
----
-
-# 7. Application Name
-
-The application name appears in multiple places depending on the target platform.
-
-The Flutter package name and application metadata are defined through:
-
-```text
-pubspec.yaml
-```
-
-The current package name is:
-
-```text
-bizflow
-```
-
-When creating a customized application, update the relevant platform-specific application metadata as required.
-
-For Android, review the Android project configuration.
-
-For iOS, review the iOS project configuration.
-
-For web, review the web application metadata and manifest.
-
-For desktop platforms, review the relevant platform project configuration.
-
----
-
-# 8. Package / Application Identifier
-
-The application identifier should be reviewed before publishing a customized application.
-
-For Android, review the package/application identifier under the Android project.
-
-For iOS, review the bundle identifier in the iOS project.
-
-For web and desktop targets, review the relevant platform metadata.
-
-Do not change identifiers without understanding the effect on an existing deployed application.
-
-Changing an Android application identifier, for example, causes the resulting application to be treated as a different package by Android.
-
----
-
-# 9. Business Information
-
-Business information is configurable through the application's Settings screen.
-
-Supported information includes:
+Typical values include:
 
 * Business name
 * Address
-* Phone
+* Phone number
 * Email
 * Currency
 
-The settings are stored locally in the database.
+These settings are stored in the local database and are also used by application features such as receipts.
 
-This means the application can be customized for different businesses without changing the source code for ordinary business-information changes.
+For a production application, replace the demonstration business information with your own business information.
 
----
-
-# 10. Currency
-
-Currency can be changed from the Settings interface.
-
-The selected currency is used by supported financial interfaces such as:
-
-* Dashboard
-* Products
-* POS
-* Sales
-* Customers
-* Expenses
-* Reports
-* Receipts
-
-If additional currency behavior is required, review the relevant settings and financial display logic before modifying the database schema.
+Do not publish the demo business identity as your own business unless that is intentional.
 
 ---
 
-# 11. Product Fields
+## 11. Change Currency
 
-Product information is defined by the database and product feature.
+BizFlow supports business/currency configuration through the application settings.
 
-Current product fields include:
+Before using the application for a different market:
 
-* ID
-* Name
-* SKU
-* Category
-* Purchase price
-* Selling price
-* Stock quantity
-* Low-stock threshold
-* Barcode
+1. Open Settings.
+2. Select the desired currency.
+3. Save the settings.
+4. Test products and prices.
+5. Test checkout.
+6. Test sales history.
+7. Test reports.
+8. Generate a receipt and verify the currency.
 
-Database table definitions are located under:
+Always verify calculations after changing currency settings.
+
+Changing the displayed currency does not automatically convert existing prices or historical financial records. Review your data and pricing before using a customized application in production.
+
+---
+
+## 12. Barcode Scanning Setup
+
+BizFlow supports barcode entry through the existing Point of Sale (POS) search field.
+
+The barcode workflow supports compatible USB and Bluetooth barcode scanners that operate as keyboard input devices. A dedicated barcode-scanning package is not required for this workflow.
+
+### Product Barcode Setup
+
+1. Open the Products section.
+2. Create a product or edit an existing product.
+3. Enter the product's barcode in the barcode field.
+4. Save the product.
+5. Open the POS screen and test the barcode.
+
+Barcode values are stored as strings, allowing numeric and alphanumeric values, including leading zeros.
+
+Each product should have a unique barcode. Duplicate barcode values can cause ambiguous matches and prevent automatic product selection.
+
+### Scanning at the POS
+
+1. Open the POS screen.
+2. Focus the product search field.
+3. Scan the product barcode using a compatible scanner configured to send an Enter key after the barcode.
+4. Verify that the matching product is added to the cart.
+5. Scan the same barcode again and verify that the quantity increases when sufficient stock is available.
+
+The search field is cleared after a successful barcode addition.
+
+### Barcode Validation
+
+BizFlow checks the submitted barcode against stored product barcodes.
+
+* **Matching barcode:** Adds the matching product to the cart.
+* **Unknown barcode:** Displays a message indicating that no product was found.
+* **Duplicate barcode:** Displays a message indicating that multiple products use the barcode.
+* **Insufficient stock:** Uses the existing stock-validation behavior to prevent adding an unavailable quantity.
+
+The barcode workflow uses the existing cart and stock-validation logic. It does not bypass the application's stock limits.
+
+### Testing Without a Physical Scanner
+
+You can test the workflow in the Flutter web application without purchasing a scanner:
+
+1. Create a test product with a known barcode.
+2. Open the POS screen.
+3. Type the exact barcode into the search field.
+4. Press Enter.
+5. Confirm that the product is added to the cart.
+
+Repeat the test with an unknown barcode and an out-of-stock product. Also test scanning the same barcode more than once.
+
+### Physical Scanner Compatibility
+
+For production use, test the actual USB or Bluetooth scanner on the target device.
+
+Confirm that:
+
+* The scanner sends the barcode as keyboard input.
+* The scanner is configured to send Enter after the barcode.
+* The POS search field receives the complete barcode.
+* The expected product is added to the cart.
+* Repeated scans update the quantity correctly.
+* Stock validation prevents quantities exceeding available stock.
+
+Scanner behavior can vary by device, connection method, keyboard layout, and scanner configuration. Physical hardware should be tested separately before deployment.
+
+---
+
+## 13. Demo Data
+
+BizFlow includes demonstration data so buyers can immediately explore the application.
+
+The demo data is intended for demonstration and testing.
+
+Before publishing a customized production application:
+
+* Review the demo products.
+* Review categories.
+* Review customers.
+* Review sales.
+* Review expenses.
+* Review stock movements.
+* Review product barcodes.
+* Replace or remove demonstration information as appropriate.
+
+Do not use demonstration customer information as real customer information.
+
+If you load or clear demo data, verify the resulting application state before using the application with real business data.
+
+---
+
+## 14. Change Visible Application Text
+
+Search the source code for the text you want to customize.
+
+From the project root, PowerShell can be used to search for text:
+
+```powershell
+Get-ChildItem lib -Recurse -File | Select-String -Pattern "BizFlow"
+```
+
+You can search for other visible text in the same way.
+
+Review each result before changing it.
+
+Avoid global replacement because a word may appear in:
+
+* Documentation
+* Database/demo data
+* Code identifiers
+* Comments
+* Package metadata
+* Application UI
+
+Change only the occurrences that are intended to be visible in your branded application.
+
+Review the POS search field and barcode validation messages if you want to customize the wording of barcode-related feedback.
+
+---
+
+## 15. Web Branding
+
+BizFlow can also be built for Flutter Web.
+
+Review the web project for branding and browser metadata:
 
 ```text
-lib/data/database/tables/
+web/
 ```
 
-Product-related screens are located under:
+Check:
 
 ```text
-lib/features/products/
+web/index.html
+web/manifest.json
+web/icons/
 ```
 
-Product repository logic is located under:
+Update:
 
-```text
-lib/data/repositories/
-```
+* Browser title
+* Web application name
+* Web icons
+* Manifest name
+* Manifest short name
+* Any branding images
 
----
+Then build:
 
-# 12. Adding Product Fields
-
-Adding a new product field normally requires changes to several areas:
-
-1. Drift table definition
-2. Database schema version
-3. Database migration
-4. Generated Drift database code
-5. Product repository
-6. Product forms
-7. Product display
-8. Product search/filter logic where applicable
-9. Backup and restore
-10. CSV export where applicable
-11. Reports where applicable
-12. Demo data where applicable
-
-Do not add a database column only to the UI.
-
-A database schema change should include an appropriate Drift migration.
-
-After modifying the schema, regenerate the Drift code using the project's build process.
-
----
-
-# 13. Product Categories
-
-Categories can be managed through the application.
-
-Category-related functionality is located in the Products feature and database category table.
-
-Categories can be customized for different business types.
-
-Examples:
-
-```text
-Electronics
-
-Groceries
-
-Beverages
-
-Household
-
-Personal Care
-
-Stationery
-```
-
-These are demonstration categories and can be replaced with categories appropriate for a customized application.
-
----
-
-# 14. Product Deletion and Historical Sales
-
-Products can be deleted from the application without automatically deleting historical sales records.
-
-This allows historical transactions to remain available even when a product is no longer actively sold.
-
-When customizing product deletion behavior, consider the relationship between:
-
-* Products
-* Sale items
-* Sales
-* Stock movements
-* Reports
-* Backup and restore
-
-The current implementation allows a historical sale to remain accessible after its related product has been deleted.
-
-Sale cancellation also handles deleted products safely. If a product from a historical sale no longer exists, the sale can still be cancelled. Stock is restored for products that still exist, while a deleted product cannot receive stock because its product record no longer exists.
-
-If changing this behavior, test:
-
-1. Create a sale.
-2. Delete the related product.
-3. Open the historical sale.
-4. Cancel the sale.
-5. Verify that the remaining products are handled correctly.
-6. Verify the sale status.
-7. Verify stock movements.
-8. Verify reports.
-
----
-
-# 15. POS Customization
-
-The POS feature is located under:
-
-```text
-lib/features/pos/
-```
-
-Common customization areas include:
-
-* Product search
-* Cart behavior
-* Quantity controls
-* Discounts
-* Customer selection
-* Payment methods
-* Payment calculations
-* Checkout behavior
-* Stock validation
-* Receipt generation
-
-When modifying checkout behavior, test the complete workflow from:
-
-```text
-Product
-
-   ↓
-
-Cart
-
-   ↓
-
-Checkout
-
-   ↓
-
-Sale
-
-   ↓
-
-Stock
-
-   ↓
-
-Customer balance
-
-   ↓
-
-Receipt
-
-   ↓
-
-Reports
-```
-
-Changes to one stage can affect later stages.
-
----
-
-# 16. Payment Methods
-
-Payment method handling is part of the sales/POS workflow.
-
-Developers can extend payment options according to their requirements.
-
-For example, a customized application could add additional payment methods.
-
-When adding a payment method, review:
-
-* POS interface
-* Sale database fields
-* Sale repository
-* Sales screen
-* Receipt output
-* Reports
-
----
-
-# 17. Discounts
-
-The POS supports discounts as part of the sale calculation.
-
-When modifying discount behavior, verify:
-
-* Subtotal
-* Discount
-* Final total
-* Paid amount
-* Change
-* Receipt
-* Reports
-
-Use consistent calculations throughout the application.
-
----
-
-# 18. Customer Management
-
-Customer functionality is located under:
-
-```text
-lib/features/customers/
-```
-
-Customer information includes:
-
-* Name
-* Phone
-* Email
-* Address
-* Outstanding balance
-
-Additional customer fields can be added by updating the database schema, repository, forms, screens, backup/restore logic, and any related reports.
-
----
-
-# 19. Inventory Customization
-
-Inventory functionality is located under:
-
-```text
-lib/features/inventory/
-```
-
-The database tracks stock movements with information such as:
-
-* Product
-* Movement type
-* Quantity
-* Previous stock
-* New stock
-* Note
-* Date and time
-
-When changing inventory logic, verify that stock quantities and stock movements remain consistent.
-
----
-
-# 20. Expense Categories
-
-Expense categories can be adapted for different businesses.
-
-Examples include:
-
-```text
-Rent
-
-Utilities
-
-Transport
-
-Supplies
-
-Maintenance
-
-Other
-```
-
-Customized applications can introduce additional categories or category management functionality.
-
----
-
-# 21. Reports
-
-Reports are located under:
-
-```text
-lib/features/reports/
-```
-
-The reporting system can be extended with additional business metrics.
-
-Possible extensions include:
-
-* Monthly sales
-* Daily sales
-* Product margins
-* Customer sales
-* Payment-method summaries
-* Tax summaries
-* Inventory valuation
-* Additional expense analysis
-
-When adding reports, use the existing repository/database layer rather than placing database queries directly into reusable UI components.
-
----
-
-# 22. Dashboard
-
-Dashboard functionality is located under:
-
-```text
-lib/features/dashboard/
-```
-
-Dashboard cards and summaries can be customized according to business requirements.
-
-Possible additions include:
-
-* Monthly revenue
-* Outstanding customer balances
-* Inventory valuation
-* Top customers
-* Payment summaries
-* Additional KPIs
-
-Keep dashboard calculations connected to the repository/data layer.
-
----
-
-# 23. Receipt Customization
-
-PDF receipt functionality can be customized to match a business's requirements.
-
-Possible changes include:
-
-* Business logo
-* Business information
-* Receipt title
-* Product layout
-* Customer information
-* Payment information
-* Footer
-* Terms and conditions
-* Contact information
-
-When modifying receipt generation, test both:
-
-* Receipt generation
-* Receipt printing/sharing
-
----
-
-# 24. Backup Format
-
-The backup system stores application data in JSON format.
-
-The backup includes:
-
-* Products
-* Categories
-* Sales
-* Sale items
-* Customers
-* Expenses
-* Stock movements
-* Business settings
-
-The backup service is located under the data/service layer.
-
-If database fields are added, the backup system should be updated accordingly.
-
-A schema change should also consider compatibility with previously created backup files.
-
----
-
-# 25. Database Changes
-
-BizFlow uses Drift for database management.
-
-Database files are located under:
-
-```text
-lib/data/database/
-```
-
-The main database contains tables for:
-
-* Products
-* Categories
-* Sales
-* Sale items
-* Customers
-* Expenses
-* Stock movements
-* Business settings
-
-The database uses schema versioning.
-
----
-
-# 26. Database Migration
-
-When changing the database schema:
-
-1. Increase the schema version.
-2. Add the required migration.
-3. Regenerate Drift code.
-4. Run `flutter analyze`.
-5. Test a fresh database.
-6. Test an upgraded existing database.
-7. Test backup creation.
-8. Test backup restoration.
-9. Test affected application features.
-10. Test data persistence after application restart or browser refresh where applicable.
-
-Never remove or modify an existing migration without understanding its effect on existing installations.
-
----
-
-# 27. Demo Data
-
-Demo data is located under:
-
-```text
-lib/data/demo/
-```
-
-The demo service provides sample:
-
-* Business settings
-* Categories
-* Customers
-* Products
-* Sales
-* Expenses
-* Stock movements
-
-Developers can customize the demo dataset to match their intended marketplace screenshots or business domain.
-
-### Important
-
-Loading demo data applies the demo business settings.
-
-Create a backup before loading demo data if existing business information needs to be preserved.
-
----
-
-# 28. Data Reset and Recovery
-
-BizFlow includes a **Reset All Data** function for returning the local application database to a clean state.
-
-The reset removes:
-
-* Products
-* Categories
-* Sales
-* Sale items
-* Customers
-* Expenses
-* Stock movements
-* Business settings
-
-The reset requires user confirmation before the destructive operation is performed.
-
-### Important
-
-Reset All Data permanently deletes the current local application data.
-
-If the data may be needed later, create a backup before performing the reset.
-
-A recommended recovery workflow is:
-
-```text
-Create backup
-
-     ↓
-
-Reset All Data
-
-     ↓
-
-Start with empty database
-
-     ↓
-
-Configure business
-
-     ↓
-
-Add real data
-```
-
-For demonstration or testing:
-
-```text
-Reset All Data
-
-     ↓
-
-Load Demo Data
-
-     ↓
-
-Test application
-```
-
-When customizing the reset functionality, make sure newly added persistent tables are also considered. A new table should be included in the reset workflow if it represents application data that should be removed during a complete reset.
-
----
-
-# 29. Navigation
-
-The main application shell controls navigation between major sections.
-
-The current application includes:
-
-* Dashboard
-* Products
-* POS
-* Sales
-* More
-
-Additional features are available through the More section, including:
-
-* Customers
-* Inventory
-* Expenses
-* Reports
-* Settings
-
-Navigation can be customized by adding or removing feature destinations.
-
-When changing navigation, verify the layout on:
-
-* Mobile
-* Tablet
-* Desktop
-
----
-
-# 30. Adding a New Feature
-
-For a new feature, a recommended structure is:
-
-```text
-lib/features/
-
-└── new_feature/
-
-    ├── presentation/
-
-    │   ├── screens/
-
-    │   └── widgets/
-
-    └── ...
-```
-
-If the feature requires persistent data, also consider:
-
-```text
-lib/data/database/tables/
-
-lib/data/repositories/
-```
-
-Keep feature-specific UI separate from database implementation where practical.
-
----
-
-# 31. Adding a Repository
-
-Repositories provide a useful separation between UI and database operations.
-
-A repository can be used to:
-
-* Query database records
-* Insert records
-* Update records
-* Delete records
-* Perform business-specific data operations
-
-This keeps screens focused on presentation and user interaction.
-
----
-
-# 32. Adding External Services
-
-The current core application does not require a backend service.
-
-A customized application can integrate external services if required.
-
-Examples include:
-
-* Cloud synchronization
-* Authentication
-* Online payments
-* Cloud backup
-* Remote analytics
-* External APIs
-
-When adding external services, consider:
-
-* Offline behavior
-* Error handling
-* Authentication
-* API failures
-* Data synchronization
-* Privacy
-* Security
-* Dependency maintenance
-
----
-
-# 33. Changing the Web Server Configuration
-
-The production web helper is:
-
-```text
-serve_bizflow.py
-```
-
-It serves:
-
-```text
-build/web
-```
-
-and supplies the cross-origin headers required by the web database environment.
-
-If deploying BizFlow to another server, make sure the server configuration supports the requirements of the selected Drift web storage implementation.
-
-Do not remove the SQLite WASM or Drift worker assets from the web build.
-
-After changing the web database configuration, test:
-
-* Initial database creation
-* Adding data
-* Browser refresh
-* Browser restart
-* Backup
-* Restore
-* Reset All Data
-
----
-
-# 34. Adding Authentication
-
-Authentication is not included in the current core application.
-
-If authentication is added, the developer should design:
-
-* User accounts
-* Password handling
-* Session management
-* Authorization
-* Logout
-* Offline behavior
-* Data ownership
-* Recovery mechanisms
-
-Authentication should not be implemented by simply storing plaintext passwords in the local database.
-
----
-
-# 35. Testing After Customization
-
-After modifying the application:
-
-```bash id="d3zbrq"
-flutter analyze
-```
-
-Then test the affected feature manually.
-
-For larger changes, also test:
-
-* Fresh installation
-* Existing local data
-* Database migration
-* Backup
-* Restore
-* Demo data
-* Reset All Data
-* Product deletion
-* Historical sales after product deletion
-* Sale cancellation involving deleted products
-* Data persistence after application restart
-* Web browser refresh where applicable
-* Responsive layouts
-* Light theme
-* Dark theme
-* Target platform
-
-For a web release:
-
-```bash id="4gk7ti"
+```powershell
 flutter build web --release
 ```
 
-Then test the generated production build through an HTTP server.
+Test the generated web application before deployment.
+
+### Barcode Scanning on Web
+
+The barcode workflow uses the POS search field and supports keyboard-style scanner input.
+
+For a compatible USB or Bluetooth scanner:
+
+1. Connect the scanner to the target computer.
+2. Open the deployed web application.
+3. Focus the POS search field.
+4. Scan a product barcode.
+5. Confirm that the matching product is added to the cart.
+
+Ensure that the scanner sends Enter after the barcode. Test the workflow in the actual browser and deployment environment before production use.
+
+BizFlow's existing web database configuration and hosting requirements must also be preserved when deploying a customized build.
 
 ---
 
-# 36. Safe Customization Workflow
+## 16. Android Release Signing
 
-The recommended workflow is:
+A production Android application must be signed with the buyer's own release credentials.
 
-```text
-Backup original project
+**Never use another developer's keystore or signing credentials.**
 
-        ↓
+Create or obtain your own Android upload/release keystore.
 
-Make one logical change
+A typical keystore can be generated with:
 
-        ↓
-
-Run flutter analyze
-
-        ↓
-
-Run application
-
-        ↓
-
-Test changed feature
-
-        ↓
-
-Test related features
-
-        ↓
-
-Test data persistence
-
-        ↓
-
-Create release build
-
-        ↓
-
-Test release build
-
-        ↓
-
-Repeat
+```powershell
+keytool -genkeypair -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
 ```
 
-Avoid making many unrelated changes at once. Smaller changes make problems easier to identify.
+Store the keystore securely.
+
+Do not commit private signing credentials to source control or distribute them with the application source.
+
+For a Flutter Android project, the signing configuration can be connected through:
+
+```text
+android/key.properties
+```
+
+and:
+
+```text
+android/app/build.gradle.kts
+```
+
+Follow the signing instructions in the Installation & Release section of this package.
+
+Before distributing a release, build and test the signed application using the buyer's own release configuration.
 
 ---
 
-# 37. Important Developer Notes
+## 17. iOS Release Signing
 
-### Avoid unnecessary database changes
+iOS release signing requires:
 
-If a requirement can be implemented without changing the database schema, consider that approach first.
+* macOS
+* Xcode
+* An Apple Developer account
+* A buyer-owned Apple development/distribution identity
+* The correct App ID/bundle identifier
 
-### Keep business logic out of `main.dart`
+Open:
 
-Application-wide configuration belongs in the appropriate architecture layer.
+```text
+ios/Runner.xcworkspace
+```
 
-### Reuse existing theme definitions
+in Xcode.
 
-Use the existing shared theme, dimensions, and text styles instead of introducing duplicate constants.
+Then:
 
-### Test responsive layouts
+1. Select the `Runner` target.
+2. Open `Signing & Capabilities`.
+3. Select your Apple Developer Team.
+4. Confirm your Bundle Identifier.
+5. Enable automatic signing if appropriate for your project.
+6. Select a valid signing certificate/profile.
+7. Build and test the application.
+8. Create an archive when ready for distribution.
 
-A change that looks correct on desktop may not work correctly on mobile.
-
-### Preserve backup compatibility
-
-When changing persistent data structures, consider existing backup files.
-
-### Preserve destructive-operation safeguards
-
-When modifying product deletion, sale cancellation, demo data, restore, or reset behavior, keep appropriate confirmation and recovery workflows.
-
-### Do not remove web database assets
-
-The production web build depends on the SQLite WASM and Drift worker assets. Changes to web hosting or build configuration should preserve the required files and server configuration.
-
----
-
-# 38. Customization Checklist
-
-Before delivering a customized application:
-
-* [ ] Change application branding
-* [ ] Review application identifiers
-* [ ] Review theme colors
-* [ ] Review typography
-* [ ] Review business information
-* [ ] Review currency
-* [ ] Review product categories
-* [ ] Review demo data
-* [ ] Review receipt design
-* [ ] Review dashboard
-* [ ] Review reports
-* [ ] Review navigation
-* [ ] Test product deletion
-* [ ] Verify historical sales after product deletion
-* [ ] Test sale cancellation
-* [ ] Test sale cancellation involving a deleted product
-* [ ] Test POS
-* [ ] Test sales
-* [ ] Test inventory
-* [ ] Test customers
-* [ ] Test expenses
-* [ ] Test backup
-* [ ] Test restore
-* [ ] Test Reset All Data
-* [ ] Test demo data after reset
-* [ ] Test data persistence
-* [ ] Run `flutter analyze`
-* [ ] Build the target platform
-* [ ] Test the release build
+Never distribute another developer's Apple signing credentials.
 
 ---
 
-# BizFlow
+## 18. Production Branding Checklist
 
-**Offline-first Flutter POS & Inventory Template**
+Before releasing the customized application, verify the following items.
 
-Customize the source code according to your business requirements while preserving the application's database, backup, data-reset, and feature relationships.
+### Identity
+
+* [ ] Application name changed
+* [ ] Android application ID changed
+* [ ] iOS bundle identifier changed
+* [ ] Web title/manifest updated if publishing Web
+
+### Branding
+
+* [ ] Android launcher icon replaced
+* [ ] iOS AppIcon replaced
+* [ ] Splash/launch branding replaced
+* [ ] Logos replaced where applicable
+* [ ] Application colors reviewed
+* [ ] Visible BizFlow branding reviewed
+
+### Business
+
+* [ ] Business name updated
+* [ ] Address updated
+* [ ] Phone/email updated
+* [ ] Currency configured
+* [ ] Demo data reviewed
+* [ ] Demo barcodes reviewed or replaced as appropriate
+
+### Barcode Scanning
+
+* [ ] Product barcodes can be saved and edited
+* [ ] Barcode submission adds the correct product to the POS cart
+* [ ] Leading zeros are preserved in barcode values
+* [ ] Repeated barcode scans update the cart quantity correctly
+* [ ] Unknown barcodes display appropriate feedback
+* [ ] Duplicate barcodes display appropriate feedback
+* [ ] Stock validation works during barcode entry
+* [ ] Physical barcode scanner tested on the target device, if applicable
+
+### Android
+
+* [ ] Own keystore created or selected
+* [ ] `key.properties` configured locally
+* [ ] Release signing configured
+* [ ] Release APK tested
+* [ ] Release AAB tested/validated
+
+### iOS
+
+* [ ] Own Apple Developer Team selected
+* [ ] Bundle identifier configured
+* [ ] Signing configuration verified
+* [ ] Release archive tested
+
+### Final Testing
+
+* [ ] App launches correctly
+* [ ] Navigation works
+* [ ] Product management works
+* [ ] POS checkout works
+* [ ] Sales work
+* [ ] Inventory works
+* [ ] Reports work
+* [ ] Backup/restore works
+* [ ] Receipts work
+* [ ] Light mode works
+* [ ] Dark mode works
+* [ ] Customized branding appears consistently
+* [ ] Barcode workflow tested in the target environment
+
+---
+
+## 19. Important Release Notes
+
+The source package is a reusable template.
+
+The buyer is responsible for:
+
+* Their own application identity
+* Their own Android signing credentials
+* Their own Apple Developer account
+* Their own Apple signing credentials
+* Store accounts
+* Store listings
+* Screenshots for their customized application
+* Legal requirements for their application
+* Third-party services or accounts they independently add
+* Testing any additional hardware or integrations used by their customized application
+
+Never publish using the original BizFlow application identity:
+
+```text
+com.bizflow.app
+```
+
+unless you are intentionally maintaining the original application identity.
+
+Barcode scanners and other peripheral devices should be tested for compatibility with the target operating system, browser, and deployment configuration before production distribution.
+
+---
+
+## 20. Safe Customization Principle
+
+When customizing BizFlow:
+
+> Change branding and configuration first. Preserve the working application architecture unless you intentionally need to modify functionality.
+
+Keep backups before making significant changes.
+
+After customization, run:
+
+```powershell
+flutter analyze
+```
+
+Then run the automated tests:
+
+```powershell
+flutter test
+```
+
+Finally, test the application on the target platform before creating a production release.
+
+Verify all customized branding, business settings, POS workflows, inventory operations, backups, reports, and barcode scanning behavior before distributing the application.
