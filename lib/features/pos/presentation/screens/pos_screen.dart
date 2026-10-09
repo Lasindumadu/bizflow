@@ -266,6 +266,40 @@ class PosScreenState extends State<PosScreen> {
     });
   }
 
+  void _handleBarcodeSubmitted(String value) {
+    final barcode = value.trim();
+
+    if (barcode.isEmpty) return;
+
+    final matches = _products
+        .where((product) => product.barcode.trim() == barcode)
+        .toList();
+
+    if (matches.length != 1) {
+      setState(() {
+        _stockMessage = matches.isEmpty
+            ? 'No product found for barcode: $barcode'
+            : 'Multiple products use barcode: $barcode';
+      });
+      return;
+    }
+
+    final product = matches.single;
+    final previousQuantity = _getCartQuantity(product.id);
+
+    _addToCart(product);
+
+    final newQuantity = _getCartQuantity(product.id);
+
+    if (newQuantity > previousQuantity) {
+      _searchController.clear();
+
+      setState(() {
+        _searchQuery = '';
+      });
+    }
+  }
+
   void _increaseQuantity(_CartItem item) {
     if (item.quantity >= item.product.stockQuantity) {
       setState(() {
@@ -2077,6 +2111,7 @@ class PosScreenState extends State<PosScreen> {
           const SizedBox(height: AppDimensions.spacingLg),
           _PosSearchField(
             controller: _searchController,
+            onSubmitted: _handleBarcodeSubmitted,
             onChanged: (value) {
               setState(() {
                 _searchQuery = value;
@@ -2333,11 +2368,13 @@ class _PosSearchField extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final VoidCallback onClear;
+  final ValueChanged<String> onSubmitted;
 
   const _PosSearchField({
     required this.controller,
     required this.onChanged,
     required this.onClear,
+    required this.onSubmitted,
   });
 
   @override
@@ -2395,6 +2432,7 @@ class _PosSearchFieldState extends State<_PosSearchField> {
         controller: widget.controller,
         focusNode: _focusNode,
         onChanged: widget.onChanged,
+        onSubmitted: widget.onSubmitted,
         style: theme.textTheme.bodyLarge?.copyWith(
           color: colorScheme.onSurface,
         ),
