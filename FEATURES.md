@@ -59,6 +59,14 @@ Deleting a product does not delete historical sales or sale-item records associa
 
 Product barcodes are stored as strings, allowing numeric or alphanumeric barcode values and preservation of leading zeros.
 
+### Barcode Validation
+
+* Prevents assigning the same non-empty barcode to multiple products.
+* Validates barcode uniqueness when adding or editing a product.
+* Allows a product to retain its own barcode when edited.
+* Displays an inline validation error when a barcode is already assigned to another product.
+* Enforces duplicate-barcode checks at the repository layer, not only in the user interface.
+
 ---
 
 # 3. Category Management
@@ -205,6 +213,7 @@ Inventory provides visibility into current stock and stock changes.
 * Movement timestamps
 * Inventory search
 * Alphabetical sorting
+* Search products by name, SKU, category, and barcode
 
 ---
 

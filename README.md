@@ -31,6 +31,9 @@ The application uses a local Drift/SQLite database and includes support for Flut
 * Current stock quantity
 * Low-stock threshold
 * Barcode field
+* Duplicate barcode prevention when adding or editing products
+* Inline validation feedback for duplicate barcodes
+* Repository-level barcode uniqueness validation
 * Category filtering
 * Alphabetical sorting
 * Stock status indicators
@@ -98,6 +101,7 @@ A physical scanner is not required to test the basic workflow. In Flutter Web, a
 * Stock-in and stock-out tracking
 * Previous and new stock quantities
 * Inventory search
+* Search products by name, SKU, category, and barcode
 * Alphabetical sorting
 
 ### Expense Management
@@ -678,6 +682,8 @@ flutter build web --release
 ## Recommended barcode tests
 
 * Create a product with a barcode.
+* Verify that creating a product with another product's barcode is rejected.
+* Verify that editing a product with another product's barcode is rejected, while retaining its own barcode is allowed.
 * Submit the barcode using typed input followed by Enter.
 * Confirm the correct product is added to the cart.
 * Submit an unknown barcode.
