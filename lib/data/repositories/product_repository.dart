@@ -8,6 +8,34 @@ class ProductRepository {
 
   ProductRepository(this.database);
 
+  Future<bool> isBarcodeTaken(
+    String barcode, {
+    String? excludingProductId,
+  }) async {
+    final normalizedBarcode = barcode.trim();
+
+    if (normalizedBarcode.isEmpty) {
+      return false;
+    }
+
+    final rows = await database.select(database.products).get();
+
+    return rows.any(
+      (row) =>
+          row.barcode.trim() == normalizedBarcode &&
+          row.id != excludingProductId,
+    );
+  }
+
+  Future<void> _ensureBarcodeAvailable(
+    String barcode, {
+    String? excludingProductId,
+  }) async {
+    if (await isBarcodeTaken(barcode, excludingProductId: excludingProductId)) {
+      throw StateError('This barcode is already assigned to another product.');
+    }
+  }
+
   Stream<List<Product>> watchProducts() {
     final query = database.select(database.products)
       ..orderBy([(table) => OrderingTerm.asc(table.name)]);
@@ -38,6 +66,7 @@ class ProductRepository {
   }
 
   Future<void> addProduct(Product product) async {
+    await _ensureBarcodeAvailable(product.barcode);
     await database
         .into(database.products)
         .insert(
@@ -56,6 +85,10 @@ class ProductRepository {
   }
 
   Future<void> updateProduct(Product product) async {
+    await _ensureBarcodeAvailable(
+      product.barcode,
+      excludingProductId: product.id,
+    );
     await (database.update(
       database.products,
     )..where((table) => table.id.equals(product.id))).write(

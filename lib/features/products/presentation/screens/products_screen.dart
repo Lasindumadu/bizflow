@@ -152,6 +152,17 @@ class ProductsScreenState extends State<ProductsScreen>
     super.dispose();
   }
 
+  String _productSaveErrorMessage(Object error, String action) {
+    if (error is StateError &&
+        error.message ==
+            'This barcode is already assigned to another product.') {
+      return 'This barcode is already assigned to another product. '
+          'Please enter a unique barcode.';
+    }
+
+    return 'Failed to $action product. Please try again.';
+  }
+
   Future<void> _addProduct() async {
     final product = await Navigator.of(context).push<Product>(
       MaterialPageRoute(builder: (context) => const AddProductScreen()),
@@ -168,9 +179,9 @@ class ProductsScreenState extends State<ProductsScreen>
         return;
       }
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Failed to add product: $error')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_productSaveErrorMessage(error, 'add'))),
+      );
     }
   }
 
@@ -193,7 +204,7 @@ class ProductsScreenState extends State<ProductsScreen>
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to update product: $error')),
+        SnackBar(content: Text(_productSaveErrorMessage(error, 'update'))),
       );
     }
   }

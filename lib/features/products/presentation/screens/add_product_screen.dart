@@ -9,6 +9,7 @@ import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../data/repositories/category_repository.dart';
 import '../../../../models/product.dart';
+import '../../../../data/repositories/product_repository.dart';
 
 class AddProductScreen extends StatefulWidget {
   final Product? product;
@@ -45,6 +46,8 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   String _currency = 'USD';
   bool _isLoadingSettings = true;
+  String? _barcodeError;
+  bool _isSaving = false;
 
   late final AnimationController _pageAnimationController;
   late final Animation<double> _fadeAnimation;
@@ -233,26 +236,64 @@ class _AddProductScreenState extends State<AddProductScreen>
     }
   }
 
-  void _saveProduct() {
-    if (!_formKey.currentState!.validate()) {
+  Future<void> _saveProduct() async {
+    if (_isSaving || !_formKey.currentState!.validate()) {
       return;
     }
 
-    final product = Product(
-      id:
-          widget.product?.id ??
-          DateTime.now().millisecondsSinceEpoch.toString(),
-      name: _nameController.text.trim(),
-      sku: _skuController.text.trim(),
-      category: _selectedCategory!.trim(),
-      purchasePrice: double.parse(_purchasePriceController.text.trim()),
-      sellingPrice: double.parse(_sellingPriceController.text.trim()),
-      stockQuantity: int.parse(_stockController.text.trim()),
-      lowStockThreshold: int.parse(_lowStockController.text.trim()),
-      barcode: _barcodeController.text.trim(),
-    );
+    setState(() {
+      _isSaving = true;
+      _barcodeError = null;
+    });
 
-    Navigator.of(context).pop(product);
+    try {
+      final barcode = _barcodeController.text.trim();
+      final productId = widget.product?.id;
+
+      final barcodeTaken = await ProductRepository(appDatabase)
+          .isBarcodeTaken(barcode, excludingProductId: productId);
+
+      if (!mounted) {
+        return;
+      }
+
+      if (barcodeTaken) {
+        setState(() {
+          _barcodeError =
+              'This barcode is already assigned to another product.';
+          _isSaving = false;
+        });
+        return;
+      }
+
+      final product = Product(
+        id: productId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        name: _nameController.text.trim(),
+        sku: _skuController.text.trim(),
+        category: _selectedCategory!.trim(),
+        purchasePrice: double.parse(_purchasePriceController.text.trim()),
+        sellingPrice: double.parse(_sellingPriceController.text.trim()),
+        stockQuantity: int.parse(_stockController.text.trim()),
+        lowStockThreshold: int.parse(_lowStockController.text.trim()),
+        barcode: barcode,
+      );
+
+      Navigator.of(context).pop(product);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to validate the barcode. Please try again.'),
+        ),
+      );
+
+      setState(() {
+        _isSaving = false;
+      });
+    }
   }
 
   String? _requiredValidator(String? value) {
@@ -662,6 +703,13 @@ class _AddProductScreenState extends State<AddProductScreen>
                           child: TextFormField(
                             controller: _barcodeController,
                             keyboardType: TextInputType.number,
+                            onChanged: (_) {
+                              if (_barcodeError != null) {
+                                setState(() {
+                                  _barcodeError = null;
+                                });
+                              }
+                            },
                             decoration:
                                 _inputDecoration(
                                   context: context,
@@ -669,6 +717,7 @@ class _AddProductScreenState extends State<AddProductScreen>
                                   hint: 'e.g. 4791234567890',
                                   icon: Icons.qr_code_2,
                                 ).copyWith(
+                                  errorText: _barcodeError,
                                   helperText: 'You can type the barcode or scan it using a compatible scanner.',
                                   helperStyle: Theme.of(context)
                                       .textTheme
@@ -688,7 +737,9 @@ class _AddProductScreenState extends State<AddProductScreen>
                           width: double.infinity,
                           height: AppDimensions.buttonHeight,
                           child: FilledButton.icon(
-                            onPressed: _isLoadingSettings ? null : _saveProduct,
+                            onPressed: _isLoadingSettings || _isSaving
+                                ? null
+                                : _saveProduct,
                             icon: Icon(
                               isEditing
                                   ? Icons.save_outlined

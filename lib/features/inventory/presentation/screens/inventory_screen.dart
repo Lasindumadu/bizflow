@@ -85,7 +85,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
         : _products.where((product) {
             return product.name.toLowerCase().contains(query) ||
                 product.sku.toLowerCase().contains(query) ||
-                product.category.toLowerCase().contains(query);
+                product.category.toLowerCase().contains(query) ||
+                product.barcode.trim().toLowerCase().contains(query);
           }).toList();
 
     filtered.sort(
