@@ -270,6 +270,16 @@ All notable changes to the BizFlow source-code template are documented in this f
 * Automatic clearing of the search field after a successful barcode addition.
 * Support for numeric and alphanumeric barcode values, including leading zeros.
 
+#### Products and Inventory — Barcode Workflow
+
+* Duplicate barcode validation when creating products.
+* Duplicate barcode validation when editing products.
+* Allowing products to retain their own barcode during edits.
+* Barcode search in the Inventory screen.
+* Inline form validation feedback when a barcode is already assigned to another product.
+* Repository-level validation to prevent duplicate barcode assignments through product creation and updates.
+
+
 #### Testing
 
 * Added automated product repository tests for barcode persistence.
@@ -280,10 +290,13 @@ All notable changes to the BizFlow source-code template are documented in this f
 ### Validation
 
 * `flutter analyze` completed with no issues.
-* All 11 automated tests passed.
-* `git diff --check` completed without errors.
-* Barcode implementation and tests committed as `30cf974`.
-* Barcode feature commit pushed to `feature/bizflow-1.1.0-foundation`.
+* All 14 automated tests passed.
+* Manually verified barcode validation when creating and editing products.
+* Manually verified that products can retain their existing barcode during edits.
+* Manually verified saving a unique barcode and searching for a product by barcode in Inventory.
+* Barcode workflow changes committed as `0416f7b`.
+* Changes pushed to `feature/bizflow-1.1.0-foundation`.
+
 
 ---
 
