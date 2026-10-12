@@ -39,6 +39,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isClearingDemoData = false;
   bool _isResettingData = false;
 
+  bool _loyaltyEnabled = true;
+  final TextEditingController _loyaltyEarnRateController =
+      TextEditingController(text: '1.0');
+  final TextEditingController _loyaltyRedeemValueController =
+      TextEditingController(text: '0.01');
+
+  final TextEditingController _receiptHeaderController =
+      TextEditingController();
+  final TextEditingController _receiptFooterController =
+      TextEditingController();
+  final TextEditingController _receiptNoteController =
+      TextEditingController();
+  bool _receiptShowPhone = true;
+  bool _receiptShowAddress = true;
+
   String _currency = 'USD';
 
   @override
@@ -53,6 +68,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _addressController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _loyaltyEarnRateController.dispose();
+    _loyaltyRedeemValueController.dispose();
+    _receiptHeaderController.dispose();
+    _receiptFooterController.dispose();
+    _receiptNoteController.dispose();
     super.dispose();
   }
 
@@ -68,9 +88,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _addressController.text = settings.address;
       _phoneController.text = settings.phone;
       _emailController.text = settings.email;
+      _loyaltyEarnRateController.text = settings.loyaltyEarnRate
+          .toStringAsFixed(2);
+      _loyaltyRedeemValueController.text = settings.loyaltyRedeemValue
+          .toStringAsFixed(2);
+      _receiptHeaderController.text = settings.receiptHeader;
+      _receiptFooterController.text = settings.receiptFooter;
+      _receiptNoteController.text = settings.receiptNote;
 
       setState(() {
         _currency = settings.currency;
+        _loyaltyEnabled = settings.loyaltyEnabled;
+        _receiptShowPhone = settings.receiptShowPhone;
+        _receiptShowAddress = settings.receiptShowAddress;
         _isLoadingSettings = false;
       });
     } catch (error) {
@@ -183,6 +213,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         phone: _phoneController.text.trim(),
         email: _emailController.text.trim(),
         currency: _currency,
+        loyaltyEnabled: _loyaltyEnabled,
+        loyaltyEarnRate:
+            double.tryParse(_loyaltyEarnRateController.text.trim()) ?? 1.0,
+        loyaltyRedeemValue:
+            double.tryParse(_loyaltyRedeemValueController.text.trim()) ?? 0.01,
+        receiptHeader: _receiptHeaderController.text.trim(),
+        receiptFooter: _receiptFooterController.text.trim(),
+        receiptNote: _receiptNoteController.text.trim(),
+        receiptShowPhone: _receiptShowPhone,
+        receiptShowAddress: _receiptShowAddress,
       );
 
       if (!mounted) {
@@ -811,9 +851,212 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildBusinessConfigurationSection(BuildContext context) {
+  Widget _buildReceiptSection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Receipt Branding',
+          style: AppTextStyles.heading2.copyWith(color: colorScheme.onSurface),
+        ),
+        const SizedBox(height: AppDimensions.spacingXs),
+        Text(
+          'Control what appears on printed and PDF receipts.',
+          style: AppTextStyles.bodySmall.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppDimensions.spacingMd),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.screenPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: _receiptHeaderController,
+                  decoration: const InputDecoration(
+                    labelText: 'Receipt header',
+                    hintText: 'e.g. Thank you for your purchase!',
+                    prefixIcon: Icon(Icons.receipt_long_outlined),
+                  ),
+                ),
+                const SizedBox(height: AppDimensions.spacingMd),
+                TextFormField(
+                  controller: _receiptFooterController,
+                  decoration: const InputDecoration(
+                    labelText: 'Receipt footer',
+                    hintText: 'e.g. Returns accepted within 7 days',
+                    prefixIcon: Icon(Icons.notes_rounded),
+                  ),
+                ),
+                const SizedBox(height: AppDimensions.spacingMd),
+                TextFormField(
+                  controller: _receiptNoteController,
+                  decoration: const InputDecoration(
+                    labelText: 'Note under the total',
+                    hintText: 'e.g. Tax invoice',
+                    prefixIcon: Icon(Icons.info_outline_rounded),
+                  ),
+                ),
+                const SizedBox(height: AppDimensions.spacingSm),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: _receiptShowPhone,
+                  onChanged: (v) => setState(() => _receiptShowPhone = v),
+                  title: const Text('Show phone number'),
+                ),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  value: _receiptShowAddress,
+                  onChanged: (v) => setState(() => _receiptShowAddress = v),
+                  title: const Text('Show address'),
+                ),
+                const SizedBox(height: AppDimensions.spacingSm),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: _isSavingSettings
+                        ? null
+                        : _saveBusinessSettings,
+                    icon: _isSavingSettings
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_rounded, size: 18),
+                    label: const Text('Save Receipt Settings'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLoyaltySection(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Loyalty Programme',
+          style: AppTextStyles.heading2.copyWith(color: colorScheme.onSurface),
+        ),
+        const SizedBox(height: AppDimensions.spacingXs),
+        Text(
+          'Reward repeat customers with points on every sale.',
+          style: AppTextStyles.bodySmall.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: AppDimensions.spacingMd),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.screenPadding),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                        ),
+                        borderRadius: BorderRadius.circular(13),
+                      ),
+                      child: const Icon(
+                        Icons.emoji_events_rounded,
+                        color: Colors.white,
+                        size: 21,
+                      ),
+                    ),
+                    const SizedBox(width: AppDimensions.spacingMd),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Enable loyalty points',
+                            style: AppTextStyles.titleSmall.copyWith(
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          Text(
+                            'Customers earn points automatically at checkout',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: _loyaltyEnabled,
+                      onChanged: (value) =>
+                          setState(() => _loyaltyEnabled = value),
+                    ),
+                  ],
+                ),
+                if (_loyaltyEnabled) ...[
+                  const SizedBox(height: AppDimensions.spacingLg),
+                  TextFormField(
+                    controller: _loyaltyEarnRateController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Points earned per 1.0 spent',
+                      hintText: 'e.g. 1.0',
+                      prefixIcon: Icon(Icons.add_circle_outline_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: AppDimensions.spacingMd),
+                  TextFormField(
+                    controller: _loyaltyRedeemValueController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      labelText: 'Value of 1 point when redeemed',
+                      hintText: 'e.g. 0.01',
+                      prefixIcon: Icon(Icons.redeem_rounded),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: AppDimensions.spacingLg),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton.icon(
+                    onPressed: _isSavingSettings ? null : _saveBusinessSettings,
+                    icon: _isSavingSettings
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.save_rounded, size: 18),
+                    label: const Text('Save Loyalty'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBusinessConfigurationSection(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1018,6 +1261,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: AppDimensions.spacingXl),
 
           _buildBusinessConfigurationSection(context),
+
+          const SizedBox(height: AppDimensions.spacingXl),
+
+          _buildLoyaltySection(context),
+
+          const SizedBox(height: AppDimensions.spacingXl),
+
+          _buildReceiptSection(context),
 
           const SizedBox(height: AppDimensions.spacingXl),
 

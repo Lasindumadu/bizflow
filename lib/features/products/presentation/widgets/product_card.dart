@@ -38,30 +38,53 @@ class _ProductCardState extends State<ProductCard> {
         ? colorScheme.errorContainer
         : colorScheme.primaryContainer;
 
+    final isDark = theme.brightness == Brightness.dark;
+
     return AnimatedScale(
       scale: _isPressed ? 0.995 : 1.0,
       duration: const Duration(milliseconds: 100),
       curve: Curves.easeOut,
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTapDown: (_) {
-            setState(() {
-              _isPressed = true;
-            });
-          },
-          onTapUp: (_) {
-            setState(() {
-              _isPressed = false;
-            });
-          },
-          onTapCancel: () {
-            setState(() {
-              _isPressed = false;
-            });
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimensions.spacingLg),
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF0F172A) : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : const Color(0xFFE2E8F0),
+            width: 1.1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: isDark
+                  ? Colors.black.withValues(alpha: 0.3)
+                  : Colors.black.withValues(alpha: 0.03),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTapDown: (_) {
+              setState(() {
+                _isPressed = true;
+              });
+            },
+            onTapUp: (_) {
+              setState(() {
+                _isPressed = false;
+              });
+            },
+            onTapCancel: () {
+              setState(() {
+                _isPressed = false;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.spacingLg),
             child: Row(
               children: [
                 _buildProductIcon(context),
@@ -82,25 +105,60 @@ class _ProductCardState extends State<ProductCard> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   Widget _buildProductIcon(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+    final c = _categoryStyle(widget.product.category);
     return Container(
-      width: 56,
-      height: 56,
+      width: 58,
+      height: 58,
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
+        gradient: LinearGradient(
+            colors: c, begin: Alignment.topLeft, end: Alignment.bottomRight),
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Icon(
-        Icons.inventory_2_outlined,
-        size: 27,
-        color: colorScheme.primary,
+        _categoryIcon(widget.product.category),
+        size: 28,
+        color: Colors.white,
       ),
     );
+  }
+
+  List<Color> _categoryStyle(String category) {
+    final k = category.toLowerCase();
+    if (k.contains('elect')) {
+      return const [Color(0xFF4F46E5), Color(0xFF7C3AED)];
+    }
+    if (k.contains('groc') || k.contains('food')) {
+      return const [Color(0xFF059669), Color(0xFF10B981)];
+    }
+    if (k.contains('bev')) {
+      return const [Color(0xFF0EA5E9), Color(0xFF6366F1)];
+    }
+    if (k.contains('house')) {
+      return const [Color(0xFFF59E0B), Color(0xFFF97316)];
+    }
+    if (k.contains('care') || k.contains('beaut')) {
+      return const [Color(0xFFEC4899), Color(0xFFF43F5E)];
+    }
+    return const [Color(0xFF6366F1), Color(0xFF0EA5E9)];
+  }
+
+  IconData _categoryIcon(String category) {
+    final k = category.toLowerCase();
+    if (k.contains('elect')) return Icons.devices_rounded;
+    if (k.contains('groc') || k.contains('food')) {
+      return Icons.shopping_basket_rounded;
+    }
+    if (k.contains('bev')) return Icons.local_cafe_rounded;
+    if (k.contains('house')) return Icons.chair_rounded;
+    if (k.contains('care') || k.contains('beaut')) {
+      return Icons.spa_rounded;
+    }
+    if (k.contains('stat')) return Icons.note_alt_rounded;
+    return Icons.inventory_2_rounded;
   }
 
   Widget _buildProductInfo(BuildContext context) {

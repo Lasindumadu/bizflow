@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../data/database/app_database.dart' hide Sale;
@@ -207,32 +208,31 @@ class SalesScreenState extends State<SalesScreen> {
           ),
         ),
         const SizedBox(height: AppDimensions.spacingMd),
-        DropdownButtonFormField<String>(
-          initialValue: _selectedDateFilter,
-          decoration: InputDecoration(
-            labelText: 'Date',
-            prefixIcon: const Icon(Icons.calendar_today_outlined),
-            filled: true,
-            fillColor: colorScheme.surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
-            ),
-          ),
-          items: const [
-            DropdownMenuItem(value: 'All Sales', child: Text('All Sales')),
-            DropdownMenuItem(value: 'Today', child: Text('Today')),
-            DropdownMenuItem(value: 'This Week', child: Text('This Week')),
-            DropdownMenuItem(value: 'This Month', child: Text('This Month')),
-          ],
-          onChanged: (value) {
-            if (value == null) {
-              return;
-            }
+        Wrap(
+          spacing: AppDimensions.spacingSm,
+          runSpacing: AppDimensions.spacingSm,
+          children: [
+            for (final filter in const [
+              'All Sales',
+              'Today',
+              'This Week',
+              'This Month',
+            ])
+              ChoiceChip(
+                label: Text(filter),
+                selected: _selectedDateFilter == filter,
+                showCheckmark: false,
+                onSelected: (selected) {
+                  if (!selected) {
+                    return;
+                  }
 
-            setState(() {
-              _selectedDateFilter = value;
-            });
-          },
+                  setState(() {
+                    _selectedDateFilter = filter;
+                  });
+                },
+              ),
+          ],
         ),
       ],
     );
@@ -304,6 +304,15 @@ class SalesScreenState extends State<SalesScreen> {
                           ),
                           child: _buildSalesFilters(),
                         ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppDimensions.screenPadding,
+                            AppDimensions.spacingMd,
+                            AppDimensions.screenPadding,
+                            0,
+                          ),
+                          child: _buildResultsStrip(filteredSales),
+                        ),
                         Expanded(
                           child: filteredSales.isEmpty
                               ? _buildNoMatchingSalesState()
@@ -346,6 +355,58 @@ class SalesScreenState extends State<SalesScreen> {
                 );
               },
             ),
+    );
+  }
+
+  Widget _buildResultsStrip(List<Sale> filteredSales) {
+    final total = filteredSales.fold<double>(
+      0.0,
+      (sum, sale) => sum + sale.total,
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.spacingLg,
+        vertical: AppDimensions.spacingMd,
+      ),
+      decoration: BoxDecoration(
+         color: AppColors.lightSurfaceVariant,
+        borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Sales', style: AppTextStyles.caption),
+                const SizedBox(height: 2),
+                Text(
+                  '${filteredSales.length}',
+                  style: AppTextStyles.heading2.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Revenue', style: AppTextStyles.caption),
+                const SizedBox(height: 2),
+                Text(
+                  '$_currency ${total.toStringAsFixed(2)}',
+                  style: AppTextStyles.heading2.copyWith(
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -507,26 +568,45 @@ class _SaleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final customerName = customer == null ? 'Walk-in Customer' : customer!.name;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
-        child: Padding(
-          padding: const EdgeInsets.all(AppDimensions.spacingLg),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primary
-                      .withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(
-                    AppDimensions.buttonRadius,
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : AppColors.lightBorder,
+          width: 1.1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.03),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.all(AppDimensions.spacingLg),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.primary
+                        .withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(15),
                   ),
-                ),
                 child: Icon(
                   Icons.receipt_long_outlined,
                   color: Theme.of(context).colorScheme.primary,
@@ -542,10 +622,7 @@ class _SaleCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             SaleReference.format(sale),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14,
-                            ),
+                            style: AppTextStyles.titleMedium.copyWith(fontSize: 14),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -621,10 +698,7 @@ class _SaleCard extends StatelessWidget {
                 children: [
                   Text(
                     '$currency ${sale.total.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                    style: AppTextStyles.titleMedium.copyWith(fontSize: 16),
                   ),
                   const SizedBox(height: AppDimensions.spacingXs),
                   const Icon(Icons.chevron_right, size: 20),
@@ -634,6 +708,6 @@ class _SaleCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }

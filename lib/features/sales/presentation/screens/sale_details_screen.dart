@@ -84,11 +84,12 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('Cancel / Refund Sale?'),
+          title: const Text('Cancel Sale?'),
           content: Text(
             'Are you sure you want to cancel Sale #${sale.id}?\n\n'
-            'The sale will be marked as cancelled and all sold '
-            'quantities will be returned to inventory.\n\n'
+            'The sale will be marked as cancelled, and quantities for '
+            'products that still exist will be returned to inventory.\n\n'
+            'Any customer payment refund must be handled separately.\n\n'
             'This action cannot be undone.',
           ),
           actions: [
@@ -497,7 +498,7 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
             : const Icon(Icons.cancel_outlined),
-        label: Text(_isCancelling ? 'Cancelling...' : 'Cancel / Refund Sale'),
+        label: Text(_isCancelling ? 'Cancelling...' : 'Cancel Sale'),
         style: OutlinedButton.styleFrom(
           foregroundColor: Theme.of(context).colorScheme.error,
           side: BorderSide(color: Theme.of(context).colorScheme.error),

@@ -218,8 +218,14 @@ class SaleRepository {
         throw StateError('Sale not found.');
       }
 
-      if (sale.status == 'cancelled') {
-        throw StateError('This sale has already been cancelled.');
+      // Only completed sales may be cancelled.
+      // This prevents duplicate stock restoration and invalid transitions.
+      if (sale.status != 'completed') {
+        throw StateError(
+          sale.status == 'cancelled'
+              ? 'This sale has already been cancelled.'
+              : 'Only completed sales can be cancelled.',
+        );
       }
 
       final itemQuery = database.select(database.saleItems)
@@ -243,9 +249,8 @@ class SaleRepository {
 
       // Restore stock for products that still exist.
       //
-      // A product may have been deleted after the sale was created.
-      // In that case, the historical sale item is retained, but there
-      // is no product record available to restore stock to.
+      // Deleted products have no product record to update,
+      // so their historical sale items remain unchanged.
       for (final entry in productQuantities.entries) {
         final productQuery = database.select(database.products)
           ..where((table) => table.id.equals(entry.key));
@@ -274,7 +279,7 @@ class SaleRepository {
                 quantity: returnedQuantity,
                 previousStock: previousStock,
                 newStock: newStock,
-                note: Value('Refund $saleId'),
+                note: Value('Cancellation of sale $saleId'),
                 createdAt: DateTime.now(),
               ),
             );
@@ -284,6 +289,29 @@ class SaleRepository {
       await (database.update(database.sales)
             ..where((table) => table.id.equals(saleId)))
           .write(const db.SalesCompanion(status: Value('cancelled')));
+
+      // Audit the cancellation (best-effort — never blocks the cancel).
+      try {
+        await database
+            .into(database.auditLogs)
+            .insert(
+              db.AuditLogsCompanion.insert(
+                id: 'aud_${DateTime.now().microsecondsSinceEpoch}',
+                action: 'sale.cancel',
+                entityType: const Value('sale'),
+                entityId: Value(saleId),
+                summary: Value(
+                  'Cancelled sale $saleId and restored '
+                  '${productQuantities.values.fold<int>(0, (a, b) => a + b)} '
+                  'unit(s) to stock',
+                ),
+                afterJson: const Value('{"status":"cancelled"}'),
+                createdAt: DateTime.now(),
+              ),
+            );
+      } catch (_) {
+        // Auditing must never break cancellation.
+      }
     });
   }
 

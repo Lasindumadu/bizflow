@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../data/database/database_provider.dart';
@@ -268,9 +270,13 @@ class ProductsScreenState extends State<ProductsScreen>
           : 'All Categories',
       decoration: InputDecoration(
         labelText: 'Category',
-        prefixIcon: const Icon(Icons.category_outlined),
+        prefixIcon: Icon(Icons.category_outlined, color: AppColors.primary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
         ),
       ),
       items: categories.map((category) {
@@ -298,8 +304,20 @@ class ProductsScreenState extends State<ProductsScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: colorScheme.error),
-            const SizedBox(height: AppDimensions.spacingMd),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 36,
+                color: AppColors.error,
+              ),
+            ),
+            const SizedBox(height: AppDimensions.spacingLg),
             Text(
               'Unable to load products.',
               style: AppTextStyles.heading2.copyWith(
@@ -307,7 +325,7 @@ class ProductsScreenState extends State<ProductsScreen>
               ),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: AppDimensions.spacingSm),
+            const SizedBox(height: AppDimensions.spacingXs),
             Text(
               'Something went wrong while loading your products. '
               'Please try again.',
@@ -319,7 +337,7 @@ class ProductsScreenState extends State<ProductsScreen>
             const SizedBox(height: AppDimensions.spacingLg),
             FilledButton.icon(
               onPressed: _watchProducts,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh_rounded),
               label: const Text('Try Again'),
             ),
           ],
@@ -345,6 +363,15 @@ class ProductsScreenState extends State<ProductsScreen>
             color: colorScheme.onSurfaceVariant,
           ),
         ),
+        const SizedBox(height: AppDimensions.spacingMd),
+        Container(
+          height: 4,
+          width: 60,
+          decoration: BoxDecoration(
+            gradient: AppDecor.indigoGradient,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
       ],
     );
   }
@@ -366,13 +393,24 @@ class ProductsScreenState extends State<ProductsScreen>
             vertical: AppDimensions.spacingXs,
           ),
           decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: 0.08),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.primary.withValues(alpha: 0.12),
+                AppColors.accent.withValues(alpha: 0.12),
+              ],
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+            ),
             borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+            border: Border.all(
+              color: AppColors.primary.withValues(alpha: 0.3),
+              width: 1,
+            ),
           ),
           child: Text(
             '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
             style: AppTextStyles.caption.copyWith(
-              color: colorScheme.primary,
+              color: AppColors.primary,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -397,6 +435,7 @@ class ProductsScreenState extends State<ProductsScreen>
             color: colorScheme.surface,
             borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
             border: Border.all(color: colorScheme.outlineVariant),
+            boxShadow: AppDecor.cardShadow(context),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -405,14 +444,14 @@ class ProductsScreenState extends State<ProductsScreen>
                 width: 56,
                 height: 56,
                 decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
+                  gradient: AppDecor.indigoGradient,
                   shape: BoxShape.circle,
                 ),
                 child: Padding(
                   padding: const EdgeInsets.all(AppDimensions.spacingLg),
                   child: CircularProgressIndicator(
                     strokeWidth: 2.5,
-                    color: colorScheme.primary,
+                    color: AppColors.onPrimary,
                   ),
                 ),
               ),
@@ -511,14 +550,38 @@ class ProductsScreenState extends State<ProductsScreen>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Products'),
+        title: Text(
+          'Products',
+          style: AppTextStyles.heading3.copyWith(
+            color: Theme.of(context).colorScheme.onSurface,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: AppDecor.heroGradient(
+              Theme.of(context).brightness == Brightness.dark,
+            ),
+          ),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: AppDimensions.spacingLg),
             child: FilledButton.icon(
               onPressed: _addProduct,
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add_rounded),
               label: const Text('Add Product'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.onPrimary,
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimensions.spacingMd,
+                  vertical: AppDimensions.spacingSm,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
+                ),
+              ),
             ),
           ),
         ],

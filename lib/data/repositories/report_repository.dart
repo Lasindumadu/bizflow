@@ -47,6 +47,7 @@ class ReportSummary {
   final List<BestSellingProduct> bestSellingProducts;
   final double stockValue;
   final int lowStockProducts;
+  final double totalRefunded;
 
   const ReportSummary({
     required this.today,
@@ -58,10 +59,82 @@ class ReportSummary {
     required this.bestSellingProducts,
     required this.stockValue,
     required this.lowStockProducts,
+    this.totalRefunded = 0.0,
   });
 
   double get monthlyProfit {
     return thisMonth.grossProfit - monthlyExpenses;
+  }
+
+  /// Net revenue after refunds (all-time refunds vs this month's revenue is
+  /// not meaningful, so this exposes this month's revenue minus all refunds
+  /// only for display of returns impact).
+  double get refundImpact => totalRefunded;
+}
+
+/// Revenue share for one payment method.
+class PaymentMethodTotal {
+  final String method;
+  final double amount;
+  final int count;
+
+  const PaymentMethodTotal({
+    required this.method,
+    required this.amount,
+    required this.count,
+  });
+}
+
+/// Aggregated insight about a single customer's purchasing.
+class CustomerInsight {
+  final String customerName;
+  final double totalSpent;
+  final int orderCount;
+
+  const CustomerInsight({
+    required this.customerName,
+    required this.totalSpent,
+    required this.orderCount,
+  });
+}
+
+/// Profit + margin for a product or category over a period.
+class MarginRow {
+  final String label;
+  final double revenue;
+  final double cost;
+  final int unitsSold;
+
+  const MarginRow({
+    required this.label,
+    required this.revenue,
+    required this.cost,
+    required this.unitsSold,
+  });
+
+  double get profit => revenue - cost;
+
+  double get marginPct => revenue <= 0 ? 0 : (profit / revenue) * 100;
+}
+
+/// One period's headline figures, used for side-by-side comparisons.
+class PeriodComparison {
+  final String label;
+  final double revenue;
+  final double profit;
+  final int transactions;
+
+  const PeriodComparison({
+    required this.label,
+    required this.revenue,
+    required this.profit,
+    required this.transactions,
+  });
+
+  /// Percentage change in revenue vs [previous], or null when not comparable.
+  double? revenueChangeVs(PeriodComparison previous) {
+    if (previous.revenue <= 0) return null;
+    return ((revenue - previous.revenue) / previous.revenue) * 100;
   }
 }
 
@@ -228,6 +301,194 @@ class ReportRepository {
     }).length;
   }
 
+  /// Revenue split by payment method across all completed sales.
+  Future<List<PaymentMethodTotal>> getPaymentMethodBreakdown() async {
+    final sales = await (database.select(
+      database.sales,
+    )..where((t) => t.status.equals('completed'))).get();
+
+    final Map<String, PaymentMethodTotal> totals = {};
+    for (final sale in sales) {
+      final key = sale.paymentMethod.isEmpty ? 'cash' : sale.paymentMethod;
+      final existing = totals[key];
+      totals[key] = PaymentMethodTotal(
+        method: key,
+        amount: (existing?.amount ?? 0) + sale.total,
+        count: (existing?.count ?? 0) + 1,
+      );
+    }
+
+    final result = totals.values.toList()
+      ..sort((a, b) => b.amount.compareTo(a.amount));
+    return result;
+  }
+
+  /// Top customers by total amount spent (all-time, completed sales).
+  Future<List<CustomerInsight>> getCustomerInsights({int limit = 5}) async {
+    final sales = await (database.select(
+      database.sales,
+    )..where((t) => t.status.equals('completed'))).get();
+
+    final customers = await database.select(database.customers).get();
+    final nameById = {for (final c in customers) c.id: c.name};
+
+    final Map<String, CustomerInsight> totals = {};
+    for (final sale in sales) {
+      final id = sale.customerId;
+      if (id == null) continue;
+      final name = nameById[id] ?? 'Walk-in';
+      final existing = totals[id];
+      totals[id] = CustomerInsight(
+        customerName: name,
+        totalSpent: (existing?.totalSpent ?? 0) + sale.total,
+        orderCount: (existing?.orderCount ?? 0) + 1,
+      );
+    }
+
+    final result = totals.values.toList()
+      ..sort((a, b) => b.totalSpent.compareTo(a.totalSpent));
+    return result.take(limit).toList();
+  }
+
+  /// Profit & margin grouped by product, highest profit first.
+  Future<List<MarginRow>> getMarginByProduct({int limit = 10}) async {
+    final rows = await _salesInRange(null, null);
+    final grouped = <String, _MarginAccumulator>{};
+
+    for (final entry in rows) {
+      final item = entry.item;
+      final revenue = item.unitPrice * item.quantity;
+      final cost = item.purchasePrice * item.quantity;
+      final acc = grouped.putIfAbsent(
+        item.productName,
+        () => _MarginAccumulator(),
+      );
+      acc.revenue += revenue;
+      acc.cost += cost;
+      acc.units += item.quantity;
+    }
+
+    final result =
+        grouped.entries
+            .map(
+              (e) => MarginRow(
+                label: e.key,
+                revenue: e.value.revenue,
+                cost: e.value.cost,
+                unitsSold: e.value.units,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.profit.compareTo(a.profit));
+
+    return result.take(limit).toList();
+  }
+
+  /// Profit & margin grouped by category, highest profit first.
+  Future<List<MarginRow>> getMarginByCategory() async {
+    final products = await database.select(database.products).get();
+    final categoryByProduct = {
+      for (final p in products)
+        p.id: p.category.isEmpty ? 'Uncategorised' : p.category,
+    };
+
+    final rows = await _salesInRange(null, null);
+    final grouped = <String, _MarginAccumulator>{};
+
+    for (final entry in rows) {
+      final item = entry.item;
+      final category = categoryByProduct[item.productId] ?? 'Uncategorised';
+      final acc = grouped.putIfAbsent(category, () => _MarginAccumulator());
+      acc.revenue += item.unitPrice * item.quantity;
+      acc.cost += item.purchasePrice * item.quantity;
+      acc.units += item.quantity;
+    }
+
+    final result =
+        grouped.entries
+            .map(
+              (e) => MarginRow(
+                label: e.key,
+                revenue: e.value.revenue,
+                cost: e.value.cost,
+                unitsSold: e.value.units,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.profit.compareTo(a.profit));
+
+    return result;
+  }
+
+  /// This period vs the immediately preceding period of equal length.
+  Future<({PeriodComparison current, PeriodComparison previous})>
+  getPeriodComparison({required int days, String label = 'This period'}) async {
+    final now = DateTime.now();
+    final currentStart = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).subtract(Duration(days: days - 1));
+    final previousStart = currentStart.subtract(Duration(days: days));
+    final end = DateTime(
+      now.year,
+      now.month,
+      now.day,
+    ).add(const Duration(days: 1));
+
+    final current = await _periodStats(currentStart, end, label);
+    final previous = await _periodStats(
+      previousStart,
+      currentStart,
+      'Previous $days days',
+    );
+
+    return (current: current, previous: previous);
+  }
+
+  Future<PeriodComparison> _periodStats(
+    DateTime start,
+    DateTime end,
+    String label,
+  ) async {
+    final report = await _getSalesReport(start: start, end: end);
+    return PeriodComparison(
+      label: label,
+      revenue: report.revenue,
+      profit: report.grossProfit,
+      transactions: report.transactionCount,
+    );
+  }
+
+  /// Completed sale rows (sale + item) optionally within a date range.
+  Future<List<({Sale sale, SaleItem item})>> _salesInRange(
+    DateTime? start,
+    DateTime? end,
+  ) async {
+    final salesQuery = database.select(database.sales)
+      ..where((t) => t.status.equals('completed'));
+
+    final sales = await salesQuery.get();
+    final filtered = sales.where((s) {
+      if (start != null && s.createdAt.isBefore(start)) return false;
+      if (end != null && !s.createdAt.isBefore(end)) return false;
+      return true;
+    }).toList();
+
+    if (filtered.isEmpty) return [];
+
+    final ids = filtered.map((s) => s.id).toSet();
+    final items = await (database.select(
+      database.saleItems,
+    )..where((t) => t.saleId.isIn(ids))).get();
+
+    final saleById = {for (final s in filtered) s.id: s};
+    return items
+        .where((i) => saleById.containsKey(i.saleId))
+        .map((i) => (sale: saleById[i.saleId]!, item: i))
+        .toList();
+  }
+
   Future<ReportSummary> getSummary() async {
     final today = await getTodayReport();
 
@@ -247,6 +508,8 @@ class ReportRepository {
 
     final lowStockProducts = await getLowStockProductCount();
 
+    final totalRefunded = await getTotalRefunded();
+
     return ReportSummary(
       today: today,
       thisWeek: thisWeek,
@@ -257,7 +520,14 @@ class ReportRepository {
       bestSellingProducts: bestSellingProducts,
       stockValue: stockValue,
       lowStockProducts: lowStockProducts,
+      totalRefunded: totalRefunded,
     );
+  }
+
+  /// Total value refunded across all recorded returns.
+  Future<double> getTotalRefunded() async {
+    final rows = await database.select(database.saleReturns).get();
+    return rows.fold<double>(0, (s, r) => s + r.refundAmount);
   }
 
   Future<SalesReport> _getSalesReport({
@@ -327,4 +597,11 @@ class _ProductSalesData {
     required this.quantitySold,
     required this.revenue,
   });
+}
+
+/// Mutable accumulator used when grouping margin rows.
+class _MarginAccumulator {
+  double revenue = 0;
+  double cost = 0;
+  int units = 0;
 }

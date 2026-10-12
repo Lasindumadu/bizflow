@@ -3,13 +3,18 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
+import 'tables/cash_movements.dart';
+import 'tables/cash_shifts.dart';
 import 'tables/categories.dart';
 import 'tables/customers.dart';
 import 'tables/expenses.dart';
 import 'tables/products.dart';
 import 'tables/sale_items.dart';
+import 'tables/sale_returns.dart';
+import 'tables/sale_return_items.dart';
 import 'tables/sales.dart';
 import 'tables/stock_movements.dart';
+import 'tables/audit_logs.dart';
 import 'tables/business_settings.dart';
 
 part 'app_database.g.dart';
@@ -24,6 +29,11 @@ part 'app_database.g.dart';
     Expenses,
     StockMovements,
     BusinessSettings,
+    SaleReturns,
+    SaleReturnItems,
+    AuditLogs,
+    CashShifts,
+    CashMovements,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -40,7 +50,9 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 9;
+
+  static const int currentSchemaVersion = 9;
 
   @override
   MigrationStrategy get migration {
@@ -60,6 +72,58 @@ class AppDatabase extends _$AppDatabase {
 
         if (from < 4) {
           await m.createTable(businessSettings);
+        }
+
+        if (from < 5) {
+          // Loyalty programme.
+          await m.addColumn(customers, customers.loyaltyPoints);
+          await m.addColumn(customers, customers.loyaltyTier);
+          await m.addColumn(businessSettings, businessSettings.loyaltyEnabled);
+          await m.addColumn(businessSettings, businessSettings.loyaltyEarnRate);
+          await m.addColumn(
+            businessSettings,
+            businessSettings.loyaltyRedeemValue,
+          );
+        }
+
+        if (from < 6) {
+          // Separate spendable balance from lifetime (tier) points so that
+          // redeeming points never demotes a customer's tier.
+          await m.addColumn(customers, customers.pointsBalance);
+
+          // Existing customers: assume their current points are both the
+          // lifetime total and the spendable balance (nothing redeemed yet).
+          await customStatement(
+            'UPDATE customers SET points_balance = loyalty_points',
+          );
+        }
+
+        if (from < 7) {
+          // Returns/refunds and the audit trail.
+          await m.createTable(saleReturns);
+          await m.createTable(saleReturnItems);
+          await m.createTable(auditLogs);
+        }
+
+        if (from < 8) {
+          // Cashier shifts and cash movements.
+          await m.createTable(cashShifts);
+          await m.createTable(cashMovements);
+        }
+
+        if (from < 9) {
+          // Receipt branding settings.
+          await m.addColumn(businessSettings, businessSettings.receiptHeader);
+          await m.addColumn(businessSettings, businessSettings.receiptFooter);
+          await m.addColumn(
+            businessSettings,
+            businessSettings.receiptShowPhone,
+          );
+          await m.addColumn(
+            businessSettings,
+            businessSettings.receiptShowAddress,
+          );
+          await m.addColumn(businessSettings, businessSettings.receiptNote);
         }
       },
     );

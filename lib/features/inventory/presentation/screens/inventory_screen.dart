@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../data/database/database_provider.dart';
@@ -15,10 +16,10 @@ class InventoryScreen extends StatefulWidget {
   const InventoryScreen({super.key});
 
   @override
-  State<InventoryScreen> createState() => _InventoryScreenState();
+  State<InventoryScreen> createState() => InventoryScreenState();
 }
 
-class _InventoryScreenState extends State<InventoryScreen> {
+class InventoryScreenState extends State<InventoryScreen> {
   final ProductRepository _productRepository = ProductRepository(appDatabase);
 
   final StockMovementRepository _stockMovementRepository =
@@ -36,6 +37,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
     super.initState();
 
     _watchProducts();
+  }
+
+  Future<void> refreshBusinessSettings() async {
+    // Inventory screen does not depend on business settings
   }
 
   void _watchProducts() {
@@ -292,21 +297,25 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         title: 'Products',
                         value: '${_products.length}',
                         icon: Icons.inventory_2_outlined,
+                        color: AppColors.primaryDark,
                       ),
                       _InventorySummaryCard(
                         title: 'Total Units',
                         value: '$_totalUnits',
                         icon: Icons.layers_outlined,
+                        color: AppColors.accent,
                       ),
                       _InventorySummaryCard(
                         title: 'Low Stock',
                         value: '$_lowStockCount',
                         icon: Icons.warning_amber_outlined,
+                        color: AppColors.tertiary,
                       ),
                       _InventorySummaryCard(
                         title: 'Out of Stock',
                         value: '$_outOfStockCount',
                         icon: Icons.remove_shopping_cart_outlined,
+                        color: AppColors.errorDark,
                       ),
                     ],
                   ),
@@ -317,10 +326,30 @@ class _InventoryScreenState extends State<InventoryScreen> {
                         _searchQuery = value;
                       });
                     },
-                    decoration: const InputDecoration(
-                      hintText: 'Search products...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name, SKU, category...',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: true,
+                      fillColor: Theme.of(context)
+                          .colorScheme
+                          .surfaceContainerHighest
+                          .withValues(alpha: 0.5),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppDimensions.buttonRadius,
+                        ),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(
+                          AppDimensions.buttonRadius,
+                        ),
+                        borderSide: BorderSide(
+                          color: Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppDimensions.spacingXl),
@@ -394,11 +423,13 @@ class _InventorySummaryCard extends StatelessWidget {
   final String title;
   final String value;
   final IconData icon;
+  final Color color;
 
   const _InventorySummaryCard({
     required this.title,
     required this.value,
     required this.icon,
+    required this.color,
   });
 
   @override
@@ -406,11 +437,19 @@ class _InventorySummaryCard extends StatelessWidget {
     return SizedBox(
       width: 180,
       child: Card(
+        margin: EdgeInsets.zero,
         child: Padding(
           padding: const EdgeInsets.all(AppDimensions.spacingLg),
           child: Row(
             children: [
-              Icon(icon, color: Theme.of(context).colorScheme.primary),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
               const SizedBox(width: AppDimensions.spacingSm),
               Expanded(
                 child: Column(

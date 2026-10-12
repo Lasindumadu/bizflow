@@ -33,7 +33,7 @@ void main() {
 
       expect(backup['application'], 'BizFlow');
       expect(backup['backupFormatVersion'], 1);
-      expect(backup['databaseSchemaVersion'], 4);
+      expect(backup['databaseSchemaVersion'], 9);
 
       final data = backup['data'] as Map<String, dynamic>;
       expect(data['categories'], hasLength(1));

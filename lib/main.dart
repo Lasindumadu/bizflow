@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
+import 'core/services/notification_store.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
 import 'core/widgets/app_shell.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  notificationStore.seedWelcome();
   runApp(const BizFlowApp());
 }
 

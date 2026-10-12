@@ -107,6 +107,7 @@ class DemoDataService {
         email: 'kasun@example.com',
         address: 'Colombo',
         balance: 0.0,
+        loyaltyPoints: 1250,
       ),
       (
         id: 'customer_002',
@@ -115,6 +116,7 @@ class DemoDataService {
         email: 'nimali@example.com',
         address: 'Negombo',
         balance: 2500.0,
+        loyaltyPoints: 2300,
       ),
       (
         id: 'customer_003',
@@ -123,6 +125,7 @@ class DemoDataService {
         email: 'ravindu@example.com',
         address: 'Wattala',
         balance: 0.0,
+        loyaltyPoints: 320,
       ),
       (
         id: 'customer_004',
@@ -131,6 +134,7 @@ class DemoDataService {
         email: 'amaya@example.com',
         address: 'Ja-Ela',
         balance: 12500.0,
+        loyaltyPoints: 5400,
       ),
     ];
 
@@ -145,6 +149,8 @@ class DemoDataService {
               email: Value(customer.email),
               address: Value(customer.address),
               outstandingBalance: Value(customer.balance),
+              loyaltyPoints: Value(customer.loyaltyPoints),
+              pointsBalance: Value(customer.loyaltyPoints),
             ),
           );
     }

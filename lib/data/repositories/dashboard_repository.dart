@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:drift/drift.dart';
 
+
 import '../../models/sale.dart' as model;
 import '../database/app_database.dart';
 
@@ -81,6 +82,35 @@ class DashboardRepository {
 
   Future<DashboardStats> getStats() {
     return _loadStats();
+  }
+
+  /// Last 7 days revenue (oldest -> newest), completed sales only.
+  Future<List<double>> getLast7DaysRevenue() async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final out = <double>[];
+    for (var i = 6; i >= 0; i--) {
+      final start = today.subtract(Duration(days: i));
+      final end = start.add(const Duration(days: 1));
+      final q = database.select(database.sales)
+        ..where((t) =>
+            t.createdAt.isBiggerOrEqualValue(start) &
+            t.createdAt.isSmallerThanValue(end) &
+            t.status.equals('completed'));
+      final rows = await q.get();
+      out.add(rows.fold<double>(0, (s, r) => s + r.total));
+    }
+    return out;
+  }
+
+  /// Low-stock product rows for the dashboard alert card.
+  Future<List<ProductRow>> getLowStockProducts({int limit = 5}) async {
+    final rows = await database.select(database.products).get();
+    final low = rows
+        .where((p) => p.stockQuantity <= p.lowStockThreshold)
+        .toList()
+      ..sort((a, b) => a.stockQuantity.compareTo(b.stockQuantity));
+    return low.take(limit).toList();
   }
 
   Future<DashboardStats> _loadStats() async {

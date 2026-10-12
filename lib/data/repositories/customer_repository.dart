@@ -35,6 +35,7 @@ class CustomerRepository {
     String email = '',
     String address = '',
     double outstandingBalance = 0.0,
+    int loyaltyPoints = 0,
   }) async {
     await database
         .into(database.customers)
@@ -46,6 +47,8 @@ class CustomerRepository {
             email: Value(email),
             address: Value(address),
             outstandingBalance: Value(outstandingBalance),
+            loyaltyPoints: Value(loyaltyPoints),
+            pointsBalance: Value(loyaltyPoints),
           ),
         );
   }

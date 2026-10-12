@@ -11,6 +11,12 @@ class BackupService {
 
   BackupService([AppDatabase? database]) : _database = database ?? appDatabase;
 
+  /// Keep in sync with `AppDatabase.schemaVersion`.
+  static const int _currentSchemaVersion = 9;
+
+  /// The oldest schema version this build can still restore from.
+  static const int _oldestSupportedSchemaVersion = 4;
+
   Future<String> createBackupJson() async {
     final products = await _database.select(_database.products).get();
     final categories = await _database.select(_database.categories).get();
@@ -29,7 +35,7 @@ class BackupService {
       'backupFormatVersion': 1,
       'application': 'BizFlow',
       'createdAt': DateTime.now().toUtc().toIso8601String(),
-      'databaseSchemaVersion': 4,
+      'databaseSchemaVersion': _currentSchemaVersion,
       'data': {
         'products': products.map((product) {
           return {
@@ -80,6 +86,8 @@ class BackupService {
             'email': customer.email,
             'address': customer.address,
             'outstandingBalance': customer.outstandingBalance,
+            'loyaltyPoints': customer.loyaltyPoints,
+            'pointsBalance': customer.pointsBalance,
           };
         }).toList(),
         'expenses': expenses.map((expense) {
@@ -112,6 +120,14 @@ class BackupService {
             'phone': settings.phone,
             'email': settings.email,
             'currency': settings.currency,
+            'loyaltyEnabled': settings.loyaltyEnabled,
+            'loyaltyEarnRate': settings.loyaltyEarnRate,
+            'loyaltyRedeemValue': settings.loyaltyRedeemValue,
+            'receiptHeader': settings.receiptHeader,
+            'receiptFooter': settings.receiptFooter,
+            'receiptShowPhone': settings.receiptShowPhone,
+            'receiptShowAddress': settings.receiptShowAddress,
+            'receiptNote': settings.receiptNote,
           };
         }).toList(),
       },
@@ -166,8 +182,18 @@ class BackupService {
       throw const FormatException('This backup format is not supported.');
     }
 
-    if (decoded['databaseSchemaVersion'] is! int ||
-        decoded['databaseSchemaVersion'] != 4) {
+    if (decoded['databaseSchemaVersion'] is! int) {
+      throw const FormatException(
+        'This backup is missing its database version.',
+      );
+    }
+
+    final backupSchemaVersion = decoded['databaseSchemaVersion'] as int;
+
+    // Accept any backup from a supported earlier schema version. Restore logic
+    // uses safe defaults for fields that did not exist in older backups.
+    if (backupSchemaVersion > _currentSchemaVersion ||
+        backupSchemaVersion < _oldestSupportedSchemaVersion) {
       throw const FormatException(
         'This backup was created with an unsupported database version.',
       );
@@ -246,6 +272,15 @@ class BackupService {
             throw FormatException(
               'Field "$field" in "$section" record $index '
               'must be an integer.',
+            );
+          }
+        }
+
+        void requireBool(String field) {
+          if (item[field] is! bool) {
+            throw FormatException(
+              'Field "$field" in "$section" record $index '
+              'must be a boolean.',
             );
           }
         }
@@ -333,6 +368,16 @@ class BackupService {
               'currency',
             ]) {
               requireString(field);
+            }
+            // Loyalty fields are optional so pre-v5 backups still validate.
+            if (item.containsKey('loyaltyEnabled')) {
+              requireBool('loyaltyEnabled');
+            }
+            if (item.containsKey('loyaltyEarnRate')) {
+              requireNumber('loyaltyEarnRate');
+            }
+            if (item.containsKey('loyaltyRedeemValue')) {
+              requireNumber('loyaltyRedeemValue');
             }
         }
       }
@@ -432,6 +477,20 @@ class BackupService {
               address: Value(item['address'] as String),
               outstandingBalance: Value(
                 (item['outstandingBalance'] as num).toDouble(),
+              ),
+              loyaltyPoints: Value(
+                (item['loyaltyPoints'] as num?)?.toInt() ?? 0,
+              ),
+              pointsBalance: Value(
+                (item['pointsBalance'] as num?)?.toInt() ??
+                    (item['loyaltyPoints'] as num?)?.toInt() ??
+                    0,
+              ),
+              loyaltyTier: Value(
+                (item['loyaltyTier'] as String?) ??
+                    _tierForLifetime(
+                      (item['loyaltyPoints'] as num?)?.toInt() ?? 0,
+                    ),
               ),
             );
           }).toList(),
@@ -538,6 +597,29 @@ class BackupService {
               phone: Value(item['phone'] as String),
               email: Value(item['email'] as String),
               currency: Value(item['currency'] as String),
+              loyaltyEnabled: Value(
+                (item['loyaltyEnabled'] as bool?) ?? true,
+              ),
+              loyaltyEarnRate: Value(
+                (item['loyaltyEarnRate'] as num?)?.toDouble() ?? 1.0,
+              ),
+              loyaltyRedeemValue: Value(
+                (item['loyaltyRedeemValue'] as num?)?.toDouble() ?? 0.01,
+              ),
+              receiptHeader: Value(
+                (item['receiptHeader'] as String?) ??
+                    'Thank you for your purchase!',
+              ),
+              receiptFooter: Value(
+                (item['receiptFooter'] as String?) ?? '',
+              ),
+              receiptShowPhone: Value(
+                (item['receiptShowPhone'] as bool?) ?? true,
+              ),
+              receiptShowAddress: Value(
+                (item['receiptShowAddress'] as bool?) ?? true,
+              ),
+              receiptNote: Value((item['receiptNote'] as String?) ?? ''),
             );
           }).toList(),
         );
@@ -545,8 +627,17 @@ class BackupService {
     });
   }
 
-  String _backupTimestamp(DateTime dateTime) {
-    final year = dateTime.year.toString().padLeft(4, '0');
+  /// Derives the tier name from lifetime points. Mirrors LoyaltyService so a
+  /// backup restore never downgrades a customer whose tier column is absent
+  /// (older backups) or inconsistent.
+  String _tierForLifetime(int points) {
+    if (points >= 5000) return 'Platinum';
+    if (points >= 2000) return 'Gold';
+    if (points >= 500) return 'Silver';
+    return 'Bronze';
+  }
+
+  String _backupTimestamp(DateTime dateTime) {    final year = dateTime.year.toString().padLeft(4, '0');
     final month = dateTime.month.toString().padLeft(2, '0');
     final day = dateTime.day.toString().padLeft(2, '0');
     final hour = dateTime.hour.toString().padLeft(2, '0');

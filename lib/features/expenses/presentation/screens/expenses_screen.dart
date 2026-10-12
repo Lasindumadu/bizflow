@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../data/database/app_database.dart';
@@ -12,10 +14,10 @@ class ExpensesScreen extends StatefulWidget {
   const ExpensesScreen({super.key});
 
   @override
-  State<ExpensesScreen> createState() => _ExpensesScreenState();
+  State<ExpensesScreen> createState() => ExpensesScreenState();
 }
 
-class _ExpensesScreenState extends State<ExpensesScreen> {
+class ExpensesScreenState extends State<ExpensesScreen> {
   final ExpenseRepository _expenseRepository = ExpenseRepository(appDatabase);
 
   final BusinessSettingsRepository _businessSettingsRepository =
@@ -32,6 +34,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
 
     _expensesStream = _expenseRepository.watchExpenses();
     _loadBusinessSettings();
+  }
+
+  Future<void> refreshBusinessSettings() async {
+    await _loadBusinessSettings();
   }
 
   Future<void> _loadBusinessSettings() async {
@@ -209,12 +215,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   return _buildEmptyState(context);
                 }
 
-                final totalExpenses = _calculateTotal(expenses);
-
                 return ListView(
                   padding: const EdgeInsets.all(AppDimensions.screenPadding),
                   children: [
-                    _buildSummaryCard(totalExpenses),
+                    _buildSummaryCard(expenses),
                     const SizedBox(height: AppDimensions.spacingXl),
                     const Text(
                       'Expense History',
@@ -238,47 +242,150 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  Widget _buildSummaryCard(double totalExpenses) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
+  Widget _buildSummaryCard(List<Expense> expenses) {
+    final total = _calculateTotal(expenses);
+    final now = DateTime.now();
+
+    final monthExpenses = expenses.where((expense) {
+      return expense.date.year == now.year && expense.date.month == now.month;
+    }).toList();
+
+    final monthTotal = _calculateTotal(monthExpenses);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: AppDecor.indigoGradient,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primaryDark.withValues(alpha: 0.3),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.account_balance_wallet_outlined,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
-              child: const Icon(
-                Icons.account_balance_wallet_outlined,
-                color: Colors.red,
+              const SizedBox(width: AppDimensions.spacingMd),
+              Text(
+                'Total Expenses',
+                style: AppTextStyles.titleMedium.copyWith(
+                  color: Colors.white70,
+                ),
               ),
-            ),
-            const SizedBox(width: AppDimensions.spacingLg),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Total Expenses', style: AppTextStyles.caption),
-                  const SizedBox(height: AppDimensions.spacingXs),
-                  Text(
-                    '$_currency ${totalExpenses.toStringAsFixed(2)}',
-                    style: AppTextStyles.statValue,
-                  ),
-                ],
+            ],
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '$_currency ${total.toStringAsFixed(2)}',
+            style: AppTextStyles.priceLarge.copyWith(color: Colors.white),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              _summaryMiniStat(
+                'This month',
+                '$_currency ${monthTotal.toStringAsFixed(2)}',
               ),
-            ),
-          ],
-        ),
+              Container(
+                width: 1,
+                height: 32,
+                color: Colors.white.withValues(alpha: 0.25),
+              ),
+              _summaryMiniStat('Entries', '${expenses.length}'),
+            ],
+          ),
+        ],
       ),
     );
   }
 
+  Widget _summaryMiniStat(String label, String value) {
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: AppTextStyles.caption.copyWith(color: Colors.white70),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: AppTextStyles.labelLarge.copyWith(color: Colors.white),
+          ),
+        ],
+      ),
+    );
+  }
+
+  (IconData, Color) _expenseStyle(String category) {
+    final c = category.toLowerCase();
+
+    if (c.contains('rent')) {
+      return (Icons.home_outlined, AppColors.accent);
+    }
+    if (c.contains('util') ||
+        c.contains('electric') ||
+        c.contains('internet')) {
+      return (Icons.bolt_outlined, AppColors.tertiary);
+    }
+    if (c.contains('sal') || c.contains('wage')) {
+      return (Icons.badge_outlined, AppColors.secondaryDark);
+    }
+    if (c.contains('transport') || c.contains('fuel')) {
+      return (Icons.local_shipping_outlined, AppColors.info);
+    }
+    if (c.contains('inventory') || c.contains('stock') || c.contains('suppl')) {
+      return (Icons.inventory_2_outlined, AppColors.primaryDark);
+    }
+    if (c.contains('market') || c.contains('ads')) {
+      return (Icons.campaign_outlined, AppColors.error);
+    }
+    return (Icons.receipt_long_outlined, AppColors.lightTextTertiary);
+  }
+
   Widget _buildExpenseCard(Expense expense) {
-    return Card(
+    final (icon, color) = _expenseStyle(expense.category);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
       margin: const EdgeInsets.only(bottom: AppDimensions.spacingMd),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : AppColors.lightBorder,
+          width: 1.1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Colors.black.withValues(alpha: 0.3)
+                : Colors.black.withValues(alpha: 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppDimensions.spacingLg,
@@ -288,27 +395,39 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: Colors.red.withValues(alpha: 0.1),
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
           ),
-          child: const Icon(Icons.receipt_long_outlined, color: Colors.red),
+          child: Icon(icon, color: color),
         ),
         title: Text(
           expense.title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600),
+          style: AppTextStyles.titleMedium,
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: AppDimensions.spacingXs),
-          child: Text('${expense.category} • ${_formatDate(expense.date)}'),
+          child: Text(
+            '${expense.category} • ${_formatDate(expense.date)}',
+            style: AppTextStyles.caption,
+          ),
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '-$_currency ${expense.amount.toStringAsFixed(2)}',
-              style: const TextStyle(fontWeight: FontWeight.bold),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '-$_currency ${expense.amount.toStringAsFixed(2)}',
+                style: AppTextStyles.labelMedium.copyWith(
+                  color: AppColors.error,
+                ),
+              ),
             ),
             PopupMenuButton<String>(
               onSelected: (value) {

@@ -553,6 +553,105 @@ Restoring a backup replaces the current application data with the data contained
 
 Keep recent backup files in a safe location before performing destructive operations such as a full data reset.
 
+### What a backup includes
+
+The backup also preserves newer data added in recent versions:
+
+* Customer loyalty — lifetime points, spendable balance and tier
+* Loyalty programme settings (enabled flag, earn rate, redeem value)
+* Receipt branding settings
+
+Backups created with an older schema still restore: missing fields fall back to
+safe defaults.
+
+---
+
+# Where Is My Data Stored?
+
+BizFlow is offline-first. All data lives on the device that is running the app —
+there is no BizFlow server, account or cloud database.
+
+* **Android / iOS / desktop:** a local SQLite database file managed by Drift.
+* **Web:** a persistent SQLite (WASM) database stored in the browser, using the
+  origin's persistent storage. Clearing site data / browser storage removes it.
+* **Backups:** JSON files that you choose where to save.
+
+Because data is local:
+
+* Take regular backups for important business data.
+* A web deployment's data is tied to the browser and domain it was created on.
+* Copying the browser profile or the database file is not a supported transfer
+  method — use Backup & Restore instead.
+
+---
+
+# Loyalty Programme
+
+Customers can earn points on every sale, with automatic tiers.
+
+* **Lifetime points** never decrease and determine the customer's tier
+  (Bronze, Silver, Gold, Platinum).
+* **Spendable balance** is the points a customer can redeem; redeeming points
+  reduces the balance but never the lifetime total, so a customer is never
+  demoted for spending points.
+* Tier multipliers increase earning for higher tiers.
+* Points can be redeemed at checkout, capped by the balance and by the amount
+  still owed.
+
+Configure the programme in **Settings → Loyalty Programme**.
+
+---
+
+# Returns & Refunds
+
+Process full or partial returns against completed sales from
+**More → Returns & Refunds**.
+
+* Choose quantities bounded by what is still returnable.
+* Choose the refund method and whether items are restocked.
+* Restocked items increase inventory and create a `RETURN` stock movement.
+* The original sale is never deleted or altered, so history stays intact.
+* Every refund is written to the Activity Log.
+
+---
+
+# Inventory Intelligence
+
+**More → Inventory Intelligence** turns stock numbers into decisions:
+
+* **Reorder suggestions** ranked by urgency, with suggested quantities.
+* **Dead stock** — items with no recent sales and the capital tied up in them.
+* **Stock valuation** — cost value, retail value and potential profit.
+
+---
+
+# Cashier Shifts
+
+**More → Cashier Shifts** tracks the cash drawer:
+
+* Open a shift with an opening float.
+* Record cash-in and cash-out movements.
+* Close with a counted amount and an optional discrepancy reason.
+* Expected cash is derived from real cash sales and cash refunds.
+
+---
+
+# Activity Log (Audit Trail)
+
+**More → Activity Log** records important actions — stock changes, sale
+cancellations, refunds and shift events — with actor, time and affected record.
+
+---
+
+# Import Products (CSV)
+
+**More → Import Products** bulk-adds products from a CSV file with:
+
+* Flexible column order and tolerant headers.
+* Validation of required fields and numbers.
+* Duplicate detection within the file and against existing products.
+* A preview showing what will be imported and any problem rows.
+
 ---
 
 # Reset All Data
