@@ -4,6 +4,33 @@ All notable changes to the BizFlow source-code template are documented in this f
 
 ---
 
+## [1.5.0] — Polish, Reliability & Low-Stock Alerts
+
+### Added
+
+* **Low-stock alerts.** Completing a sale that pushes a product's stock at or
+  below its low-stock threshold now raises an in-app notification ("Low stock"
+  or "Out of stock"), with the product name and remaining units. The alert
+  fires exactly once, on the crossing — restocking re-arms it.
+* **Sale→cancel invariant tests** proving stock is restored exactly once and
+  repeated cancellation is rejected.
+
+### Changed
+
+* `SaleRepository` accepts an optional `onLowStock` callback so any host app
+  can surface the same alerts.
+* Code-quality sweep: resolved all 21 analyzer findings (unused fields,
+  deprecated APIs, async context-safety guards, widget ordering) — analyze
+  is now fully clean with zero issues.
+
+### Verification
+
+* `flutter analyze` — 0 issues
+* `flutter test` — 120 tests passing
+* `flutter build web --release` — succeeds
+
+---
+
 ## [1.0.0] — Initial Release
 
 ### Added

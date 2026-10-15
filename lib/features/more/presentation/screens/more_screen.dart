@@ -6,16 +6,19 @@ import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../audit/presentation/screens/audit_log_screen.dart';
+import '../../../customer_credit/presentation/screens/customer_credit_screen.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
 import '../../../expenses/presentation/screens/expenses_screen.dart';
 import '../../../import/presentation/screens/product_import_screen.dart';
 import '../../../inventory/presentation/screens/inventory_screen.dart';
 import '../../../inventory/presentation/screens/inventory_intelligence_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
+import '../../../purchase_orders/presentation/screens/purchase_orders_screen.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../returns/presentation/screens/returns_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
 import '../../../shifts/presentation/screens/cash_shift_screen.dart';
+import '../../../suppliers/presentation/screens/suppliers_screen.dart';
 
 class MoreScreen extends StatelessWidget {
   const MoreScreen({super.key});
@@ -83,6 +86,33 @@ class MoreScreen extends StatelessWidget {
             gradient: AppDecor.tealGradient,
             onTap: () =>
                 _open(context, const InventoryIntelligenceScreen()),
+          ),
+          _MoreTile(
+            title: 'Suppliers',
+            subtitle: 'Manage supplier contacts & terms',
+            icon: Icons.local_shipping_outlined,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0891B2), Color(0xFF06B6D4)],
+            ),
+            onTap: () => _open(context, const SuppliersScreen()),
+          ),
+          _MoreTile(
+            title: 'Purchase Orders',
+            subtitle: 'Create & receive stock orders',
+            icon: Icons.shopping_cart_outlined,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF4338CA), Color(0xFF6366F1)],
+            ),
+            onTap: () => _open(context, const PurchaseOrdersScreen()),
+          ),
+          _MoreTile(
+            title: 'Customer Credit',
+            subtitle: 'Accounts receivable & payments',
+            icon: Icons.credit_card_outlined,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF10B981), Color(0xFF34D399)],
+            ),
+            onTap: () => _open(context, const CustomerCreditScreen()),
           ),
           _MoreTile(
             title: 'Expenses',

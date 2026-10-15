@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -276,9 +277,11 @@ class InventoryScreenState extends State<InventoryScreen> {
     final products = _filteredProducts;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Inventory')),
+      appBar: AppBar(
+        title: const Text('Inventory').animate().fadeIn(duration: 300.ms).slideX(begin: -0.2, end: 0),
+      ),
       body: _hasError
-          ? _buildErrorState()
+          ? _buildErrorState().animate().fadeIn(duration: 300.ms).shake()
           : SingleChildScrollView(
               padding: const EdgeInsets.all(AppDimensions.screenPadding),
               child: Column(
@@ -287,7 +290,7 @@ class InventoryScreenState extends State<InventoryScreen> {
                   const Text(
                     'Manage stock levels and inventory movements.',
                     style: AppTextStyles.bodySecondary,
-                  ),
+                  ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1, end: 0),
                   const SizedBox(height: AppDimensions.spacingLg),
                   Wrap(
                     spacing: AppDimensions.spacingMd,
@@ -298,25 +301,25 @@ class InventoryScreenState extends State<InventoryScreen> {
                         value: '${_products.length}',
                         icon: Icons.inventory_2_outlined,
                         color: AppColors.primaryDark,
-                      ),
+                      ).animate(delay: 100.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
                       _InventorySummaryCard(
                         title: 'Total Units',
                         value: '$_totalUnits',
                         icon: Icons.layers_outlined,
                         color: AppColors.accent,
-                      ),
+                      ).animate(delay: 200.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
                       _InventorySummaryCard(
                         title: 'Low Stock',
                         value: '$_lowStockCount',
                         icon: Icons.warning_amber_outlined,
                         color: AppColors.tertiary,
-                      ),
+                      ).animate(delay: 300.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
                       _InventorySummaryCard(
                         title: 'Out of Stock',
                         value: '$_outOfStockCount',
                         icon: Icons.remove_shopping_cart_outlined,
                         color: AppColors.errorDark,
-                      ),
+                      ).animate(delay: 400.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
                     ],
                   ),
                   const SizedBox(height: AppDimensions.spacingXl),
@@ -351,7 +354,7 @@ class InventoryScreenState extends State<InventoryScreen> {
                         ),
                       ),
                     ),
-                  ),
+                  ).animate().fadeIn(duration: 300.ms, delay: 500.ms).slideY(begin: 0.1, end: 0),
                   const SizedBox(height: AppDimensions.spacingXl),
                   Row(
                     children: [
@@ -362,7 +365,7 @@ class InventoryScreenState extends State<InventoryScreen> {
                         style: AppTextStyles.caption,
                       ),
                     ],
-                  ),
+                  ).animate().fadeIn(duration: 300.ms, delay: 600.ms).slideX(begin: -0.1, end: 0),
                   const SizedBox(height: AppDimensions.spacingMd),
                   if (_isLoading)
                     const Center(
@@ -380,37 +383,43 @@ class InventoryScreenState extends State<InventoryScreen> {
                           ],
                         ),
                       ),
-                    )
+                    ).animate().fadeIn(duration: 300.ms)
                   else if (products.isEmpty)
                     const Card(
                       child: Padding(
                         padding: EdgeInsets.all(AppDimensions.spacingXl),
                         child: Center(child: Text('No products found.')),
                       ),
-                    )
+                    ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.9, 0.9), end: const Offset(1.0, 1.0))
                   else
-                    ...products.map(
-                      (product) => InventoryProductCard(
-                        product: product,
-                        onStockIn: () {
-                          _performStockAction(product, StockActionType.stockIn);
-                        },
-                        onStockOut: () {
-                          _performStockAction(
-                            product,
-                            StockActionType.stockOut,
-                          );
-                        },
-                        onAdjustment: () {
-                          _performStockAction(
-                            product,
-                            StockActionType.adjustment,
-                          );
-                        },
-                        onHistory: () {
-                          _showHistory(product);
-                        },
-                      ),
+                    ...products.asMap().entries.map(
+                      (entry) {
+                        final index = entry.key;
+                        final product = entry.value;
+                        return InventoryProductCard(
+                          product: product,
+                          onStockIn: () {
+                            _performStockAction(product, StockActionType.stockIn);
+                          },
+                          onStockOut: () {
+                            _performStockAction(
+                              product,
+                              StockActionType.stockOut,
+                            );
+                          },
+                          onAdjustment: () {
+                            _performStockAction(
+                              product,
+                              StockActionType.adjustment,
+                            );
+                          },
+                          onHistory: () {
+                            _showHistory(product);
+                          },
+                        ).animate(delay: Duration(milliseconds: 700 + 50 * index))
+                          .fadeIn(duration: 300.ms, curve: Curves.easeOutCubic)
+                          .slideX(begin: 0.1, end: 0);
+                      },
                     ),
                 ],
               ),

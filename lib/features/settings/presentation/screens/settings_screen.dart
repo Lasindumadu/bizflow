@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
@@ -813,35 +814,124 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: AppDimensions.spacingMd),
+            
+            // Theme Mode Selector
             AnimatedBuilder(
               animation: themeController,
               builder: (context, child) {
-                return SegmentedButton<ThemeMode>(
-                  segments: const [
-                    ButtonSegment<ThemeMode>(
-                      value: ThemeMode.light,
-                      icon: Icon(Icons.light_mode_outlined),
-                      label: Text('Light'),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Theme Mode',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                    ButtonSegment<ThemeMode>(
-                      value: ThemeMode.dark,
-                      icon: Icon(Icons.dark_mode_outlined),
-                      label: Text('Dark'),
-                    ),
-                    ButtonSegment<ThemeMode>(
-                      value: ThemeMode.system,
-                      icon: Icon(Icons.brightness_auto_outlined),
-                      label: Text('System'),
+                    const SizedBox(height: AppDimensions.spacingSm),
+                    Wrap(
+                      spacing: AppDimensions.spacingSm,
+                      runSpacing: AppDimensions.spacingSm,
+                      children: AppThemeMode.values.map((mode) {
+                        final isSelected = themeController.themeMode == mode;
+                        return ChoiceChip(
+                          label: Text(mode.name
+                              .replaceAllMapped(RegExp(r'([A-Z])'), (m) => ' ${m.group(0)}')
+                              .trim()),
+                          avatar: Icon(
+                            _getThemeModeIcon(mode),
+                            size: 18,
+                            color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
+                          ),
+                          selected: isSelected,
+                          onSelected: (_) => themeController.setThemeMode(mode),
+                          selectedColor: colorScheme.primary,
+                          labelStyle: TextStyle(
+                            color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(
+                              color: isSelected ? colorScheme.primary : colorScheme.outline,
+                              width: isSelected ? 0 : 1.5,
+                            ),
+                          ),
+                        ).animate(target: themeController.animationsEnabled ? 1 : 0)
+                          .scale(duration: 200.ms, curve: Curves.easeOutBack);
+                      }).toList(),
                     ),
                   ],
-                  selected: {themeController.themeMode},
-                  onSelectionChanged: (selection) {
-                    if (selection.isEmpty) {
-                      return;
-                    }
-
-                    themeController.setThemeMode(selection.first);
-                  },
+                );
+              },
+            ),
+            
+            const SizedBox(height: AppDimensions.spacingLg),
+            
+            // Font Size Selector
+            AnimatedBuilder(
+              animation: themeController,
+              builder: (context, child) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Font Size',
+                      style: AppTextStyles.labelMedium.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: AppDimensions.spacingSm),
+                    Wrap(
+                      spacing: AppDimensions.spacingSm,
+                      runSpacing: AppDimensions.spacingSm,
+                      children: AppFontSize.values.map((size) {
+                        final isSelected = themeController.fontSize == size;
+                        return ChoiceChip(
+                          label: Text(_getFontSizeLabel(size)),
+                          selected: isSelected,
+                          onSelected: (_) => themeController.setFontSize(size),
+                          selectedColor: colorScheme.primaryContainer,
+                          labelStyle: TextStyle(
+                            color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
+                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            side: BorderSide(
+                              color: isSelected ? colorScheme.primary : colorScheme.outline,
+                              width: isSelected ? 0 : 1.5,
+                            ),
+                          ),
+                        ).animate(target: themeController.animationsEnabled ? 1 : 0)
+                          .scale(duration: 200.ms, curve: Curves.easeOutBack);
+                      }).toList(),
+                    ),
+                  ],
+                );
+              },
+            ),
+            
+            const SizedBox(height: AppDimensions.spacingLg),
+            
+            // Animations Toggle
+            AnimatedBuilder(
+              animation: themeController,
+              builder: (context, child) {
+                return SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    'Animations',
+                    style: AppTextStyles.bodyMedium.copyWith(color: colorScheme.onSurface),
+                  ),
+                  subtitle: Text(
+                    'Enable smooth transitions and micro-interactions',
+                    style: AppTextStyles.bodySmall.copyWith(color: colorScheme.onSurfaceVariant),
+                  ),
+                  value: themeController.animationsEnabled,
+                  onChanged: (v) => themeController.setAnimationsEnabled(v),
+                  activeThumbColor: colorScheme.primary,
+                  activeTrackColor: colorScheme.primary.withValues(alpha: 0.5),
                 );
               },
             ),
@@ -849,6 +939,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  String _getFontSizeLabel(AppFontSize size) {
+    switch (size) {
+      case AppFontSize.small:
+        return 'Small (85%)';
+      case AppFontSize.medium:
+        return 'Medium (100%)';
+      case AppFontSize.large:
+        return 'Large (115%)';
+      case AppFontSize.extraLarge:
+        return 'Extra Large (130%)';
+    }
+  }
+
+  IconData _getThemeModeIcon(AppThemeMode mode) {
+    switch (mode) {
+      case AppThemeMode.light:
+        return Icons.light_mode_outlined;
+      case AppThemeMode.dark:
+        return Icons.dark_mode_outlined;
+      case AppThemeMode.system:
+        return Icons.brightness_auto_outlined;
+      case AppThemeMode.highContrastLight:
+        return Icons.contrast_outlined;
+      case AppThemeMode.highContrastDark:
+        return Icons.brightness_high_outlined;
+      case AppThemeMode.sepia:
+        return Icons.wb_sunny_outlined;
+    }
   }
 
   Widget _buildReceiptSection(BuildContext context) {

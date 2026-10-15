@@ -212,6 +212,24 @@ class AppDecor {
   // Extended modern gradients
   // ─────────────────────────────────────────────
 
+  static LinearGradient warningGradient = const LinearGradient(
+    colors: [Color(0xFFFBBF24), Color(0xFFF59E0B)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static LinearGradient errorGradient = const LinearGradient(
+    colors: [Color(0xFFF87171), Color(0xFFEF4444)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static LinearGradient grayGradient = const LinearGradient(
+    colors: [Color(0xFF9CA3AF), Color(0xFF6B7280)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
   static LinearGradient tealGradient = const LinearGradient(
     colors: [AppColors.cyanLight, AppColors.cyan],
     begin: Alignment.topLeft,

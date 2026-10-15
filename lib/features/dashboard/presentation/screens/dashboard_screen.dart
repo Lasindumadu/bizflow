@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
@@ -123,13 +124,13 @@ class DashboardScreenState extends State<DashboardScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('BizFlow'),
+        title: const Text('BizFlow').animate().fadeIn(duration: 300.ms).slideX(begin: -0.2, end: 0),
         actions: [
           IconButton(
             onPressed: widget.onOpenSettings,
             icon: const Icon(Icons.settings_outlined),
             tooltip: 'Settings',
-          ),
+          ).animate().fadeIn(duration: 300.ms, delay: 100.ms).slideX(begin: 0.2, end: 0),
         ],
       ),
       body: SafeArea(
@@ -144,7 +145,7 @@ class DashboardScreenState extends State<DashboardScreen>
                   }
 
                   if (snapshot.hasError) {
-                    return _buildErrorState();
+                    return _buildErrorState().animate().fadeIn(duration: 300.ms).shake();
                   }
 
                   final stats = snapshot.data;
@@ -159,7 +160,7 @@ class DashboardScreenState extends State<DashboardScreen>
                       position: _pageSlideAnimation,
                       child: _buildContent(context, stats),
                     ),
-                  );
+                  ).animate().fadeIn(duration: 400.ms, curve: Curves.easeOutCubic);
                 },
               ),
       ),
@@ -175,46 +176,58 @@ class DashboardScreenState extends State<DashboardScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildWelcomeHeader(context),
+              _buildWelcomeHeader(context).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
 
               const SizedBox(height: AppDimensions.spacingXl),
 
               ResponsiveGrid(
-                children: [
-                  DashboardStatCard(
-                    title: "Today's Sales",
-                    value: '$_currency ${stats.todaySales.toStringAsFixed(2)}',
-                    icon: Icons.payments_rounded,
-                    gradient: AppDecor.indigoGradient.colors,
-                    onTap: widget.onOpenPos,
-                  ),
-                  DashboardStatCard(
-                    title: "Today's Profit",
-                    value: '$_currency ${stats.todayProfit.toStringAsFixed(2)}',
-                    icon: Icons.trending_up_rounded,
-                    gradient: AppDecor.moneyGradient.colors,
-                    trend: stats.todayProfit >= 0 ? 'Profit' : 'Loss',
-                    trendUp: stats.todayProfit >= 0,
-                  ),
-                  DashboardStatCard(
-                    title: 'Transactions',
-                    value: stats.todayTransactions.toString(),
-                    icon: Icons.receipt_long_rounded,
-                    gradient: AppDecor.tealGradient.colors,
-                  ),
-                  DashboardStatCard(
-                    title: 'Products',
-                    value: stats.totalProducts.toString(),
-                    icon: Icons.inventory_2_rounded,
-                    gradient: AppDecor.skyGradient.colors,
-                  ),
-                  DashboardStatCard(
-                    title: 'Low Stock',
-                    value: stats.lowStockProducts.toString(),
-                    icon: Icons.warning_amber_rounded,
-                    gradient: AppDecor.amberGradient.colors,
-                  ),
-                ],
+                children: List.generate(6, (index) {
+                  final cards = [
+                    DashboardStatCard(
+                      title: "Today's Sales",
+                      value: '$_currency ${stats.todaySales.toStringAsFixed(2)}',
+                      icon: Icons.payments_rounded,
+                      gradient: AppDecor.indigoGradient.colors,
+                      onTap: widget.onOpenPos,
+                    ),
+                    DashboardStatCard(
+                      title: "Today's Profit",
+                      value: '$_currency ${stats.todayProfit.toStringAsFixed(2)}',
+                      icon: Icons.trending_up_rounded,
+                      gradient: AppDecor.moneyGradient.colors,
+                      trend: stats.todayProfit >= 0 ? 'Profit' : 'Loss',
+                      trendUp: stats.todayProfit >= 0,
+                    ),
+                    DashboardStatCard(
+                      title: 'Transactions',
+                      value: stats.todayTransactions.toString(),
+                      icon: Icons.receipt_long_rounded,
+                      gradient: AppDecor.tealGradient.colors,
+                    ),
+                    DashboardStatCard(
+                      title: 'Products',
+                      value: stats.totalProducts.toString(),
+                      icon: Icons.inventory_2_rounded,
+                      gradient: AppDecor.skyGradient.colors,
+                    ),
+                    DashboardStatCard(
+                      title: 'Low Stock',
+                      value: stats.lowStockProducts.toString(),
+                      icon: Icons.warning_amber_rounded,
+                      gradient: AppDecor.amberGradient.colors,
+                    ),
+                    DashboardStatCard(
+                      title: 'Customers',
+                      value: stats.totalCustomers.toString(),
+                      icon: Icons.people_alt_rounded,
+                      gradient: AppDecor.violetGradient.colors,
+                    ),
+                  ];
+                  return cards[index]
+                      .animate(delay: Duration(milliseconds: 100 * (index + 1)))
+                      .fadeIn(duration: 300.ms, curve: Curves.easeOutCubic)
+                      .slideY(begin: 0.2, end: 0);
+                }),
               ),
 
               const SizedBox(height: AppDimensions.spacingXl),
@@ -225,19 +238,19 @@ class DashboardScreenState extends State<DashboardScreen>
                     '$_currency ${stats.todaySales.toStringAsFixed(2)} today • Tap to open POS',
                 icon: Icons.point_of_sale_rounded,
                 onTap: widget.onOpenPos,
-              ),
+              ).animate().fadeIn(duration: 400.ms, delay: 500.ms).slideY(begin: 0.1, end: 0),
 
               const SizedBox(height: AppDimensions.spacingMd),
 
-              _buildQuickActions(context),
+              _buildQuickActions(context).animate().fadeIn(duration: 400.ms, delay: 600.ms).slideY(begin: 0.1, end: 0),
 
               const SizedBox(height: AppDimensions.spacingXl),
 
-              _revenueChartCard(context),
+              _revenueChartCard(context).animate().fadeIn(duration: 400.ms, delay: 700.ms).slideY(begin: 0.1, end: 0),
 
               const SizedBox(height: AppDimensions.spacingXl),
 
-              _lowStockCard(context),
+              _lowStockCard(context).animate().fadeIn(duration: 400.ms, delay: 800.ms).slideY(begin: 0.1, end: 0),
 
               const SizedBox(height: AppDimensions.spacingXxl),
 
@@ -245,7 +258,7 @@ class DashboardScreenState extends State<DashboardScreen>
                 context,
                 title: 'Recent Sales',
                 subtitle: 'Your latest transactions',
-              ),
+              ).animate().fadeIn(duration: 300.ms, delay: 900.ms).slideX(begin: -0.1, end: 0),
 
               const SizedBox(height: AppDimensions.spacingMd),
 
@@ -269,11 +282,13 @@ class DashboardScreenState extends State<DashboardScreen>
                   final sales = snapshot.data ?? [];
 
                   if (sales.isEmpty) {
-                    return const EmptySalesCard();
+                    return const EmptySalesCard().animate().fadeIn(duration: 400.ms);
                   }
 
                   return Column(
-                    children: sales.map((sale) {
+                    children: sales.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final sale = entry.value;
                       return Padding(
                         padding: const EdgeInsets.only(
                           bottom: AppDimensions.spacingMd,
@@ -289,7 +304,9 @@ class DashboardScreenState extends State<DashboardScreen>
                               ),
                             );
                           },
-                        ),
+                        ).animate(delay: Duration(milliseconds: 1000 + 80 * index))
+                          .fadeIn(duration: 300.ms, curve: Curves.easeOutCubic)
+                          .slideX(begin: 0.1, end: 0),
                       );
                     }).toList(),
                   );

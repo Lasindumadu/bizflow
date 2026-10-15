@@ -29,7 +29,16 @@ class PosScreen extends StatefulWidget {
 
 class PosScreenState extends State<PosScreen> {
   final ProductRepository _productRepository = ProductRepository(appDatabase);
-  final SaleRepository _saleRepository = SaleRepository(appDatabase);
+  final SaleRepository _saleRepository = SaleRepository(appDatabase,
+      onLowStock: (productName, remainingStock) {
+    notificationStore.push(
+      type: AppNotificationType.stock,
+      title: remainingStock <= 0 ? 'Out of stock' : 'Low stock',
+      message:
+          '$productName is running low — $remainingStock '
+          'unit${remainingStock == 1 ? '' : 's'} left.',
+    );
+  });
   final CustomerRepository _customerRepository = CustomerRepository(
     appDatabase,
   );

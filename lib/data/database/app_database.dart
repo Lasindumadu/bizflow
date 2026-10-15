@@ -7,8 +7,11 @@ import 'tables/cash_movements.dart';
 import 'tables/cash_shifts.dart';
 import 'tables/categories.dart';
 import 'tables/customers.dart';
+import 'tables/customer_credit.dart';
 import 'tables/expenses.dart';
 import 'tables/products.dart';
+import 'tables/purchase_order_items.dart';
+import 'tables/purchase_orders.dart';
 import 'tables/sale_items.dart';
 import 'tables/sale_returns.dart';
 import 'tables/sale_return_items.dart';
@@ -16,6 +19,7 @@ import 'tables/sales.dart';
 import 'tables/stock_movements.dart';
 import 'tables/audit_logs.dart';
 import 'tables/business_settings.dart';
+import 'tables/suppliers.dart';
 
 part 'app_database.g.dart';
 
@@ -34,6 +38,11 @@ part 'app_database.g.dart';
     AuditLogs,
     CashShifts,
     CashMovements,
+    Suppliers,
+    PurchaseOrders,
+    PurchaseOrderItems,
+    CustomerCreditAccounts,
+    CustomerCreditTransactions,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -50,9 +59,9 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 11;
 
-  static const int currentSchemaVersion = 9;
+  static const int currentSchemaVersion = 11;
 
   @override
   MigrationStrategy get migration {
@@ -124,6 +133,19 @@ class AppDatabase extends _$AppDatabase {
             businessSettings.receiptShowAddress,
           );
           await m.addColumn(businessSettings, businessSettings.receiptNote);
+        }
+
+        if (from < 10) {
+          // Suppliers and purchase orders.
+          await m.createTable(suppliers);
+          await m.createTable(purchaseOrders);
+          await m.createTable(purchaseOrderItems);
+        }
+
+        if (from < 11) {
+          // Customer credit / accounts receivable.
+          await m.createTable(customerCreditAccounts);
+          await m.createTable(customerCreditTransactions);
         }
       },
     );

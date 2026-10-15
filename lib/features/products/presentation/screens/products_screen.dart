@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
@@ -532,7 +533,7 @@ class ProductsScreenState extends State<ProductsScreen>
     );
   }
 
-  @override
+@override
   Widget build(BuildContext context) {
     final filteredProducts = products.where((product) {
       final name = product.name.toLowerCase();
@@ -556,7 +557,7 @@ class ProductsScreenState extends State<ProductsScreen>
             color: Theme.of(context).colorScheme.onSurface,
             fontWeight: FontWeight.w700,
           ),
-        ),
+        ).animate().fadeIn(duration: 300.ms).slideX(begin: -0.2, end: 0),
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: AppDecor.heroGradient(
@@ -582,12 +583,12 @@ class ProductsScreenState extends State<ProductsScreen>
                   borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
                 ),
               ),
-            ),
+            ).animate().fadeIn(duration: 300.ms, delay: 100.ms).slideX(begin: 0.2, end: 0),
           ),
         ],
       ),
       body: hasError
-          ? _buildErrorState()
+          ? _buildErrorState().animate().fadeIn(duration: 300.ms).shake()
           : SafeArea(
               child: FadeTransition(
                 opacity: _pageFadeAnimation,
@@ -601,7 +602,7 @@ class ProductsScreenState extends State<ProductsScreen>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildPageHeader(context),
+                            _buildPageHeader(context).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
 
                             const SizedBox(height: AppDimensions.spacingXl),
 
@@ -611,18 +612,18 @@ class ProductsScreenState extends State<ProductsScreen>
                                   searchQuery = value;
                                 });
                               },
-                            ),
+                            ).animate().fadeIn(duration: 300.ms, delay: 200.ms).slideY(begin: 0.1, end: 0),
 
                             const SizedBox(height: AppDimensions.spacingMd),
 
-                            _buildCategoryFilter(context),
+                            _buildCategoryFilter(context).animate().fadeIn(duration: 300.ms, delay: 300.ms).slideY(begin: 0.1, end: 0),
 
                             const SizedBox(height: AppDimensions.spacingXl),
 
                             _buildProductSectionHeader(
                               context,
                               filteredProducts.length,
-                            ),
+                            ).animate().fadeIn(duration: 300.ms, delay: 400.ms).slideX(begin: -0.1, end: 0),
 
                             const SizedBox(height: AppDimensions.spacingMd),
 
@@ -661,7 +662,7 @@ class ProductsScreenState extends State<ProductsScreen>
                               child: _buildProductContent(
                                 context,
                                 filteredProducts,
-                              ),
+                              ).animate().fadeIn(duration: 400.ms, delay: 500.ms),
                             ),
                           ],
                         ),

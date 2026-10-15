@@ -11,6 +11,7 @@ class DashboardStats {
   final double todayProfit;
   final int todayTransactions;
   final int totalProducts;
+  final int totalCustomers;
   final int lowStockProducts;
 
   const DashboardStats({
@@ -18,6 +19,7 @@ class DashboardStats {
     required this.todayProfit,
     required this.todayTransactions,
     required this.totalProducts,
+    required this.totalCustomers,
     required this.lowStockProducts,
   });
 }
@@ -115,6 +117,7 @@ class DashboardRepository {
 
   Future<DashboardStats> _loadStats() async {
     final products = await database.select(database.products).get();
+    final customers = await database.select(database.customers).get();
 
     final todaySales = await _getTodaySales();
     final todayProfit = await _getTodayProfit();
@@ -129,6 +132,7 @@ class DashboardRepository {
       todayProfit: todayProfit,
       todayTransactions: todayTransactions,
       totalProducts: products.length,
+      totalCustomers: customers.length,
       lowStockProducts: lowStockProducts,
     );
   }

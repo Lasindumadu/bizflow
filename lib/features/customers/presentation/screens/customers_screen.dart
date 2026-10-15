@@ -7,7 +7,9 @@ import '../../../../core/theme/app_text_styles.dart';
 import '../../../../data/database/app_database.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
+import '../../../../data/repositories/customer_credit_repository.dart';
 import '../../../../data/repositories/customer_repository.dart';
+import '../../../customer_credit/presentation/screens/customer_credit_detail_screen.dart';
 import 'add_customer_screen.dart';
 
 class CustomersScreen extends StatefulWidget {
@@ -65,6 +67,48 @@ class CustomersScreenState extends State<CustomersScreen> {
         builder: (context) => AddCustomerScreen(customer: customer),
       ),
     );
+  }
+
+  Future<void> _openCustomerCredit(Customer customer) async {
+    final creditRepo = CustomerCreditRepository(appDatabase);
+    final account = await creditRepo.getCreditAccountByCustomer(customer.id);
+    
+    if (!mounted) return;
+    
+    if (account == null) {
+      // Ask if they want to create a credit account
+      final shouldCreate = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Create Credit Account?'),
+          content: Text(
+            '"${customer.name}" does not have a credit account yet.\n\n'
+            'Would you like to create one to track their outstanding balance and payment terms?',
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Create')),
+          ],
+        ),
+      );
+      
+      if (shouldCreate != true) return;
+      
+      // Create the account
+      final newAccount = await creditRepo.ensureCreditAccount(customer.id);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CustomerCreditDetailScreen(account: newAccount),
+        ),
+      );
+    } else {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => CustomerCreditDetailScreen(account: account),
+        ),
+      );
+    }
   }
 
   Future<void> _confirmDeleteCustomer(Customer customer) async {
@@ -250,6 +294,9 @@ class CustomersScreenState extends State<CustomersScreen> {
                                   },
                                   onDelete: () {
                                     _confirmDeleteCustomer(customer);
+                                  },
+                                  onCredit: () {
+                                    _openCustomerCredit(customer);
                                   },
                                 );
                               },
@@ -524,11 +571,13 @@ class _CustomerCard extends StatelessWidget {
   final String currency;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onCredit;
   const _CustomerCard({
     required this.customer,
     required this.currency,
     required this.onEdit,
     required this.onDelete,
+    required this.onCredit,
   });
   @override
   Widget build(BuildContext context) {
@@ -686,14 +735,16 @@ class _CustomerCard extends StatelessWidget {
                   onEdit();
                 } else if (value == 'delete') {
                   onDelete();
+                } else if (value == 'credit') {
+                  onCredit();
                 }
               },
               icon: Icon(
                 Icons.more_vert_rounded,
                 color: colorScheme.onSurfaceVariant,
               ),
-              itemBuilder: (context) => const [
-                PopupMenuItem(
+              itemBuilder: (context) => [
+                const PopupMenuItem(
                   value: 'edit',
                   child: ListTile(
                     leading: Icon(Icons.edit_outlined),
@@ -701,7 +752,15 @@ class _CustomerCard extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                   ),
                 ),
-                PopupMenuItem(
+                const PopupMenuItem(
+                  value: 'credit',
+                  child: ListTile(
+                    leading: Icon(Icons.credit_card_outlined),
+                    title: Text('Credit Account'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                const PopupMenuItem(
                   value: 'delete',
                   child: ListTile(
                     leading: Icon(Icons.delete_outline, color: Colors.red),

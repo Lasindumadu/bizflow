@@ -7,7 +7,13 @@ import '../database/app_database.dart' as db;
 class SaleRepository {
   final db.AppDatabase database;
 
-  SaleRepository(this.database);
+  /// Called when a completed sale pushes a product's stock at or below its
+  /// low-stock threshold. Receives the product name and remaining stock.
+  ///
+  /// Invoked *after* the sale has been committed — treat as best-effort.
+  final void Function(String productName, int remainingStock)? onLowStock;
+
+  SaleRepository(this.database, {this.onLowStock});
 
   Stream<List<model.Sale>> watchSales() {
     final query = database.select(database.sales)
@@ -191,6 +197,13 @@ class SaleRepository {
                 createdAt: createdAt,
               ),
             );
+
+        // Fire a low-stock alert when this sale just crossed the threshold.
+        if (onLowStock != null &&
+            previousStock > product.lowStockThreshold &&
+            newStock <= product.lowStockThreshold) {
+          onLowStock!(product.name, newStock);
+        }
       }
 
       return model.Sale(

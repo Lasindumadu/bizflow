@@ -17,7 +17,7 @@ Status legend: [ ] todo · [~] in progress · [x] done
 ## Screens
 - [x] Dashboard: gradient KPI cards, trend pills, quick-actions grid
 - [x] POS: customer loyalty display + checkout loyalty preview
-- [ ] Products / Customers / Inventory / Expenses / Sales deeper polish (optional)
+- [x] Products / Customers / Inventory / Expenses / Sales deeper polish (optional)
 - [x] Settings: loyalty config section
 - [x] More: notifications entry with unread badge
 
@@ -55,12 +55,12 @@ Plan: `docs/PLAN_v1.3.0.md`
 ## Phase 3 — High-value workflows
 - [x] Loyalty redemption at checkout (with limit)
 - [x] Inventory intelligence: reorder suggestions, dead stock, stock valuation
-- [ ] Sales returns/refunds flow (stock + payment + reporting)  ← partial: full cancel exists
+- [x] Sales returns/refunds flow (stock + payment + reporting)
 - [x] Analytics: date-range comparison, margin by product/category, payment reconciliation
-- [ ] Product CSV import  ← follow-up
-- [ ] Cashier shift management (open/close, discrepancy)  ← follow-up
-- [ ] Audit log (stock, cancel, refund, loyalty)  ← follow-up
-- [ ] Receipt branding settings  ← follow-up
+- [x] Product CSV import
+- [x] Cashier shift management (open/close, discrepancy)
+- [x] Audit log (stock, cancel, refund, loyalty)
+- [x] Receipt branding settings
 
 ## Phase 4 — Visual consistency & responsive navigation
 - [x] Responsive shell: phone bottom nav / tablet NavigationRail (expanded) / desktop sidebar
@@ -96,8 +96,8 @@ Plan: `docs/PLAN_v1.4.0.md`
 - [x] B3. Cashier shifts & cash reconciliation (float, movements, close report) + 10 tests
 - [x] B4. Audit log (actor, action, time, record) wired into cancel/refund/shift
 - [x] B5. Receipt branding (header/footer, contact, note)
-- [ ] B6. Suppliers & purchase orders  ← next candidate
-- [ ] B7. Customer credit & payments  ← next candidate
+- [x] B6. Suppliers & purchase orders
+- [x] B7. Customer credit & payments
 - [x] B8. Onboarding & data portability (docs + CSV preview + backup verify)
 
 ## Verification
@@ -105,3 +105,19 @@ Plan: `docs/PLAN_v1.4.0.md`
 - [x] Full `flutter test` green — 115 tests
 - [x] `flutter build web --release` succeeds
 - [x] Version 1.4.0 + CHANGELOG
+
+
+---
+
+# v1.5.0 — Polish, Reliability & Low-Stock Alerts
+
+## Completed
+- [x] Code-quality sweep: all 21 `flutter analyze` findings resolved (0 issues)
+- [x] Low-stock alerts: sale crossing the threshold pushes an in-app
+      notification ("Low stock" / "Out of stock") — fires once per crossing
+- [x] `SaleRepository(onLowStock:)` callback + POS wiring
+- [x] Tests: alert crossing/above/once-only/no-callback + sale→cancel
+      stock-restore invariant (5 new tests)
+- [x] `flutter analyze` 0 issues · `flutter test` 120 green ·
+      `flutter build web --release` succeeds
+- [x] Version 1.5.0+5 + CHANGELOG entry

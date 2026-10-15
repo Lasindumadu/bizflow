@@ -206,8 +206,6 @@ class AppTextStyles {
 
   // ─────────────────────────────────────────────
   // Modern numeric / tabular styles
-  // Use these for any money, quantity or metric that
-  // changes in place so digits do not shift width.
   // ─────────────────────────────────────────────
 
   static const numericLarge = TextStyle(
@@ -266,4 +264,20 @@ class AppTextStyles {
     height: 1.4,
     letterSpacing: 0.1,
   );
+
+  // ─────────────────────────────────────────────
+  // Font scaling helpers
+  // ─────────────────────────────────────────────
+
+  /// Scale a text style by the given font scale factor
+  static TextStyle scale(TextStyle style, double scale) {
+    return style.copyWith(
+      fontSize: (style.fontSize ?? 14) * scale,
+    );
+  }
+
+  /// Scale all text styles in a map by the given factor
+  static Map<String, TextStyle> scaleAll(Map<String, TextStyle> styles, double scale) {
+    return styles.map((key, style) => MapEntry(key, AppTextStyles.scale(style, scale)));
+  }
 }

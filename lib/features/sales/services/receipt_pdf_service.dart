@@ -46,19 +46,19 @@ class ReceiptPdfService {
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(32),
-        build: (context) {
-          return [
-            _buildHeader(businessSettings),
-            pw.SizedBox(height: 24),
-            _buildSaleInformation(sale, customer),
-            pw.SizedBox(height: 24),
-            _buildItemsTable(items, businessSettings.currency),
-            pw.SizedBox(height: 24),
-            _buildSummary(sale, businessSettings.currency),
-            pw.SizedBox(height: 40),
-            _buildFooter(),
-          ];
-        },
+build: (context) {
+            return [
+              _buildHeader(businessSettings),
+              pw.SizedBox(height: 24),
+              _buildSaleInformation(sale, customer),
+              pw.SizedBox(height: 24),
+              _buildItemsTable(items, businessSettings.currency),
+              pw.SizedBox(height: 24),
+              _buildSummary(sale, businessSettings.currency),
+              pw.SizedBox(height: 40),
+              _buildFooter(businessSettings),
+            ];
+          },
       ),
     );
 
@@ -74,7 +74,15 @@ class ReceiptPdfService {
           textAlign: pw.TextAlign.center,
           style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold),
         ),
-        if (settings.address.isNotEmpty) ...[
+        if (settings.receiptHeader.isNotEmpty) ...[
+          pw.SizedBox(height: 8),
+          pw.Text(
+            settings.receiptHeader,
+            textAlign: pw.TextAlign.center,
+            style: const pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold),
+          ),
+        ],
+        if (settings.receiptShowAddress == true && settings.address.isNotEmpty) ...[
           pw.SizedBox(height: 5),
           pw.Text(
             settings.address,
@@ -82,7 +90,7 @@ class ReceiptPdfService {
             style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
           ),
         ],
-        if (settings.phone.isNotEmpty) ...[
+        if (settings.receiptShowPhone == true && settings.phone.isNotEmpty) ...[
           pw.SizedBox(height: 3),
           pw.Text(
             settings.phone,
@@ -267,22 +275,49 @@ class ReceiptPdfService {
     );
   }
 
-  pw.Widget _buildFooter() {
+  pw.Widget _buildFooter(BusinessSetting settings) {
+    final children = <pw.Widget>[
+      pw.Divider(),
+      pw.SizedBox(height: 12),
+    ];
+
+    if (settings.receiptFooter.isNotEmpty) {
+      children.add(
+        pw.Text(
+          settings.receiptFooter,
+          textAlign: pw.TextAlign.center,
+          style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
+        ),
+      );
+      children.add(pw.SizedBox(height: 8));
+    }
+
+    if (settings.receiptNote.isNotEmpty) {
+      children.add(
+        pw.Text(
+          settings.receiptNote,
+          textAlign: pw.TextAlign.center,
+          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600, fontStyle: pw.FontStyle.italic),
+        ),
+      );
+      children.add(pw.SizedBox(height: 8));
+    }
+
+    children.addAll([
+      pw.Text(
+        'Thank you for your business!',
+        style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
+      ),
+      pw.SizedBox(height: 5),
+      pw.Text(
+        'Powered by BizFlow',
+        style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
+      ),
+    ]);
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
-      children: [
-        pw.Divider(),
-        pw.SizedBox(height: 12),
-        pw.Text(
-          'Thank you for your business!',
-          style: pw.TextStyle(fontSize: 11, fontWeight: pw.FontWeight.bold),
-        ),
-        pw.SizedBox(height: 5),
-        pw.Text(
-          'Powered by BizFlow',
-          style: const pw.TextStyle(fontSize: 9, color: PdfColors.grey600),
-        ),
-      ],
+      children: children,
     );
   }
 
