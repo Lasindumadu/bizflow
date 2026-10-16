@@ -396,6 +396,7 @@ class BackupService {
       await _database.delete(_database.products).go();
       await _database.delete(_database.categories).go();
       await _database.delete(_database.businessSettings).go();
+      await _database.delete(_database.staffAccounts).go();
     });
   }
 

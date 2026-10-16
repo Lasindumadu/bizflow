@@ -1,0 +1,124 @@
+
+  test_output2.txt:115:00:04 +3 -1: StaffAccountRepository createAccount assigns the recovery-code verifier to the owner row only [E]                                                                                         
+> test_output2.txt:116:  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:117:   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:118:   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:119:   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:120:   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:177:00:04 +3 -2: StaffAccountRepository createAccount normalizes duplicate usernames to the same form [E]                                                                                                  
+> test_output2.txt:178:  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:179:   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:180:   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:181:   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:182:   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:275:00:04 +4 -3: StaffAccountRepository createAccount rejects a second owner (single-owner invariant) [E]                                                                                                  
+> test_output2.txt:276:  Expected: throws <Instance of 'StateError'> with `message`: contains 'owner account already exists'
+> test_output2.txt:277:    Actual: <Closure: () => Future<CreatedStaffAccount>>
+> test_output2.txt:278:     Which: threw ArgumentError:<Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:279:                   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:280:                   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:281:                   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:282:                   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:390:00:04 +6 -3: StaffAccountRepository verifyPin matches a correct PIN and returns the account summary                                                                                                    
+> test_output2.txt:391:00:04 +6 -3: StaffAccountRepository verifyPin success resets failed-attempt counter to 0                                                                                                               
+> test_output2.txt:392:00:04 +6 -3: StaffAccountRepository verifyPin success resets failed-attempt counter to 0                                                                                                               
+  test_output2.txt:393:WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+  test_output2.txt:394:Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+  test_output2.txt:395:Here is the stacktrace from when the database was opened a second time:
+  test_output2.txt:425:
+> test_output2.txt:426:00:05 +6 -4: StaffAccountRepository verifyPin success resets failed-attempt counter to 0 [E]                                                                                                           
+> test_output2.txt:427:  Expected: <0>
+> test_output2.txt:428:    Actual: <4>
+  test_output2.txt:429:  
+  test_output2.txt:430:  package:matcher                                                  expect
+  test_output2.txt:431:  package:flutter_test/src/widget_tester.dart 473:18               expect
+  test_output2.txt:434:
+> test_output2.txt:435:To run this test again: C:\Flutter\flutter\bin\cache\dart-sdk\bin\dart.exe test C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart -p vm --plain-name "StaffAccountRepository verifyPin success resets failed-attempt counter to 0"
+  test_output2.txt:436:
+  test_output2.txt:437:00:05 +6 -4: StaffAccountRepository verifyPin: malformed input non-numeric PIN is invalidPin without consuming an attempt                                                                              
+  test_output2.txt:438:00:05 +6 -4: StaffAccountRepository verifyPin: malformed input non-numeric PIN is invalidPin without consuming an attempt                                                                              
+  test_output2.txt:544:00:05 +9 -4: StaffAccountRepository verifyPin: disabled and locked rejects a disabled account as disabled                                                                                              
+> test_output2.txt:545:00:05 +9 -4: StaffAccountRepository verifyPin: disabled and locked locks the account after 5 consecutive failures                                                                                      
+> test_output2.txt:546:00:05 +9 -4: StaffAccountRepository verifyPin: disabled and locked locks the account after 5 consecutive failures                                                                                      
+  test_output2.txt:547:WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+  test_output2.txt:548:Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+  test_output2.txt:549:Here is the stacktrace from when the database was opened a second time:
+  test_output2.txt:579:
+> test_output2.txt:580:00:05 +10 -4: StaffAccountRepository verifyPin: disabled and locked locks the account after 5 consecutive failures                                                                                     
+  test_output2.txt:581:00:05 +10 -4: StaffAccountRepository verifyPin: disabled and locked a lock blocks verification even a correct PIN                                                                                      
+  test_output2.txt:582:00:05 +10 -4: StaffAccountRepository verifyPin: disabled and locked a lock blocks verification even a correct PIN                                                                                      
+  test_output2.txt:583:WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+  test_output2.txt:724:00:06 +13 -5: StaffAccountRepository changePin / setRole / setActive a correct current PIN changes the PIN atomically [E]                                                                              
+> test_output2.txt:725:  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:726:   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:727:   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:728:   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:729:   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:788:00:07 +13 -6: StaffAccountRepository changePin / setRole / setActive owner reset (asOwner) skips the current-PIN check [E]                                                                             
+> test_output2.txt:789:  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:790:   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:791:   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:792:   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:793:   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:888:00:07 +14 -7: StaffAccountRepository changePin / setRole / setActive setRole rejects promoting to owner (single-owner invariant) [E]                                                                   
+> test_output2.txt:889:  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:890:   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:891:   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:892:   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:893:   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:1094:00:07 +18 -8: StaffAccountRepository recoverOwnerPin recovers the owner PIN with the correct recovery code [E]                                                                                         
+> test_output2.txt:1095:  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:1096:   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:1097:   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:1098:   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:1099:   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:1230:00:08 +20 -9: StaffAccountRepository recoverOwnerPin rotates the recovery code (old code invalidated) [E]                                                                                              
+> test_output2.txt:1231:  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:1232:   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:1233:   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:1234:   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:1235:   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:1258:
+> test_output2.txt:1259:00:08 +20 -9: StaffAccountRepository recoverOwnerPin: atomicity a simulated staff-write failure leaves the previous recovery code valid                                                                
+> test_output2.txt:1260:00:08 +20 -9: StaffAccountRepository recoverOwnerPin: atomicity a simulated staff-write failure leaves the previous recovery code valid                                                                
+  test_output2.txt:1261:WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+  test_output2.txt:1262:Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+  test_output2.txt:1263:Here is the stacktrace from when the database was opened a second time:
+  test_output2.txt:1293:
+> test_output2.txt:1294:00:08 +20 -10: StaffAccountRepository recoverOwnerPin: atomicity a simulated staff-write failure leaves the previous recovery code valid [E]                                                           
+> test_output2.txt:1295:  Expected: throws <Instance of 'StateError'> with `message`: contains 'Simulated staff write failure'
+> test_output2.txt:1296:    Actual: <Closure: () => Future<RecoveredOwnerPin>>
+> test_output2.txt:1297:     Which: threw ArgumentError:<Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:1298:                   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:1299:                   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:1300:                   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:1301:                   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:1333:  
+> test_output2.txt:1334:  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:1335:   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:1336:   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:1337:   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:1338:   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:1359:
+> test_output2.txt:1360:To run this test again: C:\Flutter\flutter\bin\cache\dart-sdk\bin\dart.exe test C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart -p vm --plain-name "StaffAccountRepository recoverOwnerPin: atomicity a simulated staff-write failure leaves the previous recovery code valid"
+  test_output2.txt:1361:
+> test_output2.txt:1362:00:08 +20 -10: StaffAccountRepository recoverOwnerPin: atomicity success clears failures and the lockout                                                                                               
+> test_output2.txt:1363:00:08 +20 -10: StaffAccountRepository recoverOwnerPin: atomicity success clears failures and the lockout                                                                                               
+  test_output2.txt:1364:WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+  test_output2.txt:1365:Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+  test_output2.txt:1366:Here is the stacktrace from when the database was opened a second time:
+  test_output2.txt:1396:
+> test_output2.txt:1397:00:09 +20 -11: StaffAccountRepository recoverOwnerPin: atomicity success clears failures and the lockout [E]                                                                                           
+> test_output2.txt:1398:  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+> test_output2.txt:1399:   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+  test_output2.txt:1400:   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+  test_output2.txt:1401:   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+  test_output2.txt:1402:   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+  test_output2.txt:1423:
+> test_output2.txt:1424:To run this test again: C:\Flutter\flutter\bin\cache\dart-sdk\bin\dart.exe test C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart -p vm --plain-name "StaffAccountRepository recoverOwnerPin: atomicity success clears failures and the lockout"
+  test_output2.txt:1425:
+  test_output2.txt:1426:00:09 +20 -11: StaffAccountRepository DTO safety listStaff never exposes pinVerifier or recoveryCodeVerifier                                                                                           
+  test_output2.txt:1427:00:09 +20 -11: StaffAccountRepository DTO safety listStaff never exposes pinVerifier or recoveryCodeVerifier                                                                                           
+  test_output2.txt:1533:00:10 +23 -11: StaffAccountRepository null/empty guard createAccount rejects a null username                                                                                                           
+> test_output2.txt:1534:00:10 +23 -11: Some tests failed.                                                                                                                                                                      
+

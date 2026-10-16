@@ -1,0 +1,1415 @@
+00:00 +0: loading C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart
+00:00 +0: StaffAccountRepository createAccount stores the account and returns a summary without verifiers
+00:00 +1: StaffAccountRepository createAccount hashes the PIN with the default cost and persists a verifier
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:00 +2: StaffAccountRepository createAccount generates and returns a one-time recovery code for the owner
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:00 +3: StaffAccountRepository createAccount assigns the recovery-code verifier to the owner row only
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:00 +3 -1: StaffAccountRepository createAccount assigns the recovery-code verifier to the owner row only [E]
+  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+  
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 343:34  StaffAccountRepository.createAccount
+  test\data\repositories\staff_account_repository_test.dart 60:26         main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 343:34  StaffAccountRepository.createAccount
+  test\data\repositories\staff_account_repository_test.dart 60:26         main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 59:9          main.<fn>.<fn>.<fn>
+  
+00:00 +3 -1: StaffAccountRepository createAccount normalizes duplicate usernames to the same form
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:00 +3 -2: StaffAccountRepository createAccount normalizes duplicate usernames to the same form [E]
+  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+  
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 343:34  StaffAccountRepository.createAccount
+  test\data\repositories\staff_account_repository_test.dart 70:41         main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 343:34  StaffAccountRepository.createAccount
+  test\data\repositories\staff_account_repository_test.dart 70:41         main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 69:9          main.<fn>.<fn>.<fn>
+  
+00:00 +3 -2: StaffAccountRepository createAccount rejects an invalid PIN with a message that never contains the PIN
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:00 +4 -2: StaffAccountRepository createAccount rejects a second owner (single-owner invariant)
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:00 +4 -3: StaffAccountRepository createAccount rejects a second owner (single-owner invariant) [E]
+  Expected: throws <Instance of 'StateError'> with `message`: contains 'owner account already exists'
+    Actual: <Closure: () => Future<CreatedStaffAccount>>
+     Which: threw ArgumentError:<Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+                   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+                   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+                   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+                   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+                   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+                   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+                   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+                   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+                  >
+            stack dart:isolate                                                            Isolate.run
+                  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+                  package:bizflow/data/repositories/staff_account_repository.dart 343:34  StaffAccountRepository.createAccount
+                  test\data\repositories\staff_account_repository_test.dart 106:40        main.<fn>.<fn>.<fn>.<fn>
+                  package:matcher                                                         expect
+                  package:flutter_test/src/widget_tester.dart 473:18                      expect
+                  test\data\repositories\staff_account_repository_test.dart 105:9         main.<fn>.<fn>.<fn>
+                  ===== asynchronous gap ===========================
+                  dart:isolate                                                            Isolate.run
+                  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+                  package:bizflow/data/repositories/staff_account_repository.dart 343:34  StaffAccountRepository.createAccount
+                  test\data\repositories\staff_account_repository_test.dart 106:40        main.<fn>.<fn>.<fn>.<fn>
+                  package:matcher                                                         expect
+                  package:flutter_test/src/widget_tester.dart 473:18                      expect
+                  test\data\repositories\staff_account_repository_test.dart 105:9         main.<fn>.<fn>.<fn>
+                  ===== asynchronous gap ===========================
+                  dart:async                                                              _CustomZone.registerUnaryCallback
+                  test\data\repositories\staff_account_repository_test.dart 104:9         main.<fn>.<fn>.<fn>
+                  
+            which is not an instance of 'StateError'
+  
+  package:matcher                                                  expect
+  package:flutter_test/src/widget_tester.dart 473:18               expect
+  test\data\repositories\staff_account_repository_test.dart 105:9  main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                       _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 104:9  main.<fn>.<fn>.<fn>
+  
+00:00 +4 -3: StaffAccountRepository verifyPin rejects a well-formed wrong PIN as invalidPin
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:01 +5 -3: StaffAccountRepository verifyPin matches a correct PIN and returns the account summary
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:01 +6 -3: StaffAccountRepository verifyPin success resets failed-attempt counter to 0
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:01 +6 -4: StaffAccountRepository verifyPin success resets failed-attempt counter to 0 [E]
+  Expected: <0>
+    Actual: <4>
+  
+  package:matcher                                                  expect
+  package:flutter_test/src/widget_tester.dart 473:18               expect
+  test\data\repositories\staff_account_repository_test.dart 149:9  main.<fn>.<fn>.<fn>
+  
+00:01 +6 -4: StaffAccountRepository verifyPin: malformed input non-numeric PIN is invalidPin without consuming an attempt
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:01 +7 -4: StaffAccountRepository verifyPin: malformed input PIN with separators is invalidPin without consuming an attempt
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:01 +8 -4: StaffAccountRepository verifyPin: disabled and locked rejects a disabled account as disabled
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:01 +9 -4: StaffAccountRepository verifyPin: disabled and locked locks the account after 5 consecutive failures
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:02 +10 -4: StaffAccountRepository verifyPin: disabled and locked a lock blocks verification even a correct PIN
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:02 +11 -4: StaffAccountRepository changePin / setRole / setActive self-service PIN change requires the current PIN
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:02 +12 -4: StaffAccountRepository changePin / setRole / setActive wrong current PIN refuses a self-service change
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:03 +13 -4: StaffAccountRepository changePin / setRole / setActive a correct current PIN changes the PIN atomically
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:03 +13 -5: StaffAccountRepository changePin / setRole / setActive a correct current PIN changes the PIN atomically [E]
+  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+  
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 575:27  StaffAccountRepository.changePin
+  ===== asynchronous gap ===========================
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 575:27  StaffAccountRepository.changePin
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  package:bizflow/data/repositories/staff_account_repository.dart 554:17  StaffAccountRepository.changePin
+  test\data\repositories\staff_account_repository_test.dart 242:26        main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 241:9         main.<fn>.<fn>.<fn>
+  
+00:03 +13 -5: StaffAccountRepository changePin / setRole / setActive owner reset (asOwner) skips the current-PIN check
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:03 +13 -6: StaffAccountRepository changePin / setRole / setActive owner reset (asOwner) skips the current-PIN check [E]
+  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+  
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 575:27  StaffAccountRepository.changePin
+  ===== asynchronous gap ===========================
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 575:27  StaffAccountRepository.changePin
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  package:bizflow/data/repositories/staff_account_repository.dart 554:17  StaffAccountRepository.changePin
+  test\data\repositories\staff_account_repository_test.dart 253:26        main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 252:9         main.<fn>.<fn>.<fn>
+  
+00:03 +13 -6: StaffAccountRepository changePin / setRole / setActive setRole requires asOwner
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:03 +14 -6: StaffAccountRepository changePin / setRole / setActive setRole rejects promoting to owner (single-owner invariant)
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:03 +14 -7: StaffAccountRepository changePin / setRole / setActive setRole rejects promoting to owner (single-owner invariant) [E]
+  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+  
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 343:34  StaffAccountRepository.createAccount
+  test\data\repositories\staff_account_repository_test.dart 272:26        main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 343:34  StaffAccountRepository.createAccount
+  test\data\repositories\staff_account_repository_test.dart 272:26        main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 271:9         main.<fn>.<fn>.<fn>
+  
+00:03 +14 -7: StaffAccountRepository changePin / setRole / setActive setRole rejects demoting the owner
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:03 +15 -7: StaffAccountRepository changePin / setRole / setActive setActive requires asOwner
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:03 +16 -7: StaffAccountRepository changePin / setRole / setActive setActive deactivates a staff account while keeping its data
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:03 +17 -7: StaffAccountRepository changePin / setRole / setActive setActive refuses to deactivate the only owner
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:04 +18 -7: StaffAccountRepository recoverOwnerPin recovers the owner PIN with the correct recovery code
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:04 +18 -8: StaffAccountRepository recoverOwnerPin recovers the owner PIN with the correct recovery code [E]
+  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+  
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+  ===== asynchronous gap ===========================
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  package:bizflow/data/repositories/staff_account_repository.dart 721:18  StaffAccountRepository.recoverOwnerPin
+  test\data\repositories\staff_account_repository_test.dart 328:44        main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 322:25        main.<fn>.<fn>.<fn>
+  
+00:04 +18 -8: StaffAccountRepository recoverOwnerPin rejects an incorrect recovery code
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:04 +19 -8: StaffAccountRepository recoverOwnerPin rejects an invalid new PIN
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:04 +20 -8: StaffAccountRepository recoverOwnerPin rotates the recovery code (old code invalidated)
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:05 +20 -9: StaffAccountRepository recoverOwnerPin rotates the recovery code (old code invalidated) [E]
+  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+  
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+  ===== asynchronous gap ===========================
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  package:bizflow/data/repositories/staff_account_repository.dart 721:18  StaffAccountRepository.recoverOwnerPin
+  test\data\repositories\staff_account_repository_test.dart 377:44        main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 372:23        main.<fn>.<fn>.<fn>
+  
+00:05 +20 -9: StaffAccountRepository recoverOwnerPin: atomicity a simulated staff-write failure leaves the previous recovery code valid
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:05 +20 -10: StaffAccountRepository recoverOwnerPin: atomicity a simulated staff-write failure leaves the previous recovery code valid [E]
+  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+  
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+  ===== asynchronous gap ===========================
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  package:bizflow/data/repositories/staff_account_repository.dart 721:18  StaffAccountRepository.recoverOwnerPin
+  test\data\repositories\staff_account_repository_test.dart 417:45        main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 400:25        main.<fn>.<fn>.<fn>
+  
+  Expected: throws <Instance of 'StateError'> with `message`: contains 'Simulated staff write failure'
+    Actual: <Closure: () => Future<RecoveredOwnerPin>>
+     Which: threw ArgumentError:<Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+                   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+                   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+                   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+                   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+                   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+                   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+                   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+                   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+                  >
+            stack dart:isolate                                                            Isolate.run
+                  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+                  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+                  ===== asynchronous gap ===========================
+                  dart:isolate                                                            Isolate.run
+                  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+                  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+                  ===== asynchronous gap ===========================
+                  dart:async                                                              _CustomZone.registerUnaryCallback
+                  package:bizflow/data/repositories/staff_account_repository.dart 721:18  StaffAccountRepository.recoverOwnerPin
+                  test\data\repositories\staff_account_repository_test.dart 408:42        main.<fn>.<fn>.<fn>.<fn>
+                  package:matcher                                                         expect
+                  package:flutter_test/src/widget_tester.dart 473:18                      expect
+                  test\data\repositories\staff_account_repository_test.dart 407:11        main.<fn>.<fn>.<fn>
+                  ===== asynchronous gap ===========================
+                  dart:async                                                              _CustomZone.registerUnaryCallback
+                  test\data\repositories\staff_account_repository_test.dart 400:25        main.<fn>.<fn>.<fn>
+                  
+            which is not an instance of 'StateError'
+  
+  package:matcher                                                   expect
+  package:flutter_test/src/widget_tester.dart 473:18                expect
+  test\data\repositories\staff_account_repository_test.dart 407:11  main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                        _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 400:25  main.<fn>.<fn>.<fn>
+  
+00:05 +20 -10: StaffAccountRepository recoverOwnerPin: atomicity success clears failures and the lockout
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:06 +20 -11: StaffAccountRepository recoverOwnerPin: atomicity success clears failures and the lockout [E]
+  Invalid argument(s): Illegal argument in isolate message: object is unsendable - Library:'package:sqlite3/src/ffi/bindings.dart' Class: FfiDatabase (see restrictions listed at `SendPort.send()` documentation for more information)
+   <- database in Instance of 'FfiDatabaseImplementation' (from package:sqlite3/src/ffi/implementation.dart)
+   <- _database in Instance of '_NativeDelegate' (from package:drift/native.dart)
+   <- delegate in Instance of 'NativeDatabase' (from package:drift/native.dart)
+   <- executor in Instance of 'DatabaseConnection' (from package:drift/src/runtime/api/runtime_api.dart)
+   <- connection in Instance of 'AppDatabase' (from package:bizflow/data/database/app_database.dart)
+   <- database in Instance of 'StaffAccountRepository' (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- field this in StaffAccountRepository._hashPinOffload.<anonymous closure> (from package:bizflow/data/repositories/staff_account_repository.dart)
+   <- computation in Instance of '_RemoteRunner<String>' (from dart:isolate)
+  
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+  ===== asynchronous gap ===========================
+  dart:isolate                                                            Isolate.run
+  package:bizflow/data/repositories/staff_account_repository.dart 235:20  StaffAccountRepository._hashPinOffload
+  package:bizflow/data/repositories/staff_account_repository.dart 738:30  StaffAccountRepository.recoverOwnerPin
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  package:bizflow/data/repositories/staff_account_repository.dart 721:18  StaffAccountRepository.recoverOwnerPin
+  test\data\repositories\staff_account_repository_test.dart 435:44        main.<fn>.<fn>.<fn>
+  ===== asynchronous gap ===========================
+  dart:async                                                              _CustomZone.registerUnaryCallback
+  test\data\repositories\staff_account_repository_test.dart 426:25        main.<fn>.<fn>.<fn>
+  
+00:06 +20 -11: StaffAccountRepository DTO safety listStaff never exposes pinVerifier or recoveryCodeVerifier
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:06 +21 -11: StaffAccountRepository DTO safety credentials are never read by the repository
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:06 +22 -11: StaffAccountRepository null/empty guard createAccount rejects a null username
+WARNING (drift): It looks like you've created the database class AppDatabase multiple times. When these two databases use the same QueryExecutor, race conditions will occur and might corrupt the database. 
+Try to follow the advice at https://drift.simonbinder.eu/faq/#using-the-database or, if you know what you're doing, set driftRuntimeOptions.dontWarnAboutMultipleDatabases = true
+Here is the stacktrace from when the database was opened a second time:
+#0      GeneratedDatabase._handleInstantiated (package:drift/src/runtime/api/db_base.dart:96:30)
+#1      GeneratedDatabase._whenConstructed (package:drift/src/runtime/api/db_base.dart:73:12)
+#2      new GeneratedDatabase (package:drift/src/runtime/api/db_base.dart:64:5)
+#3      new _$AppDatabase (package:bizflow/data/database/app_database.g.dart:10597:36)
+#4      new AppDatabase (package:bizflow/data/database/app_database.dart:52:7)
+#5      main.<anonymous closure>.<anonymous closure> (file:///C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart:14:18)
+#6      Declarer._runSetUps.<anonymous closure> (package:test_api/src/backend/declarer.dart:434:61)
+#7      Future.forEach.<anonymous closure> (dart:async/future.dart:695:26)
+#8      Future.doWhile.<anonymous closure> (dart:async/future.dart:753:26)
+#9      StackZoneSpecification._registerUnaryCallback.<anonymous closure>.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:36)
+#10     StackZoneSpecification._run (package:stack_trace/src/stack_zone_specification.dart:207:15)
+#11     StackZoneSpecification._registerUnaryCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:127:24)
+#12     _rootRunUnary (dart:async/zone_root.dart:48:47)
+#13     _CustomZone.runUnary (dart:async/zone.dart:816:35)
+#14     _CustomZone.runUnaryGuarded (dart:async/zone.dart:710:7)
+#15     _CustomZone.bindUnaryCallbackGuarded.<anonymous closure> (dart:async/zone.dart:748:26)
+#16     Future.doWhile (dart:async/future.dart:770:18)
+#17     Future.forEach (dart:async/future.dart:693:12)
+#18     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:434:18)
+<asynchronous suspension>
+#19     Declarer._runSetUps (package:test_api/src/backend/declarer.dart:432:26)
+<asynchronous suspension>
+#20     Declarer.test.<anonymous closure>.<anonymous closure> (package:test_api/src/backend/declarer.dart:252:15)
+<asynchronous suspension>
+#21     Declarer.test.<anonymous closure> (package:test_api/src/backend/declarer.dart:250:11)
+<asynchronous suspension>
+#22     Invoker._waitForOutstandingCallbacks.<anonymous closure> (package:test_api/src/backend/invoker.dart:318:9)
+<asynchronous suspension>
+This warning will only appear on debug builds.
+00:06 +23 -11: Some tests failed.
+
+Failing tests:
+  C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart: StaffAccountRepository changePin / setRole / setActive a correct current PIN changes the PIN atomically
+  C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart: StaffAccountRepository changePin / setRole / setActive owner reset (asOwner) skips the current-PIN check
+  C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart: StaffAccountRepository changePin / setRole / setActive setRole rejects promoting to owner (single-owner invariant)
+  C:/Users/Admin/Desktop/APss/bizflow_v1.1.0_dev/test/data/repositories/staff_account_repository_test.dart: StaffAccountRepository createAccount assigns the recovery-code verifier to the owner row only
+  ... and 7 more

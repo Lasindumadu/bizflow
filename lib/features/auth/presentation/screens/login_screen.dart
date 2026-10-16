@@ -1,602 +1,482 @@
-import 'dart:math' as math;
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../../core/session/session_controller.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_decor.dart';
+import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_badge.dart';
+import '../../../../data/database/database_provider.dart';
+import '../../../../data/repositories/staff_account_repository.dart';
 
-/// A modern, tactile, glassmorphic Cashier PIN & Operator authentication screen.
+/// Real staff PIN login (Phase D).
+///
+/// Replaces the earlier demo screen (which accepted any 4-digit PIN and
+/// hardcoded operators). Authentication always goes through
+/// [StaffAccountRepository.verifyPin]: bcrypt comparison with persisted
+/// failed-attempt throttling and lockout.
+///
+/// Selecting a staff member is NOT authentication — the session is
+/// established only after [StaffAuthStatus.success], via [SessionController].
+/// The PIN is held only in this screen's text controller; it is never
+/// stored, logged, or passed to the session.
 class LoginScreen extends StatefulWidget {
-  final VoidCallback onAuthenticated;
-
   const LoginScreen({
     super.key,
-    required this.onAuthenticated,
+    this.repository,
+    this.session,
+    this.onAuthenticated,
   });
+
+  /// Injectable for tests; defaults to the app database singleton.
+  final StaffAccountRepository? repository;
+
+  /// Injectable for tests; defaults to the app-wide [sessionController].
+  final SessionController? session;
+
+  /// Called after the session has been established (optional hook; the
+  /// startup gate also reacts to the session itself).
+  final VoidCallback? onAuthenticated;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with SingleTickerProviderStateMixin {
-  String _pin = '';
-  bool _isError = false;
-  bool _isSuccess = false;
-  bool _showPasswordMode = false;
-  final TextEditingController _usernameController =
-      TextEditingController(text: 'admin');
-  final TextEditingController _passwordController = TextEditingController();
+class _LoginScreenState extends State<LoginScreen> {
+  late final StaffAccountRepository _repository;
+  late final SessionController _session;
 
-  late AnimationController _shakeController;
-  late Animation<double> _shakeAnimation;
-
-  final List<Map<String, String>> _operators = [
-    {'name': 'Alex Rivera', 'role': 'Store Manager', 'avatar': 'AR'},
-    {'name': 'Sarah Chen', 'role': 'Head Cashier', 'avatar': 'SC'},
-    {'name': 'David Kim', 'role': 'Sales Associate', 'avatar': 'DK'},
-  ];
-
-  late int _selectedOperatorIndex = 0;
+  List<StaffAccountSummary> _staff = [];
+  bool _isLoadingStaff = true;
+  StaffAccountSummary? _selected;
+  final TextEditingController _pinController = TextEditingController();
+  final FocusNode _pinFocus = FocusNode();
+  bool _isVerifying = false;
+  bool _obscurePin = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _shakeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    _shakeAnimation = Tween<double>(begin: 0, end: 1).animate(
-      CurvedAnimation(parent: _shakeController, curve: Curves.easeInOut),
-    );
+    _repository = widget.repository ?? StaffAccountRepository(appDatabase);
+    _session = widget.session ?? sessionController;
+    _loadStaff();
   }
 
   @override
   void dispose() {
-    _shakeController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _pinController.dispose();
+    _pinFocus.dispose();
     super.dispose();
   }
 
-  void _onNumberTap(String number) {
-    if (_pin.length >= 4) return;
+  /// Loads ACTIVE staff only — deactivated accounts are not offered.
+  Future<void> _loadStaff() async {
     setState(() {
-      _isError = false;
-      _pin += number;
+      _isLoadingStaff = true;
+      _error = null;
     });
-
-    if (_pin.length == 4) {
-      _verifyPin();
-    }
-  }
-
-  void _onBackspace() {
-    if (_pin.isEmpty) return;
-    setState(() {
-      _isError = false;
-      _pin = _pin.substring(0, _pin.length - 1);
-    });
-  }
-
-  void _verifyPin() {
-    // Default demo passcode or manager bypass
-    if (_pin == '1234' || _pin == '0000' || _pin == '9999' || _pin.length == 4) {
+    try {
+      final all = await _repository.listStaff();
+      if (!mounted) return;
       setState(() {
-        _isSuccess = true;
-      });
-      Future.delayed(const Duration(milliseconds: 350), () {
-        if (mounted) {
-          widget.onAuthenticated();
+        _staff = all.where((a) => a.isActive).toList();
+        _isLoadingStaff = false;
+        if (_staff.isEmpty) {
+          _selected = null;
+        } else if (_selected != null) {
+          // Keep selection only if that account is still listed.
+          _selected = _staff.cast<StaffAccountSummary?>().firstWhere(
+            (a) => a!.id == _selected!.id,
+            orElse: () => null,
+          );
         }
       });
-    } else {
+    } catch (_) {
+      if (!mounted) return;
       setState(() {
-        _isError = true;
-        _pin = '';
+        _isLoadingStaff = false;
+        _error = 'Could not load staff accounts. Try again.';
       });
-      _shakeController.forward(from: 0);
     }
   }
 
-  void _submitCredentials() {
+  void _select(StaffAccountSummary account) {
+    if (_isVerifying) return;
     setState(() {
-      _isSuccess = true;
+      _selected = account;
+      _error = null;
+      _pinController.clear();
     });
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) {
-        widget.onAuthenticated();
-      }
+    _pinFocus.requestFocus();
+  }
+
+  /// Verifies the entered PIN through the real repository. Busy-guarded so
+  /// repeated taps cannot fire multiple verifications.
+  Future<void> _verify() async {
+    if (_isVerifying) return;
+    final selected = _selected;
+    if (selected == null) {
+      setState(() => _error = 'Select your staff account first.');
+      return;
+    }
+    final pin = _pinController.text;
+    // Client-side format check first: malformed PINs can never be correct
+    // and must not consume a failed attempt (mirrors the repository).
+    final pinError = StaffAccountRepository.validatePin(pin);
+    if (pinError != null) {
+      setState(() => _error = pinError);
+      return;
+    }
+
+    // Paint the busy state before the (possibly UI-blocking on web)
+    // bcrypt verification starts.
+    setState(() {
+      _isVerifying = true;
+      _error = null;
     });
+
+    final result = await _repository.verifyPin(
+      username: selected.username,
+      pin: pin,
+    );
+
+    if (!mounted) return;
+    _pinController.clear();
+
+    switch (result.status) {
+      case StaffAuthStatus.success:
+        final account = result.account!;
+        _session.signIn(account);
+        widget.onAuthenticated?.call();
+        setState(() => _isVerifying = false);
+      case StaffAuthStatus.invalidPin:
+        setState(() {
+          _isVerifying = false;
+          _error = 'Incorrect PIN. Please try again.';
+        });
+      case StaffAuthStatus.accountNotFound:
+        setState(() {
+          _isVerifying = false;
+          _error = 'That account no longer exists.';
+        });
+        unawaited(_loadStaff());
+      case StaffAuthStatus.disabled:
+        setState(() {
+          _isVerifying = false;
+          _selected = null;
+          _error =
+              'This account is deactivated. '
+              'Ask the owner to reactivate it.';
+        });
+        unawaited(_loadStaff());
+      case StaffAuthStatus.locked:
+        setState(() {
+          _isVerifying = false;
+          _error = _lockedMessage(result.lockedUntil);
+        });
+    }
+  }
+
+  String _lockedMessage(DateTime? lockedUntil) {
+    if (lockedUntil == null) {
+      return 'Too many failed attempts. This account is temporarily locked.';
+    }
+    final local = lockedUntil.toLocal();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return 'Too many failed attempts. Locked until $hh:$mm.';
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final size = MediaQuery.of(context).size;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.darkBackground : const Color(0xFF0F172A),
-      body: Stack(
-        children: [
-          // Ambient Glow orbs in the background
-          Positioned(
-            top: -120,
-            left: -100,
-            child: _buildAuraOrb(
-              color: AppColors.primaryLight.withValues(alpha: 0.35),
-              radius: 360,
-            ),
-          ),
-          Positioned(
-            bottom: -150,
-            right: -100,
-            child: _buildAuraOrb(
-              color: AppColors.accent.withValues(alpha: 0.3),
-              radius: 400,
-            ),
-          ),
-          Positioned(
-            top: size.height * 0.4,
-            right: -50,
-            child: _buildAuraOrb(
-              color: AppColors.cyan.withValues(alpha: 0.2),
-              radius: 260,
-            ),
-          ),
-
-          // Main Interactive Glass Container
-          Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: AnimatedBuilder(
-                animation: _shakeAnimation,
-                builder: (context, child) {
-                  final offset = math.sin(_shakeAnimation.value * math.pi * 4) * 8;
-                  return Transform.translate(
-                    offset: Offset(offset, 0),
-                    child: child,
-                  );
-                },
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 440),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: isDark ? 0.05 : 0.08),
-                    borderRadius: BorderRadius.circular(32),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.16),
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 40,
-                        offset: const Offset(0, 20),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildBrandHeader(),
-                      const SizedBox(height: 24),
-                      _buildOperatorSelector(),
-                      const SizedBox(height: 28),
-                      if (!_showPasswordMode) ...[
-                        _buildPinVisualizer(),
-                        const SizedBox(height: 32),
-                        _buildNumberKeypad(),
-                      ] else ...[
-                        _buildCredentialForm(),
+      backgroundColor: isDark
+          ? AppColors.darkBackground
+          : AppColors.primaryDark,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Padding(
+              padding: const EdgeInsets.all(AppDimensions.spacingXl),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppDimensions.spacingLg),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: AppDimensions.spacingLg),
+                        if (_isLoadingStaff) ...[
+                          const Center(child: CircularProgressIndicator()),
+                          const SizedBox(height: AppDimensions.spacingMd),
+                          Text(
+                            'Loading staff accounts…',
+                            textAlign: TextAlign.center,
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.primaryDark.withValues(
+                                alpha: 0.7,
+                              ),
+                            ),
+                          ),
+                        ] else if (_staff.isEmpty) ...[
+                          _emptyState(),
+                        ] else ...[
+                          _buildStaffPicker(),
+                          const SizedBox(height: AppDimensions.spacingLg),
+                          _buildPinForm(),
+                        ],
+                        if (_error != null) ...[
+                          const SizedBox(height: AppDimensions.spacingMd),
+                          _buildError(),
+                        ],
                       ],
-                      const SizedBox(height: 24),
-                      _buildFooterToggle(),
-                    ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAuraOrb({required Color color, required double radius}) {
-    return Container(
-      width: radius,
-      height: radius,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [
-            color,
-            color.withValues(alpha: 0),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildBrandHeader() {
+  Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            gradient: AppDecor.indigoGradient,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.5),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.bolt_rounded,
-            color: Colors.white,
-            size: 32,
-          ),
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'BizFlow Terminal',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            letterSpacing: -0.5,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 4),
+        const BrandBadge(size: 52),
+        const SizedBox(height: AppDimensions.spacingSm),
         Text(
-          'Enter operator PIN or switch cashier',
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.white.withValues(alpha: 0.65),
+          'Sign in to BizFlow',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.headlineSmall.copyWith(
+            color: AppColors.primaryDark,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: AppDimensions.spacingXs),
+        Text(
+          'Select your account and enter your PIN to continue.',
+          textAlign: TextAlign.center,
+          style: AppTextStyles.bodySmall.copyWith(
+            color: AppColors.primaryDark.withValues(alpha: 0.7),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildOperatorSelector() {
-    final operator = _operators[_selectedOperatorIndex];
+  Widget _emptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppDimensions.spacingLg),
+      child: Column(
+        children: [
+          Icon(
+            Icons.person_off_outlined,
+            size: 40,
+            color: AppColors.primaryDark.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: AppDimensions.spacingSm),
+          Text(
+            'No active staff accounts',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.titleSmall.copyWith(
+              color: AppColors.primaryDark,
+            ),
+          ),
+          const SizedBox(height: AppDimensions.spacingXs),
+          Text(
+            'Login is required, but no active account can sign in. '
+            'Ask the owner to create or reactivate a staff account.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.primaryDark.withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: AppDimensions.spacingMd),
+          TextButton.icon(
+            onPressed: _loadStaff,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Refresh'),
+          ),
+        ],
+      ),
+    );
+  }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.12),
+  String _initials(StaffAccountSummary account) {
+    final label = account.displayName.trim().isNotEmpty
+        ? account.displayName.trim()
+        : account.username;
+    final parts = label.split(RegExp(r'\s+'));
+    if (parts.length >= 2) {
+      final first = parts.first.substring(0, 1);
+      final last = parts.last.substring(0, 1);
+      return (first + last).toUpperCase();
+    }
+    return label.substring(0, label.length.clamp(1, 2)).toUpperCase();
+  }
+
+  Widget _buildStaffPicker() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Staff account',
+          style: AppTextStyles.titleSmall.copyWith(
+            color: AppColors.primaryDark,
+          ),
         ),
+        const SizedBox(height: AppDimensions.spacingSm),
+        Wrap(
+          spacing: AppDimensions.spacingSm,
+          runSpacing: AppDimensions.spacingSm,
+          children: _staff.map((account) {
+            final selected = _selected?.id == account.id;
+            return ChoiceChip(
+              avatar: CircleAvatar(
+                backgroundColor: selected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : AppColors.primary.withValues(alpha: 0.12),
+                child: Text(
+                  _initials(account),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: selected ? Colors.white : AppColors.primary,
+                  ),
+                ),
+              ),
+              label: Text(
+                account.displayName.trim().isNotEmpty
+                    ? '${account.displayName} (${account.username})'
+                    : account.username,
+              ),
+              selected: selected,
+              onSelected: _isVerifying ? null : (_) => _select(account),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPinForm() {
+    final selected = _selected;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          selected == null ? 'PIN' : 'PIN for ${selected.username}',
+          style: AppTextStyles.titleSmall.copyWith(
+            color: AppColors.primaryDark,
+          ),
+        ),
+        const SizedBox(height: AppDimensions.spacingSm),
+        TextField(
+          controller: _pinController,
+          focusNode: _pinFocus,
+          enabled: !_isVerifying && selected != null,
+          obscureText: _obscurePin,
+          keyboardType: TextInputType.number,
+          maxLength: StaffAccountRepository.maxPinLength,
+          onSubmitted: (_) => _verify(),
+          style: AppTextStyles.code.copyWith(
+            color: AppColors.primaryDark,
+            letterSpacing: 3,
+          ),
+          decoration: InputDecoration(
+            counterText: '',
+            hintText: selected == null
+                ? 'Select an account first'
+                : '${StaffAccountRepository.minPinLength}-'
+                      '${StaffAccountRepository.maxPinLength} digits',
+            prefixIcon: Icon(
+              Icons.lock_outline_rounded,
+              color: AppColors.primaryDark.withValues(alpha: 0.6),
+            ),
+            suffixIcon: IconButton(
+              tooltip: _obscurePin ? 'Show PIN' : 'Hide PIN',
+              icon: Icon(
+                _obscurePin
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+                size: 20,
+                color: AppColors.primaryDark.withValues(alpha: 0.6),
+              ),
+              onPressed: () => setState(() => _obscurePin = !_obscurePin),
+            ),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.7),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              borderSide: BorderSide(
+                color: AppColors.primaryDark.withValues(alpha: 0.15),
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              borderSide: BorderSide(
+                color: AppColors.primaryDark.withValues(alpha: 0.15),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppDimensions.spacingMd),
+        SizedBox(
+          height: AppDimensions.buttonHeight,
+          child: FilledButton.icon(
+            onPressed: (_isVerifying || selected == null) ? null : _verify,
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primaryDark,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+              ),
+            ),
+            icon: _isVerifying
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.login_rounded, size: 20),
+            label: Text(_isVerifying ? 'Verifying…' : 'Sign in'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildError() {
+    return Container(
+      padding: const EdgeInsets.all(AppDimensions.spacingSm),
+      decoration: BoxDecoration(
+        color: AppColors.error.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                operator['avatar']!,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
+          Icon(Icons.error_outline_rounded, size: 18, color: AppColors.error),
+          const SizedBox(width: AppDimensions.spacingSm),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  operator['name']!,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  operator['role']!,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 11,
-                  ),
-                ),
-              ],
+            child: Text(
+              _error!,
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
             ),
-          ),
-          PopupMenuButton<int>(
-            tooltip: 'Switch Cashier',
-            icon: Icon(
-              Icons.unfold_more_rounded,
-              color: Colors.white.withValues(alpha: 0.7),
-            ),
-            color: const Color(0xFF1E293B),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: Colors.white.withValues(alpha: 0.12)),
-            ),
-            onSelected: (idx) {
-              setState(() {
-                _selectedOperatorIndex = idx;
-                _pin = '';
-                _isError = false;
-              });
-            },
-            itemBuilder: (context) {
-              return List.generate(_operators.length, (i) {
-                final op = _operators[i];
-                return PopupMenuItem<int>(
-                  value: i,
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 12,
-                        backgroundColor: AppColors.primary,
-                        child: Text(
-                          op['avatar']!,
-                          style: const TextStyle(fontSize: 10, color: Colors.white),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        op['name']!,
-                        style: const TextStyle(color: Colors.white, fontSize: 13),
-                      ),
-                    ],
-                  ),
-                );
-              });
-            },
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildPinVisualizer() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(4, (index) {
-        final isFilled = index < _pin.length;
-        Color dotColor = Colors.white.withValues(alpha: 0.2);
-        if (_isError) {
-          dotColor = AppColors.error;
-        } else if (_isSuccess) {
-          dotColor = AppColors.success;
-        } else if (isFilled) {
-          dotColor = AppColors.primaryLight;
-        }
-
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          margin: const EdgeInsets.symmetric(horizontal: 10),
-          width: isFilled ? 18 : 14,
-          height: isFilled ? 18 : 14,
-          decoration: BoxDecoration(
-            color: dotColor,
-            shape: BoxShape.circle,
-            boxShadow: isFilled
-                ? [
-                    BoxShadow(
-                      color: dotColor.withValues(alpha: 0.6),
-                      blurRadius: 10,
-                      spreadRadius: 2,
-                    ),
-                  ]
-                : [],
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildNumberKeypad() {
-    return Column(
-      children: [
-        _buildKeyRow(['1', '2', '3']),
-        const SizedBox(height: 14),
-        _buildKeyRow(['4', '5', '6']),
-        const SizedBox(height: 14),
-        _buildKeyRow(['7', '8', '9']),
-        const SizedBox(height: 14),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _buildSpecialKey(
-              icon: Icons.fingerprint_rounded,
-              onTap: () {
-                // Biometrics / Bypass shortcut
-                _verifyPin();
-              },
-            ),
-            const SizedBox(width: 16),
-            _buildKeyButton('0'),
-            const SizedBox(width: 16),
-            _buildSpecialKey(
-              icon: Icons.backspace_outlined,
-              onTap: _onBackspace,
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildKeyRow(List<String> keys) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: keys.map((key) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: _buildKeyButton(key),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildKeyButton(String label) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () => _onNumberTap(label),
-        borderRadius: BorderRadius.circular(22),
-        splashColor: AppColors.primaryLight.withValues(alpha: 0.3),
-        child: Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.12),
-            ),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSpecialKey({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          width: 72,
-          height: 72,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.08),
-            ),
-          ),
-          child: Center(
-            child: Icon(icon, color: Colors.white70, size: 24),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCredentialForm() {
-    return Column(
-      children: [
-        TextField(
-          controller: _usernameController,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            labelText: 'Username or Email',
-            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
-            prefixIcon: const Icon(Icons.person_outline_rounded, color: Colors.white70),
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.08),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _passwordController,
-          obscureText: true,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            labelText: 'Password',
-            labelStyle: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
-            prefixIcon: const Icon(Icons.lock_outline_rounded, color: Colors.white70),
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.08),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: 4,
-            ),
-            onPressed: _submitCredentials,
-            child: const Text(
-              'Sign In to Terminal',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFooterToggle() {
-    return TextButton.icon(
-      style: TextButton.styleFrom(
-        foregroundColor: Colors.white70,
-      ),
-      onPressed: () {
-        setState(() {
-          _showPasswordMode = !_showPasswordMode;
-          _pin = '';
-          _isError = false;
-        });
-      },
-      icon: Icon(
-        _showPasswordMode ? Icons.pin_rounded : Icons.password_rounded,
-        size: 18,
-      ),
-      label: Text(
-        _showPasswordMode
-            ? 'Switch to Quick PIN Pad'
-            : 'Login with Username & Password',
-        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
       ),
     );
   }

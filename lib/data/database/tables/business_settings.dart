@@ -46,6 +46,12 @@ class BusinessSettings extends Table {
   TextColumn get receiptNote =>
       text().withDefault(const Constant(''))();
 
+  /// Phase D: when true, the startup gate requires staff PIN login before
+  /// the app shell is shown. Defaults to false so existing installations
+  /// keep today's no-login behavior after the v13 migration.
+  BoolColumn get loginRequired =>
+      boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

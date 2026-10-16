@@ -1,0 +1,37 @@
+name: Cloud-Only Free Setup
+version: 1.0.0
+schema: v1
+
+models:
+  # --- 1. GOOGLE GEMINI API (Primary Cloud Model) ---
+  - name: Gemini 2.5 Flash
+    provider: gemini
+    model: gemini-2.5-flash
+    apiKey: AQ.Ab8RN6LRvVfUBQYRKOs4zFaoOYjL3TGQVrtuLYf6-EfC4Iyh6g
+    roles:
+      - chat
+      - edit
+      - apply
+
+  # --- 2. OPENROUTER FREE MODELS (Backup Cloud Model) ---
+  - name: OpenRouter Free Coder
+    provider: openrouter
+    model: poolside/laguna-s-2.1:free
+    apiKey: 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
+    roles:
+      - chat
+      - edit
+      - apply
+
+# --- TAB AUTOCOMPLETE (Using OpenRouter Free Model) ---
+tabAutocompleteModel:
+  name: OpenRouter Autocomplete
+  provider: openrouter
+  model: poolside/laguna-s-2.1:free
+  apiKey: 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
+
+context:
+  - provider: code
+  - provider: file
+  - provider: diff
+  - provider: terminal

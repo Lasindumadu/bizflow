@@ -60,6 +60,7 @@ class BusinessSettingsRepository {
     receiptShowPhone: true,
     receiptShowAddress: true,
     receiptNote: '',
+    loginRequired: false,
   );
 
   Future<void> saveSettings({
@@ -76,6 +77,7 @@ class BusinessSettingsRepository {
     bool? receiptShowPhone,
     bool? receiptShowAddress,
     String? receiptNote,
+    bool? loginRequired,
   }) async {
     await _database
         .into(_database.businessSettings)
@@ -111,6 +113,9 @@ class BusinessSettingsRepository {
             receiptNote: receiptNote == null
                 ? const Value.absent()
                 : Value(receiptNote),
+            loginRequired: loginRequired == null
+                ? const Value.absent()
+                : Value(loginRequired),
           ),
         );
   }

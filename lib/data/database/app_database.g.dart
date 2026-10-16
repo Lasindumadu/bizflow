@@ -3513,6 +3513,21 @@ class $BusinessSettingsTable extends BusinessSettings
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _loginRequiredMeta = const VerificationMeta(
+    'loginRequired',
+  );
+  @override
+  late final GeneratedColumn<bool> loginRequired = GeneratedColumn<bool>(
+    'login_required',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("login_required" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3529,6 +3544,7 @@ class $BusinessSettingsTable extends BusinessSettings
     receiptShowPhone,
     receiptShowAddress,
     receiptNote,
+    loginRequired,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3652,6 +3668,15 @@ class $BusinessSettingsTable extends BusinessSettings
         ),
       );
     }
+    if (data.containsKey('login_required')) {
+      context.handle(
+        _loginRequiredMeta,
+        loginRequired.isAcceptableOrUnknown(
+          data['login_required']!,
+          _loginRequiredMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -3717,6 +3742,10 @@ class $BusinessSettingsTable extends BusinessSettings
         DriftSqlType.string,
         data['${effectivePrefix}receipt_note'],
       )!,
+      loginRequired: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}login_required'],
+      )!,
     );
   }
 
@@ -3757,6 +3786,11 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
 
   /// Optional note printed under the receipt total (e.g. tax info).
   final String receiptNote;
+
+  /// Phase D: when true, the startup gate requires staff PIN login before
+  /// the app shell is shown. Defaults to false so existing installations
+  /// keep today's no-login behavior after the v13 migration.
+  final bool loginRequired;
   const BusinessSetting({
     required this.id,
     required this.businessName,
@@ -3772,6 +3806,7 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
     required this.receiptShowPhone,
     required this.receiptShowAddress,
     required this.receiptNote,
+    required this.loginRequired,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3790,6 +3825,7 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
     map['receipt_show_phone'] = Variable<bool>(receiptShowPhone);
     map['receipt_show_address'] = Variable<bool>(receiptShowAddress);
     map['receipt_note'] = Variable<String>(receiptNote);
+    map['login_required'] = Variable<bool>(loginRequired);
     return map;
   }
 
@@ -3809,6 +3845,7 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       receiptShowPhone: Value(receiptShowPhone),
       receiptShowAddress: Value(receiptShowAddress),
       receiptNote: Value(receiptNote),
+      loginRequired: Value(loginRequired),
     );
   }
 
@@ -3834,6 +3871,7 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       receiptShowPhone: serializer.fromJson<bool>(json['receiptShowPhone']),
       receiptShowAddress: serializer.fromJson<bool>(json['receiptShowAddress']),
       receiptNote: serializer.fromJson<String>(json['receiptNote']),
+      loginRequired: serializer.fromJson<bool>(json['loginRequired']),
     );
   }
   @override
@@ -3854,6 +3892,7 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       'receiptShowPhone': serializer.toJson<bool>(receiptShowPhone),
       'receiptShowAddress': serializer.toJson<bool>(receiptShowAddress),
       'receiptNote': serializer.toJson<String>(receiptNote),
+      'loginRequired': serializer.toJson<bool>(loginRequired),
     };
   }
 
@@ -3872,6 +3911,7 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
     bool? receiptShowPhone,
     bool? receiptShowAddress,
     String? receiptNote,
+    bool? loginRequired,
   }) => BusinessSetting(
     id: id ?? this.id,
     businessName: businessName ?? this.businessName,
@@ -3887,6 +3927,7 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
     receiptShowPhone: receiptShowPhone ?? this.receiptShowPhone,
     receiptShowAddress: receiptShowAddress ?? this.receiptShowAddress,
     receiptNote: receiptNote ?? this.receiptNote,
+    loginRequired: loginRequired ?? this.loginRequired,
   );
   BusinessSetting copyWithCompanion(BusinessSettingsCompanion data) {
     return BusinessSetting(
@@ -3922,6 +3963,9 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
       receiptNote: data.receiptNote.present
           ? data.receiptNote.value
           : this.receiptNote,
+      loginRequired: data.loginRequired.present
+          ? data.loginRequired.value
+          : this.loginRequired,
     );
   }
 
@@ -3941,7 +3985,8 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
           ..write('receiptFooter: $receiptFooter, ')
           ..write('receiptShowPhone: $receiptShowPhone, ')
           ..write('receiptShowAddress: $receiptShowAddress, ')
-          ..write('receiptNote: $receiptNote')
+          ..write('receiptNote: $receiptNote, ')
+          ..write('loginRequired: $loginRequired')
           ..write(')'))
         .toString();
   }
@@ -3962,6 +4007,7 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
     receiptShowPhone,
     receiptShowAddress,
     receiptNote,
+    loginRequired,
   );
   @override
   bool operator ==(Object other) =>
@@ -3980,7 +4026,8 @@ class BusinessSetting extends DataClass implements Insertable<BusinessSetting> {
           other.receiptFooter == this.receiptFooter &&
           other.receiptShowPhone == this.receiptShowPhone &&
           other.receiptShowAddress == this.receiptShowAddress &&
-          other.receiptNote == this.receiptNote);
+          other.receiptNote == this.receiptNote &&
+          other.loginRequired == this.loginRequired);
 }
 
 class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
@@ -3998,6 +4045,7 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
   final Value<bool> receiptShowPhone;
   final Value<bool> receiptShowAddress;
   final Value<String> receiptNote;
+  final Value<bool> loginRequired;
   final Value<int> rowid;
   const BusinessSettingsCompanion({
     this.id = const Value.absent(),
@@ -4014,6 +4062,7 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
     this.receiptShowPhone = const Value.absent(),
     this.receiptShowAddress = const Value.absent(),
     this.receiptNote = const Value.absent(),
+    this.loginRequired = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   BusinessSettingsCompanion.insert({
@@ -4031,6 +4080,7 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
     this.receiptShowPhone = const Value.absent(),
     this.receiptShowAddress = const Value.absent(),
     this.receiptNote = const Value.absent(),
+    this.loginRequired = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id);
   static Insertable<BusinessSetting> custom({
@@ -4048,6 +4098,7 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
     Expression<bool>? receiptShowPhone,
     Expression<bool>? receiptShowAddress,
     Expression<String>? receiptNote,
+    Expression<bool>? loginRequired,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4067,6 +4118,7 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
       if (receiptShowAddress != null)
         'receipt_show_address': receiptShowAddress,
       if (receiptNote != null) 'receipt_note': receiptNote,
+      if (loginRequired != null) 'login_required': loginRequired,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4086,6 +4138,7 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
     Value<bool>? receiptShowPhone,
     Value<bool>? receiptShowAddress,
     Value<String>? receiptNote,
+    Value<bool>? loginRequired,
     Value<int>? rowid,
   }) {
     return BusinessSettingsCompanion(
@@ -4103,6 +4156,7 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
       receiptShowPhone: receiptShowPhone ?? this.receiptShowPhone,
       receiptShowAddress: receiptShowAddress ?? this.receiptShowAddress,
       receiptNote: receiptNote ?? this.receiptNote,
+      loginRequired: loginRequired ?? this.loginRequired,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4152,6 +4206,9 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
     if (receiptNote.present) {
       map['receipt_note'] = Variable<String>(receiptNote.value);
     }
+    if (loginRequired.present) {
+      map['login_required'] = Variable<bool>(loginRequired.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4175,6 +4232,7 @@ class BusinessSettingsCompanion extends UpdateCompanion<BusinessSetting> {
           ..write('receiptShowPhone: $receiptShowPhone, ')
           ..write('receiptShowAddress: $receiptShowAddress, ')
           ..write('receiptNote: $receiptNote, ')
+          ..write('loginRequired: $loginRequired, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9879,6 +9937,720 @@ class CustomerCreditTransactionsCompanion
   }
 }
 
+class $StaffAccountsTable extends StaffAccounts
+    with TableInfo<$StaffAccountsTable, StaffAccount> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $StaffAccountsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _usernameMeta = const VerificationMeta(
+    'username',
+  );
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+    'username',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
+  static const VerificationMeta _displayNameMeta = const VerificationMeta(
+    'displayName',
+  );
+  @override
+  late final GeneratedColumn<String> displayName = GeneratedColumn<String>(
+    'display_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  @override
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _isActiveMeta = const VerificationMeta(
+    'isActive',
+  );
+  @override
+  late final GeneratedColumn<bool> isActive = GeneratedColumn<bool>(
+    'is_active',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_active" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
+  static const VerificationMeta _pinVerifierMeta = const VerificationMeta(
+    'pinVerifier',
+  );
+  @override
+  late final GeneratedColumn<String> pinVerifier = GeneratedColumn<String>(
+    'pin_verifier',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _recoveryCodeVerifierMeta =
+      const VerificationMeta('recoveryCodeVerifier');
+  @override
+  late final GeneratedColumn<String> recoveryCodeVerifier =
+      GeneratedColumn<String>(
+        'recovery_code_verifier',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _failedPinAttemptsMeta = const VerificationMeta(
+    'failedPinAttempts',
+  );
+  @override
+  late final GeneratedColumn<int> failedPinAttempts = GeneratedColumn<int>(
+    'failed_pin_attempts',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _pinLockedUntilMeta = const VerificationMeta(
+    'pinLockedUntil',
+  );
+  @override
+  late final GeneratedColumn<DateTime> pinLockedUntil =
+      GeneratedColumn<DateTime>(
+        'pin_locked_until',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _pinChangedAtMeta = const VerificationMeta(
+    'pinChangedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> pinChangedAt = GeneratedColumn<DateTime>(
+    'pin_changed_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    username,
+    displayName,
+    role,
+    isActive,
+    pinVerifier,
+    recoveryCodeVerifier,
+    failedPinAttempts,
+    pinLockedUntil,
+    pinChangedAt,
+    createdAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'staff_accounts';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<StaffAccount> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('username')) {
+      context.handle(
+        _usernameMeta,
+        username.isAcceptableOrUnknown(data['username']!, _usernameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_usernameMeta);
+    }
+    if (data.containsKey('display_name')) {
+      context.handle(
+        _displayNameMeta,
+        displayName.isAcceptableOrUnknown(
+          data['display_name']!,
+          _displayNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_roleMeta);
+    }
+    if (data.containsKey('is_active')) {
+      context.handle(
+        _isActiveMeta,
+        isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
+      );
+    }
+    if (data.containsKey('pin_verifier')) {
+      context.handle(
+        _pinVerifierMeta,
+        pinVerifier.isAcceptableOrUnknown(
+          data['pin_verifier']!,
+          _pinVerifierMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_pinVerifierMeta);
+    }
+    if (data.containsKey('recovery_code_verifier')) {
+      context.handle(
+        _recoveryCodeVerifierMeta,
+        recoveryCodeVerifier.isAcceptableOrUnknown(
+          data['recovery_code_verifier']!,
+          _recoveryCodeVerifierMeta,
+        ),
+      );
+    }
+    if (data.containsKey('failed_pin_attempts')) {
+      context.handle(
+        _failedPinAttemptsMeta,
+        failedPinAttempts.isAcceptableOrUnknown(
+          data['failed_pin_attempts']!,
+          _failedPinAttemptsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pin_locked_until')) {
+      context.handle(
+        _pinLockedUntilMeta,
+        pinLockedUntil.isAcceptableOrUnknown(
+          data['pin_locked_until']!,
+          _pinLockedUntilMeta,
+        ),
+      );
+    }
+    if (data.containsKey('pin_changed_at')) {
+      context.handle(
+        _pinChangedAtMeta,
+        pinChangedAt.isAcceptableOrUnknown(
+          data['pin_changed_at']!,
+          _pinChangedAtMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_pinChangedAtMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  StaffAccount map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return StaffAccount(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      username: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}username'],
+      )!,
+      displayName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}display_name'],
+      )!,
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
+      )!,
+      isActive: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_active'],
+      )!,
+      pinVerifier: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}pin_verifier'],
+      )!,
+      recoveryCodeVerifier: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}recovery_code_verifier'],
+      ),
+      failedPinAttempts: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}failed_pin_attempts'],
+      )!,
+      pinLockedUntil: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}pin_locked_until'],
+      ),
+      pinChangedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}pin_changed_at'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $StaffAccountsTable createAlias(String alias) {
+    return $StaffAccountsTable(attachedDatabase, alias);
+  }
+}
+
+class StaffAccount extends DataClass implements Insertable<StaffAccount> {
+  final String id;
+
+  /// Normalized (trimmed, lowercased) unique login identifier.
+  final String username;
+
+  /// Optional display label shown in future UIs.
+  final String displayName;
+
+  /// 'owner' | 'manager' | 'cashier' — validated by the repository.
+  final String role;
+
+  /// Deactivated accounts cannot verify PINs (login) but keep their data.
+  final bool isActive;
+
+  /// bcrypt verifier of the staff PIN. Never exposed outside the
+  /// repository's private verification path.
+  final String pinVerifier;
+
+  /// bcrypt verifier of the owner's one-time recovery code. Set (only) on
+  /// the owner row at creation and rotated on each recovery.
+  final String? recoveryCodeVerifier;
+
+  /// Consecutive failed PIN attempts; reset on success and when a lock
+  /// begins. Persisted so restarts and web refreshes cannot bypass it.
+  final int failedPinAttempts;
+
+  /// While in the future, the account is locked and no PIN verification is
+  /// attempted. Null when not locked.
+  final DateTime? pinLockedUntil;
+  final DateTime pinChangedAt;
+  final DateTime createdAt;
+  const StaffAccount({
+    required this.id,
+    required this.username,
+    required this.displayName,
+    required this.role,
+    required this.isActive,
+    required this.pinVerifier,
+    this.recoveryCodeVerifier,
+    required this.failedPinAttempts,
+    this.pinLockedUntil,
+    required this.pinChangedAt,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['username'] = Variable<String>(username);
+    map['display_name'] = Variable<String>(displayName);
+    map['role'] = Variable<String>(role);
+    map['is_active'] = Variable<bool>(isActive);
+    map['pin_verifier'] = Variable<String>(pinVerifier);
+    if (!nullToAbsent || recoveryCodeVerifier != null) {
+      map['recovery_code_verifier'] = Variable<String>(recoveryCodeVerifier);
+    }
+    map['failed_pin_attempts'] = Variable<int>(failedPinAttempts);
+    if (!nullToAbsent || pinLockedUntil != null) {
+      map['pin_locked_until'] = Variable<DateTime>(pinLockedUntil);
+    }
+    map['pin_changed_at'] = Variable<DateTime>(pinChangedAt);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  StaffAccountsCompanion toCompanion(bool nullToAbsent) {
+    return StaffAccountsCompanion(
+      id: Value(id),
+      username: Value(username),
+      displayName: Value(displayName),
+      role: Value(role),
+      isActive: Value(isActive),
+      pinVerifier: Value(pinVerifier),
+      recoveryCodeVerifier: recoveryCodeVerifier == null && nullToAbsent
+          ? const Value.absent()
+          : Value(recoveryCodeVerifier),
+      failedPinAttempts: Value(failedPinAttempts),
+      pinLockedUntil: pinLockedUntil == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pinLockedUntil),
+      pinChangedAt: Value(pinChangedAt),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory StaffAccount.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return StaffAccount(
+      id: serializer.fromJson<String>(json['id']),
+      username: serializer.fromJson<String>(json['username']),
+      displayName: serializer.fromJson<String>(json['displayName']),
+      role: serializer.fromJson<String>(json['role']),
+      isActive: serializer.fromJson<bool>(json['isActive']),
+      pinVerifier: serializer.fromJson<String>(json['pinVerifier']),
+      recoveryCodeVerifier: serializer.fromJson<String?>(
+        json['recoveryCodeVerifier'],
+      ),
+      failedPinAttempts: serializer.fromJson<int>(json['failedPinAttempts']),
+      pinLockedUntil: serializer.fromJson<DateTime?>(json['pinLockedUntil']),
+      pinChangedAt: serializer.fromJson<DateTime>(json['pinChangedAt']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'username': serializer.toJson<String>(username),
+      'displayName': serializer.toJson<String>(displayName),
+      'role': serializer.toJson<String>(role),
+      'isActive': serializer.toJson<bool>(isActive),
+      'pinVerifier': serializer.toJson<String>(pinVerifier),
+      'recoveryCodeVerifier': serializer.toJson<String?>(recoveryCodeVerifier),
+      'failedPinAttempts': serializer.toJson<int>(failedPinAttempts),
+      'pinLockedUntil': serializer.toJson<DateTime?>(pinLockedUntil),
+      'pinChangedAt': serializer.toJson<DateTime>(pinChangedAt),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  StaffAccount copyWith({
+    String? id,
+    String? username,
+    String? displayName,
+    String? role,
+    bool? isActive,
+    String? pinVerifier,
+    Value<String?> recoveryCodeVerifier = const Value.absent(),
+    int? failedPinAttempts,
+    Value<DateTime?> pinLockedUntil = const Value.absent(),
+    DateTime? pinChangedAt,
+    DateTime? createdAt,
+  }) => StaffAccount(
+    id: id ?? this.id,
+    username: username ?? this.username,
+    displayName: displayName ?? this.displayName,
+    role: role ?? this.role,
+    isActive: isActive ?? this.isActive,
+    pinVerifier: pinVerifier ?? this.pinVerifier,
+    recoveryCodeVerifier: recoveryCodeVerifier.present
+        ? recoveryCodeVerifier.value
+        : this.recoveryCodeVerifier,
+    failedPinAttempts: failedPinAttempts ?? this.failedPinAttempts,
+    pinLockedUntil: pinLockedUntil.present
+        ? pinLockedUntil.value
+        : this.pinLockedUntil,
+    pinChangedAt: pinChangedAt ?? this.pinChangedAt,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  StaffAccount copyWithCompanion(StaffAccountsCompanion data) {
+    return StaffAccount(
+      id: data.id.present ? data.id.value : this.id,
+      username: data.username.present ? data.username.value : this.username,
+      displayName: data.displayName.present
+          ? data.displayName.value
+          : this.displayName,
+      role: data.role.present ? data.role.value : this.role,
+      isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      pinVerifier: data.pinVerifier.present
+          ? data.pinVerifier.value
+          : this.pinVerifier,
+      recoveryCodeVerifier: data.recoveryCodeVerifier.present
+          ? data.recoveryCodeVerifier.value
+          : this.recoveryCodeVerifier,
+      failedPinAttempts: data.failedPinAttempts.present
+          ? data.failedPinAttempts.value
+          : this.failedPinAttempts,
+      pinLockedUntil: data.pinLockedUntil.present
+          ? data.pinLockedUntil.value
+          : this.pinLockedUntil,
+      pinChangedAt: data.pinChangedAt.present
+          ? data.pinChangedAt.value
+          : this.pinChangedAt,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StaffAccount(')
+          ..write('id: $id, ')
+          ..write('username: $username, ')
+          ..write('displayName: $displayName, ')
+          ..write('role: $role, ')
+          ..write('isActive: $isActive, ')
+          ..write('pinVerifier: $pinVerifier, ')
+          ..write('recoveryCodeVerifier: $recoveryCodeVerifier, ')
+          ..write('failedPinAttempts: $failedPinAttempts, ')
+          ..write('pinLockedUntil: $pinLockedUntil, ')
+          ..write('pinChangedAt: $pinChangedAt, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    username,
+    displayName,
+    role,
+    isActive,
+    pinVerifier,
+    recoveryCodeVerifier,
+    failedPinAttempts,
+    pinLockedUntil,
+    pinChangedAt,
+    createdAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is StaffAccount &&
+          other.id == this.id &&
+          other.username == this.username &&
+          other.displayName == this.displayName &&
+          other.role == this.role &&
+          other.isActive == this.isActive &&
+          other.pinVerifier == this.pinVerifier &&
+          other.recoveryCodeVerifier == this.recoveryCodeVerifier &&
+          other.failedPinAttempts == this.failedPinAttempts &&
+          other.pinLockedUntil == this.pinLockedUntil &&
+          other.pinChangedAt == this.pinChangedAt &&
+          other.createdAt == this.createdAt);
+}
+
+class StaffAccountsCompanion extends UpdateCompanion<StaffAccount> {
+  final Value<String> id;
+  final Value<String> username;
+  final Value<String> displayName;
+  final Value<String> role;
+  final Value<bool> isActive;
+  final Value<String> pinVerifier;
+  final Value<String?> recoveryCodeVerifier;
+  final Value<int> failedPinAttempts;
+  final Value<DateTime?> pinLockedUntil;
+  final Value<DateTime> pinChangedAt;
+  final Value<DateTime> createdAt;
+  final Value<int> rowid;
+  const StaffAccountsCompanion({
+    this.id = const Value.absent(),
+    this.username = const Value.absent(),
+    this.displayName = const Value.absent(),
+    this.role = const Value.absent(),
+    this.isActive = const Value.absent(),
+    this.pinVerifier = const Value.absent(),
+    this.recoveryCodeVerifier = const Value.absent(),
+    this.failedPinAttempts = const Value.absent(),
+    this.pinLockedUntil = const Value.absent(),
+    this.pinChangedAt = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  StaffAccountsCompanion.insert({
+    required String id,
+    required String username,
+    this.displayName = const Value.absent(),
+    required String role,
+    this.isActive = const Value.absent(),
+    required String pinVerifier,
+    this.recoveryCodeVerifier = const Value.absent(),
+    this.failedPinAttempts = const Value.absent(),
+    this.pinLockedUntil = const Value.absent(),
+    required DateTime pinChangedAt,
+    required DateTime createdAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       username = Value(username),
+       role = Value(role),
+       pinVerifier = Value(pinVerifier),
+       pinChangedAt = Value(pinChangedAt),
+       createdAt = Value(createdAt);
+  static Insertable<StaffAccount> custom({
+    Expression<String>? id,
+    Expression<String>? username,
+    Expression<String>? displayName,
+    Expression<String>? role,
+    Expression<bool>? isActive,
+    Expression<String>? pinVerifier,
+    Expression<String>? recoveryCodeVerifier,
+    Expression<int>? failedPinAttempts,
+    Expression<DateTime>? pinLockedUntil,
+    Expression<DateTime>? pinChangedAt,
+    Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (username != null) 'username': username,
+      if (displayName != null) 'display_name': displayName,
+      if (role != null) 'role': role,
+      if (isActive != null) 'is_active': isActive,
+      if (pinVerifier != null) 'pin_verifier': pinVerifier,
+      if (recoveryCodeVerifier != null)
+        'recovery_code_verifier': recoveryCodeVerifier,
+      if (failedPinAttempts != null) 'failed_pin_attempts': failedPinAttempts,
+      if (pinLockedUntil != null) 'pin_locked_until': pinLockedUntil,
+      if (pinChangedAt != null) 'pin_changed_at': pinChangedAt,
+      if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  StaffAccountsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? username,
+    Value<String>? displayName,
+    Value<String>? role,
+    Value<bool>? isActive,
+    Value<String>? pinVerifier,
+    Value<String?>? recoveryCodeVerifier,
+    Value<int>? failedPinAttempts,
+    Value<DateTime?>? pinLockedUntil,
+    Value<DateTime>? pinChangedAt,
+    Value<DateTime>? createdAt,
+    Value<int>? rowid,
+  }) {
+    return StaffAccountsCompanion(
+      id: id ?? this.id,
+      username: username ?? this.username,
+      displayName: displayName ?? this.displayName,
+      role: role ?? this.role,
+      isActive: isActive ?? this.isActive,
+      pinVerifier: pinVerifier ?? this.pinVerifier,
+      recoveryCodeVerifier: recoveryCodeVerifier ?? this.recoveryCodeVerifier,
+      failedPinAttempts: failedPinAttempts ?? this.failedPinAttempts,
+      pinLockedUntil: pinLockedUntil ?? this.pinLockedUntil,
+      pinChangedAt: pinChangedAt ?? this.pinChangedAt,
+      createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
+    }
+    if (displayName.present) {
+      map['display_name'] = Variable<String>(displayName.value);
+    }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
+    if (isActive.present) {
+      map['is_active'] = Variable<bool>(isActive.value);
+    }
+    if (pinVerifier.present) {
+      map['pin_verifier'] = Variable<String>(pinVerifier.value);
+    }
+    if (recoveryCodeVerifier.present) {
+      map['recovery_code_verifier'] = Variable<String>(
+        recoveryCodeVerifier.value,
+      );
+    }
+    if (failedPinAttempts.present) {
+      map['failed_pin_attempts'] = Variable<int>(failedPinAttempts.value);
+    }
+    if (pinLockedUntil.present) {
+      map['pin_locked_until'] = Variable<DateTime>(pinLockedUntil.value);
+    }
+    if (pinChangedAt.present) {
+      map['pin_changed_at'] = Variable<DateTime>(pinChangedAt.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('StaffAccountsCompanion(')
+          ..write('id: $id, ')
+          ..write('username: $username, ')
+          ..write('displayName: $displayName, ')
+          ..write('role: $role, ')
+          ..write('isActive: $isActive, ')
+          ..write('pinVerifier: $pinVerifier, ')
+          ..write('recoveryCodeVerifier: $recoveryCodeVerifier, ')
+          ..write('failedPinAttempts: $failedPinAttempts, ')
+          ..write('pinLockedUntil: $pinLockedUntil, ')
+          ..write('pinChangedAt: $pinChangedAt, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
@@ -9907,6 +10679,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $CustomerCreditAccountsTable(this);
   late final $CustomerCreditTransactionsTable customerCreditTransactions =
       $CustomerCreditTransactionsTable(this);
+  late final $StaffAccountsTable staffAccounts = $StaffAccountsTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -9930,6 +10703,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     purchaseOrderItems,
     customerCreditAccounts,
     customerCreditTransactions,
+    staffAccounts,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -11820,6 +12594,7 @@ typedef $$BusinessSettingsTableCreateCompanionBuilder =
       Value<bool> receiptShowPhone,
       Value<bool> receiptShowAddress,
       Value<String> receiptNote,
+      Value<bool> loginRequired,
       Value<int> rowid,
     });
 typedef $$BusinessSettingsTableUpdateCompanionBuilder =
@@ -11838,6 +12613,7 @@ typedef $$BusinessSettingsTableUpdateCompanionBuilder =
       Value<bool> receiptShowPhone,
       Value<bool> receiptShowAddress,
       Value<String> receiptNote,
+      Value<bool> loginRequired,
       Value<int> rowid,
     });
 
@@ -11917,6 +12693,11 @@ class $$BusinessSettingsTableFilterComposer
 
   ColumnFilters<String> get receiptNote => $composableBuilder(
     column: $table.receiptNote,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get loginRequired => $composableBuilder(
+    column: $table.loginRequired,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -11999,6 +12780,11 @@ class $$BusinessSettingsTableOrderingComposer
     column: $table.receiptNote,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get loginRequired => $composableBuilder(
+    column: $table.loginRequired,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$BusinessSettingsTableAnnotationComposer
@@ -12069,6 +12855,11 @@ class $$BusinessSettingsTableAnnotationComposer
     column: $table.receiptNote,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get loginRequired => $composableBuilder(
+    column: $table.loginRequired,
+    builder: (column) => column,
+  );
 }
 
 class $$BusinessSettingsTableTableManager
@@ -12122,6 +12913,7 @@ class $$BusinessSettingsTableTableManager
                 Value<bool> receiptShowPhone = const Value.absent(),
                 Value<bool> receiptShowAddress = const Value.absent(),
                 Value<String> receiptNote = const Value.absent(),
+                Value<bool> loginRequired = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BusinessSettingsCompanion(
                 id: id,
@@ -12138,6 +12930,7 @@ class $$BusinessSettingsTableTableManager
                 receiptShowPhone: receiptShowPhone,
                 receiptShowAddress: receiptShowAddress,
                 receiptNote: receiptNote,
+                loginRequired: loginRequired,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -12156,6 +12949,7 @@ class $$BusinessSettingsTableTableManager
                 Value<bool> receiptShowPhone = const Value.absent(),
                 Value<bool> receiptShowAddress = const Value.absent(),
                 Value<String> receiptNote = const Value.absent(),
+                Value<bool> loginRequired = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => BusinessSettingsCompanion.insert(
                 id: id,
@@ -12172,6 +12966,7 @@ class $$BusinessSettingsTableTableManager
                 receiptShowPhone: receiptShowPhone,
                 receiptShowAddress: receiptShowAddress,
                 receiptNote: receiptNote,
+                loginRequired: loginRequired,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -15487,6 +16282,341 @@ typedef $$CustomerCreditTransactionsTableProcessedTableManager =
       CustomerCreditTransaction,
       PrefetchHooks Function({bool accountId})
     >;
+typedef $$StaffAccountsTableCreateCompanionBuilder =
+    StaffAccountsCompanion Function({
+      required String id,
+      required String username,
+      Value<String> displayName,
+      required String role,
+      Value<bool> isActive,
+      required String pinVerifier,
+      Value<String?> recoveryCodeVerifier,
+      Value<int> failedPinAttempts,
+      Value<DateTime?> pinLockedUntil,
+      required DateTime pinChangedAt,
+      required DateTime createdAt,
+      Value<int> rowid,
+    });
+typedef $$StaffAccountsTableUpdateCompanionBuilder =
+    StaffAccountsCompanion Function({
+      Value<String> id,
+      Value<String> username,
+      Value<String> displayName,
+      Value<String> role,
+      Value<bool> isActive,
+      Value<String> pinVerifier,
+      Value<String?> recoveryCodeVerifier,
+      Value<int> failedPinAttempts,
+      Value<DateTime?> pinLockedUntil,
+      Value<DateTime> pinChangedAt,
+      Value<DateTime> createdAt,
+      Value<int> rowid,
+    });
+
+class $$StaffAccountsTableFilterComposer
+    extends Composer<_$AppDatabase, $StaffAccountsTable> {
+  $$StaffAccountsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get pinVerifier => $composableBuilder(
+    column: $table.pinVerifier,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get recoveryCodeVerifier => $composableBuilder(
+    column: $table.recoveryCodeVerifier,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get failedPinAttempts => $composableBuilder(
+    column: $table.failedPinAttempts,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get pinLockedUntil => $composableBuilder(
+    column: $table.pinLockedUntil,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get pinChangedAt => $composableBuilder(
+    column: $table.pinChangedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$StaffAccountsTableOrderingComposer
+    extends Composer<_$AppDatabase, $StaffAccountsTable> {
+  $$StaffAccountsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isActive => $composableBuilder(
+    column: $table.isActive,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get pinVerifier => $composableBuilder(
+    column: $table.pinVerifier,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get recoveryCodeVerifier => $composableBuilder(
+    column: $table.recoveryCodeVerifier,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get failedPinAttempts => $composableBuilder(
+    column: $table.failedPinAttempts,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get pinLockedUntil => $composableBuilder(
+    column: $table.pinLockedUntil,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get pinChangedAt => $composableBuilder(
+    column: $table.pinChangedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$StaffAccountsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $StaffAccountsTable> {
+  $$StaffAccountsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
+
+  GeneratedColumn<String> get displayName => $composableBuilder(
+    column: $table.displayName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<bool> get isActive =>
+      $composableBuilder(column: $table.isActive, builder: (column) => column);
+
+  GeneratedColumn<String> get pinVerifier => $composableBuilder(
+    column: $table.pinVerifier,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get recoveryCodeVerifier => $composableBuilder(
+    column: $table.recoveryCodeVerifier,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get failedPinAttempts => $composableBuilder(
+    column: $table.failedPinAttempts,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get pinLockedUntil => $composableBuilder(
+    column: $table.pinLockedUntil,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get pinChangedAt => $composableBuilder(
+    column: $table.pinChangedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+}
+
+class $$StaffAccountsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $StaffAccountsTable,
+          StaffAccount,
+          $$StaffAccountsTableFilterComposer,
+          $$StaffAccountsTableOrderingComposer,
+          $$StaffAccountsTableAnnotationComposer,
+          $$StaffAccountsTableCreateCompanionBuilder,
+          $$StaffAccountsTableUpdateCompanionBuilder,
+          (
+            StaffAccount,
+            BaseReferences<_$AppDatabase, $StaffAccountsTable, StaffAccount>,
+          ),
+          StaffAccount,
+          PrefetchHooks Function()
+        > {
+  $$StaffAccountsTableTableManager(_$AppDatabase db, $StaffAccountsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$StaffAccountsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$StaffAccountsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$StaffAccountsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> username = const Value.absent(),
+                Value<String> displayName = const Value.absent(),
+                Value<String> role = const Value.absent(),
+                Value<bool> isActive = const Value.absent(),
+                Value<String> pinVerifier = const Value.absent(),
+                Value<String?> recoveryCodeVerifier = const Value.absent(),
+                Value<int> failedPinAttempts = const Value.absent(),
+                Value<DateTime?> pinLockedUntil = const Value.absent(),
+                Value<DateTime> pinChangedAt = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => StaffAccountsCompanion(
+                id: id,
+                username: username,
+                displayName: displayName,
+                role: role,
+                isActive: isActive,
+                pinVerifier: pinVerifier,
+                recoveryCodeVerifier: recoveryCodeVerifier,
+                failedPinAttempts: failedPinAttempts,
+                pinLockedUntil: pinLockedUntil,
+                pinChangedAt: pinChangedAt,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String username,
+                Value<String> displayName = const Value.absent(),
+                required String role,
+                Value<bool> isActive = const Value.absent(),
+                required String pinVerifier,
+                Value<String?> recoveryCodeVerifier = const Value.absent(),
+                Value<int> failedPinAttempts = const Value.absent(),
+                Value<DateTime?> pinLockedUntil = const Value.absent(),
+                required DateTime pinChangedAt,
+                required DateTime createdAt,
+                Value<int> rowid = const Value.absent(),
+              }) => StaffAccountsCompanion.insert(
+                id: id,
+                username: username,
+                displayName: displayName,
+                role: role,
+                isActive: isActive,
+                pinVerifier: pinVerifier,
+                recoveryCodeVerifier: recoveryCodeVerifier,
+                failedPinAttempts: failedPinAttempts,
+                pinLockedUntil: pinLockedUntil,
+                pinChangedAt: pinChangedAt,
+                createdAt: createdAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$StaffAccountsTable, StaffAccount>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $StaffAccountsTable,
+                    StaffAccount
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$StaffAccountsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $StaffAccountsTable,
+      StaffAccount,
+      $$StaffAccountsTableFilterComposer,
+      $$StaffAccountsTableOrderingComposer,
+      $$StaffAccountsTableAnnotationComposer,
+      $$StaffAccountsTableCreateCompanionBuilder,
+      $$StaffAccountsTableUpdateCompanionBuilder,
+      (
+        StaffAccount,
+        BaseReferences<_$AppDatabase, $StaffAccountsTable, StaffAccount>,
+      ),
+      StaffAccount,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
@@ -15534,4 +16664,6 @@ class $AppDatabaseManager {
         _db,
         _db.customerCreditTransactions,
       );
+  $$StaffAccountsTableTableManager get staffAccounts =>
+      $$StaffAccountsTableTableManager(_db, _db.staffAccounts);
 }

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'core/services/notification_store.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_controller.dart';
-import 'core/widgets/app_shell.dart';
+import 'core/widgets/startup_gate.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +25,7 @@ class BizFlowApp extends StatelessWidget {
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           themeMode: themeController.materialThemeMode,
-          home: const AppShell(),
+          home: const StartupGate(),
         );
       },
     );

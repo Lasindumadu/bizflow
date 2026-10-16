@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/theme_controller.dart';
@@ -50,12 +51,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       TextEditingController();
   final TextEditingController _receiptFooterController =
       TextEditingController();
-  final TextEditingController _receiptNoteController =
-      TextEditingController();
+  final TextEditingController _receiptNoteController = TextEditingController();
   bool _receiptShowPhone = true;
   bool _receiptShowAddress = true;
 
   String _currency = 'USD';
+  bool _loginRequired = false;
 
   @override
   void initState() {
@@ -102,6 +103,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _loyaltyEnabled = settings.loyaltyEnabled;
         _receiptShowPhone = settings.receiptShowPhone;
         _receiptShowAddress = settings.receiptShowAddress;
+        _loginRequired = settings.loginRequired;
         _isLoadingSettings = false;
       });
     } catch (error) {
@@ -224,6 +226,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         receiptNote: _receiptNoteController.text.trim(),
         receiptShowPhone: _receiptShowPhone,
         receiptShowAddress: _receiptShowAddress,
+        loginRequired: _loginRequired,
       );
 
       if (!mounted) {
@@ -240,6 +243,138 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to save business settings: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingSettings = false;
+        });
+      }
+    }
+  }
+
+  /// Prompts the owner to confirm enabling startup PIN login.
+  ///
+  /// Enabling login is an owner-only action. The repository enforces this
+  /// (rejects non-owner actors) and validates that an active owner with a
+  /// usable PIN and recovery code exists before allowing the setting to flip.
+  Future<bool?> _confirmLoginEnable() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Enable Startup PIN Login?'),
+          content: const Text(
+            'When enabled, staff must sign in with their PIN before the app '
+            'shell is shown on every startup. This applies to all staff '
+            'accounts.\n\n'
+            'Only an owner account can enable this. Before enabling, make sure '
+            'the owner account is active, has a PIN set, and has a recovery '
+            'code recorded. If you lose access to the owner account, use the '
+            'owner recovery path to regain access.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.primaryDark,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Enable'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Prompts the owner to confirm disabling startup PIN login.
+  Future<bool?> _confirmLoginDisable() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Disable Startup PIN Login?'),
+          content: const Text(
+            'When disabled, anyone can open BizFlow without signing in. '
+            'Staff accounts and PINs will no longer be required at startup.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.error,
+                foregroundColor: Colors.white,
+              ),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Disable'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// Persists the startup PIN login requirement to the database.
+  ///
+  /// Only updates the `loginRequired` column, leaving all other business
+  /// settings untouched. Shows a snack bar on success or failure.
+  Future<void> _saveLoginRequired(bool value) async {
+    setState(() {
+      _isSavingSettings = true;
+    });
+    try {
+      await _businessSettingsRepository.saveSettings(
+        businessName: _businessNameController.text.trim(),
+        address: _addressController.text.trim(),
+        phone: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
+        currency: _currency,
+        loyaltyEnabled: _loyaltyEnabled,
+        loyaltyEarnRate:
+            double.tryParse(_loyaltyEarnRateController.text.trim()) ?? 1.0,
+        loyaltyRedeemValue:
+            double.tryParse(_loyaltyRedeemValueController.text.trim()) ?? 0.01,
+        receiptHeader: _receiptHeaderController.text.trim(),
+        receiptFooter: _receiptFooterController.text.trim(),
+        receiptNote: _receiptNoteController.text.trim(),
+        receiptShowPhone: _receiptShowPhone,
+        receiptShowAddress: _receiptShowAddress,
+        loginRequired: value,
+      );
+      if (!mounted) return;
+      setState(() {
+        _loginRequired = value;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value
+                ? 'Startup PIN login enabled.'
+                : 'Startup PIN login disabled.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loginRequired = !value; // revert on failure
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Failed to ${value ? 'enable' : 'disable'} startup PIN login: '
+            '$error',
+          ),
+          backgroundColor: AppColors.error,
+        ),
       );
     } finally {
       if (mounted) {
@@ -814,7 +949,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: AppDimensions.spacingMd),
-            
+
             // Theme Mode Selector
             AnimatedBuilder(
               animation: themeController,
@@ -835,39 +970,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: AppThemeMode.values.map((mode) {
                         final isSelected = themeController.themeMode == mode;
                         return ChoiceChip(
-                          label: Text(mode.name
-                              .replaceAllMapped(RegExp(r'([A-Z])'), (m) => ' ${m.group(0)}')
-                              .trim()),
-                          avatar: Icon(
-                            _getThemeModeIcon(mode),
-                            size: 18,
-                            color: isSelected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
-                          ),
-                          selected: isSelected,
-                          onSelected: (_) => themeController.setThemeMode(mode),
-                          selectedColor: colorScheme.primary,
-                          labelStyle: TextStyle(
-                            color: isSelected ? colorScheme.onPrimary : colorScheme.onSurface,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            side: BorderSide(
-                              color: isSelected ? colorScheme.primary : colorScheme.outline,
-                              width: isSelected ? 0 : 1.5,
-                            ),
-                          ),
-                        ).animate(target: themeController.animationsEnabled ? 1 : 0)
-                          .scale(duration: 200.ms, curve: Curves.easeOutBack);
+                              label: Text(
+                                mode.name
+                                    .replaceAllMapped(
+                                      RegExp(r'([A-Z])'),
+                                      (m) => ' ${m.group(0)}',
+                                    )
+                                    .trim(),
+                              ),
+                              avatar: Icon(
+                                _getThemeModeIcon(mode),
+                                size: 18,
+                                color: isSelected
+                                    ? colorScheme.onPrimary
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                              selected: isSelected,
+                              onSelected: (_) =>
+                                  themeController.setThemeMode(mode),
+                              selectedColor: colorScheme.primary,
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? colorScheme.onPrimary
+                                    : colorScheme.onSurface,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? colorScheme.primary
+                                      : colorScheme.outline,
+                                  width: isSelected ? 0 : 1.5,
+                                ),
+                              ),
+                            )
+                            .animate(
+                              target: themeController.animationsEnabled ? 1 : 0,
+                            )
+                            .scale(duration: 200.ms, curve: Curves.easeOutBack);
                       }).toList(),
                     ),
                   ],
                 );
               },
             ),
-            
+
             const SizedBox(height: AppDimensions.spacingLg),
-            
+
             // Font Size Selector
             AnimatedBuilder(
               animation: themeController,
@@ -888,32 +1040,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: AppFontSize.values.map((size) {
                         final isSelected = themeController.fontSize == size;
                         return ChoiceChip(
-                          label: Text(_getFontSizeLabel(size)),
-                          selected: isSelected,
-                          onSelected: (_) => themeController.setFontSize(size),
-                          selectedColor: colorScheme.primaryContainer,
-                          labelStyle: TextStyle(
-                            color: isSelected ? colorScheme.onPrimaryContainer : colorScheme.onSurface,
-                            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            side: BorderSide(
-                              color: isSelected ? colorScheme.primary : colorScheme.outline,
-                              width: isSelected ? 0 : 1.5,
-                            ),
-                          ),
-                        ).animate(target: themeController.animationsEnabled ? 1 : 0)
-                          .scale(duration: 200.ms, curve: Curves.easeOutBack);
+                              label: Text(_getFontSizeLabel(size)),
+                              selected: isSelected,
+                              onSelected: (_) =>
+                                  themeController.setFontSize(size),
+                              selectedColor: colorScheme.primaryContainer,
+                              labelStyle: TextStyle(
+                                color: isSelected
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.onSurface,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                side: BorderSide(
+                                  color: isSelected
+                                      ? colorScheme.primary
+                                      : colorScheme.outline,
+                                  width: isSelected ? 0 : 1.5,
+                                ),
+                              ),
+                            )
+                            .animate(
+                              target: themeController.animationsEnabled ? 1 : 0,
+                            )
+                            .scale(duration: 200.ms, curve: Curves.easeOutBack);
                       }).toList(),
                     ),
                   ],
                 );
               },
             ),
-            
+
             const SizedBox(height: AppDimensions.spacingLg),
-            
+
             // Animations Toggle
             AnimatedBuilder(
               animation: themeController,
@@ -922,11 +1084,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(
                     'Animations',
-                    style: AppTextStyles.bodyMedium.copyWith(color: colorScheme.onSurface),
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                   subtitle: Text(
                     'Enable smooth transitions and micro-interactions',
-                    style: AppTextStyles.bodySmall.copyWith(color: colorScheme.onSurfaceVariant),
+                    style: AppTextStyles.bodySmall.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                   value: themeController.animationsEnabled,
                   onChanged: (v) => themeController.setAnimationsEnabled(v),
@@ -1038,9 +1204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: FilledButton.icon(
-                    onPressed: _isSavingSettings
-                        ? null
-                        : _saveBusinessSettings,
+                    onPressed: _isSavingSettings ? null : _saveBusinessSettings,
                     icon: _isSavingSettings
                         ? const SizedBox(
                             width: 16,
@@ -1291,6 +1455,87 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             });
                           },
                         ),
+                        const SizedBox(height: AppDimensions.spacingLg),
+
+                        // Phase D: startup PIN login toggle.
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(
+                              AppDimensions.screenPadding,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Startup PIN Login',
+                                  style: AppTextStyles.labelMedium.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                                const SizedBox(height: AppDimensions.spacingSm),
+                                SwitchListTile.adaptive(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: Text(
+                                    'Require staff PIN at startup',
+                                    style: AppTextStyles.bodyMedium.copyWith(
+                                      color: colorScheme.onSurface,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    _loginRequired
+                                        ? 'Staff must sign in with a PIN before '
+                                              'the app shell is shown.'
+                                        : 'Anyone can open BizFlow without '
+                                              'signing in.',
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  value: _loginRequired,
+                                  onChanged: _isSavingSettings
+                                      ? null
+                                      : (value) async {
+                                          if (!value) {
+                                            // Disabling login requires owner
+                                            // authorization.
+                                            final confirmed =
+                                                await _confirmLoginDisable();
+                                            if (confirmed != true || !mounted) {
+                                              return;
+                                            }
+                                          } else {
+                                            // Enabling login requires owner
+                                            // authorization and a recovery
+                                            // check.
+                                            final confirmed =
+                                                await _confirmLoginEnable();
+                                            if (confirmed != true || !mounted) {
+                                              return;
+                                            }
+                                          }
+                                          await _saveLoginRequired(value);
+                                        },
+                                  activeThumbColor: colorScheme.primary,
+                                  activeTrackColor: colorScheme.primary
+                                      .withValues(alpha: 0.5),
+                                ),
+                                if (_loginRequired) ...[
+                                  const SizedBox(
+                                    height: AppDimensions.spacingSm,
+                                  ),
+                                  Text(
+                                    'Staff PIN login is required at startup. '
+                                    'Only the owner can disable this setting.',
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+
                         const SizedBox(height: AppDimensions.spacingLg),
                         FilledButton.icon(
                           onPressed:

@@ -1,0 +1,16 @@
+Analyzing bizflow_v1.1.0_dev...                                 
+
+   info - The import of 'package:flutter/services.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart'. Try removing the import directive - lib\core\widgets\universal_search.dart:4:8 - unnecessary_import
+  error - Expected to find ']' - lib\core\widgets\universal_search.dart:462:19 - expected_token
+  error - Expected to find ';' - lib\core\widgets\universal_search.dart:468:7 - expected_token
+warning - Dead code. Try removing the code, or fixing the code before it so that it can be reached - lib\core\widgets\universal_search.dart:468:8 - dead_code
+  error - Expected an identifier - lib\core\widgets\universal_search.dart:468:8 - missing_identifier
+  error - Expected to find ';' - lib\core\widgets\universal_search.dart:468:8 - expected_token
+  error - Unexpected text ';'. Try removing the text - lib\core\widgets\universal_search.dart:468:8 - unexpected_token
+  error - Expected an identifier - lib\core\widgets\universal_search.dart:469:5 - missing_identifier
+  error - Unexpected text ';'. Try removing the text - lib\core\widgets\universal_search.dart:469:5 - unexpected_token
+   info - Unnecessary empty statement. Try removing the empty statement or restructuring the code - lib\core\widgets\universal_search.dart:469:6 - empty_statements
+warning - Unused import: '../../../../core/theme/app_decor.dart'. Try removing the import directive - lib\features\auth\presentation\screens\login_screen.dart:7:8 - unused_import
+  error - The method 'GlassCard' isn't defined for the type '_LoginScreenState'. Try correcting the name to the name of an existing method, or defining a method named 'GlassCard' - lib\features\auth\presentation\screens\login_screen.dart:206:22 - undefined_method
+
+12 issues found. (ran in 5.3s)

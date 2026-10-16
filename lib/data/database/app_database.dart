@@ -20,6 +20,7 @@ import 'tables/stock_movements.dart';
 import 'tables/audit_logs.dart';
 import 'tables/business_settings.dart';
 import 'tables/suppliers.dart';
+import 'tables/staff_accounts.dart';
 
 part 'app_database.g.dart';
 
@@ -43,6 +44,7 @@ part 'app_database.g.dart';
     PurchaseOrderItems,
     CustomerCreditAccounts,
     CustomerCreditTransactions,
+    StaffAccounts,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -59,9 +61,9 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 13;
 
-  static const int currentSchemaVersion = 11;
+  static const int currentSchemaVersion = 13;
 
   @override
   MigrationStrategy get migration {
@@ -146,6 +148,20 @@ class AppDatabase extends _$AppDatabase {
           // Customer credit / accounts receivable.
           await m.createTable(customerCreditAccounts);
           await m.createTable(customerCreditTransactions);
+        }
+
+        if (from < 12) {
+          // Local staff accounts (PIN-based operator identification).
+          await m.createTable(staffAccounts);
+        }
+
+        if (from < 13) {
+          // Phase D: optional startup PIN login. Default false so every
+          // existing installation keeps its current no-login behavior.
+          await m.addColumn(
+            businessSettings,
+            businessSettings.loginRequired,
+          );
         }
       },
     );
