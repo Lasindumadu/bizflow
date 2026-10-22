@@ -57,6 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   String _currency = 'USD';
   bool _loginRequired = false;
+  int _inactivityTimeoutMinutes = 0;
 
   @override
   void initState() {
@@ -104,6 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _receiptShowPhone = settings.receiptShowPhone;
         _receiptShowAddress = settings.receiptShowAddress;
         _loginRequired = settings.loginRequired;
+        _inactivityTimeoutMinutes = settings.inactivityTimeoutMinutes;
         _isLoadingSettings = false;
       });
     } catch (error) {
@@ -227,6 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         receiptShowPhone: _receiptShowPhone,
         receiptShowAddress: _receiptShowAddress,
         loginRequired: _loginRequired,
+        inactivityTimeoutMinutes: _inactivityTimeoutMinutes,
       );
 
       if (!mounted) {
@@ -348,6 +351,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         receiptShowPhone: _receiptShowPhone,
         receiptShowAddress: _receiptShowAddress,
         loginRequired: value,
+        inactivityTimeoutMinutes: _inactivityTimeoutMinutes,
       );
       if (!mounted) return;
       setState(() {
@@ -373,6 +377,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Failed to ${value ? 'enable' : 'disable'} startup PIN login: '
             '$error',
           ),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingSettings = false;
+        });
+      }
+    }
+  }
+
+  /// Persists the inactivity auto-lock timeout setting.
+  ///
+  /// Only updates the `inactivityTimeoutMinutes` column, leaving all other
+  /// business settings untouched. Shows a snack bar on success or failure.
+  ///
+  /// The timeout is a security control, so the repository rejects the change
+  /// for a non-owner session. On rejection the previous value is restored so
+  /// the dropdown never shows a value that was not persisted.
+  Future<void> _saveInactivityTimeout(int value) async {
+    final previous = _inactivityTimeoutMinutes;
+    setState(() {
+      _isSavingSettings = true;
+    });
+    try {
+      await _businessSettingsRepository.saveSettings(
+        businessName: _businessNameController.text.trim(),
+        address: _addressController.text.trim(),
+        phone: _phoneController.text.trim(),
+        email: _emailController.text.trim(),
+        currency: _currency,
+        loyaltyEnabled: _loyaltyEnabled,
+        loyaltyEarnRate:
+            double.tryParse(_loyaltyEarnRateController.text.trim()) ?? 1.0,
+        loyaltyRedeemValue:
+            double.tryParse(_loyaltyRedeemValueController.text.trim()) ?? 0.01,
+        receiptHeader: _receiptHeaderController.text.trim(),
+        receiptFooter: _receiptFooterController.text.trim(),
+        receiptNote: _receiptNoteController.text.trim(),
+        receiptShowPhone: _receiptShowPhone,
+        receiptShowAddress: _receiptShowAddress,
+        loginRequired: _loginRequired,
+        inactivityTimeoutMinutes: value,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value == 0
+                ? 'Inactivity auto-lock disabled.'
+                : 'Inactivity auto-lock set to $value minutes.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        // Revert to the value that is actually persisted.
+        _inactivityTimeoutMinutes = previous;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to set inactivity auto-lock: $error'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -1535,6 +1603,100 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ),
                         ),
+
+                        // Phase F: inactivity auto-lock timeout (owner-only).
+                        if (_loginRequired) ...[
+                          const SizedBox(height: AppDimensions.spacingLg),
+                          Card(
+                            child: Padding(
+                              padding: const EdgeInsets.all(
+                                AppDimensions.screenPadding,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Inactivity Auto-Lock',
+                                    style: AppTextStyles.labelMedium.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: AppDimensions.spacingSm,
+                                  ),
+                                  Text(
+                                    'Lock the session after minutes of inactivity.',
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: AppDimensions.spacingMd,
+                                  ),
+                                  DropdownButtonFormField<int>(
+                                    initialValue: _inactivityTimeoutMinutes,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Auto-lock after',
+                                      prefixIcon: Icon(Icons.timer_outlined),
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 0,
+                                        child: Text('Disabled'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 5,
+                                        child: Text('5 minutes'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 15,
+                                        child: Text('15 minutes'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 30,
+                                        child: Text('30 minutes'),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 60,
+                                        child: Text('1 hour'),
+                                      ),
+                                    ],
+                                    onChanged: _isSavingSettings
+                                        ? null
+                                        : (value) async {
+                                            if (value == null) return;
+                                            setState(() {
+                                              _inactivityTimeoutMinutes = value;
+                                            });
+                                            await _saveInactivityTimeout(value);
+                                          },
+                                  ),
+                                  const SizedBox(
+                                    height: AppDimensions.spacingSm,
+                                  ),
+                                  Text(
+                                    'When the session locks, PIN re-entry is '
+                                    'required to resume. Active POS carts are '
+                                    'preserved across lock and sign-out.',
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: AppDimensions.spacingXs,
+                                  ),
+                                  Text(
+                                    'Only the owner can change the auto-lock '
+                                    'timeout.',
+                                    style: AppTextStyles.bodySmall.copyWith(
+                                      color: AppColors.error,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
 
                         const SizedBox(height: AppDimensions.spacingLg),
                         FilledButton.icon(

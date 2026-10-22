@@ -1,7 +1,6 @@
-
 import 'dart:io';
 
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,7 +17,6 @@ class _NoopUser extends QueryExecutorUser {
     OpeningDetails details,
   ) async {}
 }
-
 
 class _RawExecutor extends _NoopUser {
   final QueryExecutor _executor;
@@ -46,7 +44,6 @@ class _RawExecutor extends _NoopUser {
   }
 }
 
-
 void main() {
   late Directory tempDir;
   late File dbFile;
@@ -62,23 +59,21 @@ void main() {
     }
   });
 
-  
-Future<void> prepareRawDb({
-  required int version,
-  required List<String> statements,
-}) async {
-  final executor = NativeDatabase(dbFile);
-  final raw = _RawExecutor(executor);
+  Future<void> prepareRawDb({
+    required int version,
+    required List<String> statements,
+  }) async {
+    final executor = NativeDatabase(dbFile);
+    final raw = _RawExecutor(executor);
 
-  try {
-    await raw.open();
-    await raw.run(statements);
-    await raw.setUserVersion(version);
-  } finally {
-    await raw.close();
+    try {
+      await raw.open();
+      await raw.run(statements);
+      await raw.setUserVersion(version);
+    } finally {
+      await raw.close();
+    }
   }
-}
-
 
   group('schema migration v5 -> v6', () {
     test('backfills points_balance from existing loyalty_points', () async {
@@ -380,12 +375,222 @@ Future<void> prepareRawDb({
       expect(await app.select(app.purchaseOrderItems).get(), isEmpty);
 
       expect(await app.select(app.customerCreditAccounts).get(), isEmpty);
-      expect(
-        await app.select(app.customerCreditTransactions).get(),
-        isEmpty,
-      );
+      expect(await app.select(app.customerCreditTransactions).get(), isEmpty);
 
       expect(await app.select(app.staffAccounts).get(), isEmpty);
+    });
+  });
+
+  group('schema migration v13 -> v14', () {
+    test('adds the staff attribution columns to existing tables', () async {
+      // A v13 database: every table that receives an attribution column
+      // already exists, but *without* that column. This is the shape of a
+      // real installation upgrading from the Phase D build.
+      await prepareRawDb(
+        version: 13,
+        statements: [
+          'CREATE TABLE sales ('
+              'id TEXT NOT NULL PRIMARY KEY, '
+              'customer_id TEXT, '
+              'subtotal REAL NOT NULL, '
+              'discount REAL NOT NULL DEFAULT 0.0, '
+              'total REAL NOT NULL, '
+              'paid_amount REAL NOT NULL, '
+              "payment_method TEXT NOT NULL DEFAULT 'cash', "
+              "status TEXT NOT NULL DEFAULT 'completed', "
+              'created_at INTEGER NOT NULL)',
+          'CREATE TABLE sale_returns ('
+              'id TEXT NOT NULL PRIMARY KEY, '
+              'sale_id TEXT, '
+              'customer_id TEXT, '
+              'refund_amount REAL NOT NULL, '
+              "refund_method TEXT NOT NULL DEFAULT 'cash', "
+              'restocked INTEGER NOT NULL DEFAULT 1, '
+              "reason TEXT NOT NULL DEFAULT '', "
+              'created_at INTEGER NOT NULL)',
+          'CREATE TABLE stock_movements ('
+              'id TEXT NOT NULL PRIMARY KEY, '
+              'product_id TEXT NOT NULL, '
+              'type TEXT NOT NULL, '
+              'quantity INTEGER NOT NULL, '
+              'previous_stock INTEGER NOT NULL, '
+              'new_stock INTEGER NOT NULL, '
+              "note TEXT NOT NULL DEFAULT '', "
+              'created_at INTEGER NOT NULL)',
+          'CREATE TABLE cash_shifts ('
+              'id TEXT NOT NULL PRIMARY KEY, '
+              'shift_number INTEGER NOT NULL, '
+              'opening_float REAL NOT NULL DEFAULT 0.0, '
+              'closing_count REAL, '
+              "discrepancy_reason TEXT NOT NULL DEFAULT '', "
+              'opened_at INTEGER NOT NULL, '
+              'closed_at INTEGER, '
+              'is_open INTEGER NOT NULL DEFAULT 1)',
+          'CREATE TABLE cash_movements ('
+              'id TEXT NOT NULL PRIMARY KEY, '
+              'shift_id TEXT NOT NULL, '
+              'direction TEXT NOT NULL, '
+              'amount REAL NOT NULL, '
+              "note TEXT NOT NULL DEFAULT '', "
+              'created_at INTEGER NOT NULL)',
+          'CREATE TABLE purchase_orders ('
+              'id TEXT NOT NULL PRIMARY KEY, '
+              'supplier_id TEXT NOT NULL, '
+              "supplier_reference TEXT NOT NULL DEFAULT '', "
+              "status TEXT NOT NULL DEFAULT 'draft', "
+              'subtotal REAL NOT NULL DEFAULT 0.0, '
+              'tax_amount REAL NOT NULL DEFAULT 0.0, '
+              'total REAL NOT NULL DEFAULT 0.0, '
+              "notes TEXT NOT NULL DEFAULT '', "
+              'created_at INTEGER NOT NULL, '
+              'updated_at INTEGER NOT NULL, '
+              'expected_date INTEGER, '
+              'received_at INTEGER)',
+        ],
+      );
+
+      final app = AppDatabase(NativeDatabase(dbFile));
+      addTearDown(app.close);
+
+      // Reading a table forces the migration to run.
+      await app.select(app.sales).get();
+
+      Future<List<String>> columnsOf(String table) async {
+        final rows = await app
+            .customSelect(
+              "SELECT name FROM pragma_table_info('$table')",
+              readsFrom: {},
+            )
+            .get();
+        return rows.map((r) => r.read<String>('name')).toList();
+      }
+
+      expect(await columnsOf('sales'), contains('staff_id'));
+      expect(await columnsOf('sale_returns'), contains('staff_id'));
+      expect(await columnsOf('stock_movements'), contains('staff_id'));
+      expect(await columnsOf('cash_shifts'), contains('opened_by_id'));
+      expect(await columnsOf('cash_shifts'), contains('closed_by_id'));
+      expect(await columnsOf('cash_movements'), contains('staff_id'));
+      expect(await columnsOf('purchase_orders'), contains('staff_id'));
+    });
+
+    test('pre-existing rows survive the upgrade with null attribution', () async {
+      await prepareRawDb(
+        version: 13,
+        statements: [
+          'CREATE TABLE sales ('
+              'id TEXT NOT NULL PRIMARY KEY, '
+              'customer_id TEXT, '
+              'subtotal REAL NOT NULL, '
+              'discount REAL NOT NULL DEFAULT 0.0, '
+              'total REAL NOT NULL, '
+              'paid_amount REAL NOT NULL, '
+              "payment_method TEXT NOT NULL DEFAULT 'cash', "
+              "status TEXT NOT NULL DEFAULT 'completed', "
+              'created_at INTEGER NOT NULL)',
+          "INSERT INTO sales (id, customer_id, subtotal, total, paid_amount, "
+              "payment_method, status, created_at) VALUES "
+              "('s1', 'c1', 10.0, 10.0, 10.0, 'cash', 'completed', 1700000000)",
+        ],
+      );
+
+      final app = AppDatabase(NativeDatabase(dbFile));
+      addTearDown(app.close);
+
+      final sales = await app.select(app.sales).get();
+      expect(sales, hasLength(1));
+      expect(sales.single.id, 's1');
+      expect(
+        sales.single.staffId,
+        isNull,
+        reason: 'legacy rows stay unattributed',
+      );
+    });
+  });
+
+  group('schema migration v14 -> v15', () {
+    test(
+      'adds the inactivity timeout column with a disabled default',
+      () async {
+        // A v14 database: `business_settings` exists with every Phase D/E
+        // column but WITHOUT the Phase F inactivity timeout.
+        await prepareRawDb(
+          version: 14,
+          statements: [
+            'CREATE TABLE business_settings ('
+                'id TEXT NOT NULL PRIMARY KEY, '
+                "business_name TEXT NOT NULL DEFAULT 'My Business', "
+                "address TEXT NOT NULL DEFAULT '', "
+                "phone TEXT NOT NULL DEFAULT '', "
+                "email TEXT NOT NULL DEFAULT '', "
+                "currency TEXT NOT NULL DEFAULT 'USD', "
+                'loyalty_enabled INTEGER NOT NULL DEFAULT 1, '
+                'loyalty_earn_rate REAL NOT NULL DEFAULT 1.0, '
+                'loyalty_redeem_value REAL NOT NULL DEFAULT 0.01, '
+                "receipt_header TEXT NOT NULL DEFAULT 'Thank you for your purchase!', "
+                "receipt_footer TEXT NOT NULL DEFAULT '', "
+                'receipt_show_phone INTEGER NOT NULL DEFAULT 1, '
+                'receipt_show_address INTEGER NOT NULL DEFAULT 1, '
+                "receipt_note TEXT NOT NULL DEFAULT '', "
+                'login_required INTEGER NOT NULL DEFAULT 0)',
+            "INSERT INTO business_settings (id) VALUES ('default')",
+          ],
+        );
+
+        final app = AppDatabase(NativeDatabase(dbFile));
+        addTearDown(app.close);
+
+        // Reading a table forces the migration to run.
+        final settings = await app.select(app.businessSettings).get();
+
+        expect(settings, hasLength(1));
+        expect(
+          settings.single.inactivityTimeoutMinutes,
+          0,
+          reason: 'the auto-lock is disabled by default after the upgrade',
+        );
+      },
+    );
+
+    test('pre-existing settings rows survive the upgrade', () async {
+      await prepareRawDb(
+        version: 14,
+        statements: [
+          'CREATE TABLE business_settings ('
+              'id TEXT NOT NULL PRIMARY KEY, '
+              "business_name TEXT NOT NULL DEFAULT 'My Business', "
+              "address TEXT NOT NULL DEFAULT '', "
+              "phone TEXT NOT NULL DEFAULT '', "
+              "email TEXT NOT NULL DEFAULT '', "
+              "currency TEXT NOT NULL DEFAULT 'USD', "
+              'loyalty_enabled INTEGER NOT NULL DEFAULT 1, '
+              'loyalty_earn_rate REAL NOT NULL DEFAULT 1.0, '
+              'loyalty_redeem_value REAL NOT NULL DEFAULT 0.01, '
+              "receipt_header TEXT NOT NULL DEFAULT 'Thank you for your purchase!', "
+              "receipt_footer TEXT NOT NULL DEFAULT '', "
+              'receipt_show_phone INTEGER NOT NULL DEFAULT 1, '
+              'receipt_show_address INTEGER NOT NULL DEFAULT 1, '
+              "receipt_note TEXT NOT NULL DEFAULT '', "
+              'login_required INTEGER NOT NULL DEFAULT 0)',
+          "INSERT INTO business_settings (id, business_name, currency, "
+              "login_required) VALUES ('default', 'Legacy Store', 'LKR', 1)",
+        ],
+      );
+
+      final app = AppDatabase(NativeDatabase(dbFile));
+      addTearDown(app.close);
+
+      final settings = await app.select(app.businessSettings).get();
+
+      expect(settings, hasLength(1));
+      expect(settings.single.businessName, 'Legacy Store');
+      expect(settings.single.currency, 'LKR');
+      expect(
+        settings.single.loginRequired,
+        isTrue,
+        reason: 'the Phase D login flag is preserved by the v15 upgrade',
+      );
+      expect(settings.single.inactivityTimeoutMinutes, 0);
     });
   });
 }

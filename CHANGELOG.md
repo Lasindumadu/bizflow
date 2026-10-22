@@ -4,6 +4,101 @@ All notable changes to the BizFlow source-code template are documented in this f
 
 ---
 
+## [1.1.0] — Startup Login, Session Security & Owner Recovery
+
+### Added
+
+#### Session locking (F1–F2)
+
+* **Inactivity auto-lock.** A new `business_settings.inactivity_timeout_minutes`
+  column (default `0` = disabled) sets how long a terminal may sit idle before
+  the session locks. The timeout is **owner-only**: managers and cashiers are
+  rejected by the repository, and every change is audited.
+* **Explicit lock.** A session menu in the app header offers *Lock now*,
+  *Staff & access* and *Sign out*.
+* **PIN-only unlock.** A locked session requires PIN re-entry through
+  `StaffAccountRepository.verifyPin` — the bcrypt-verified path, including the
+  existing failed-attempt throttling and account lockout. Touching the screen
+  does **not** unlock: `SessionController.resetActivity` never clears a lock.
+* **Locked sessions cannot authorize operations.** `resolveActor` and
+  `requireOwner` throw a `StateError` while the session is locked, so no
+  repository can act on behalf of a suspended session.
+* **Lifecycle-aware timeout.** The shell observes app lifecycle changes, so a
+  timeout that elapses while the app is backgrounded locks the session as soon
+  as the app resumes.
+
+#### POS sale preservation (F3)
+
+* An in-progress POS cart is **parked** when the session locks or signs out and
+  is **restored exactly once** when the session unlocks or a new user signs in.
+  Parking and restoring are each guarded so a cart can never be duplicated or
+  silently recalled twice.
+
+#### Staff management, recovery & readiness (F4–F5)
+
+* **New "Staff & Access" screen** (Settings → More Tools, and the session
+  menu) for listing staff, creating accounts, changing roles, activating and
+  deactivating accounts, and resetting a staff PIN.
+* **Owner recovery.** The owner PIN can be recovered with the one-time recovery
+  code issued when the owner account was created. Recovery rotates the code and
+  the new code is displayed exactly once.
+* **Login readiness.** The pre-flight check (active owner + PIN + recovery
+  code) is surfaced in the UI so an owner can see, before enabling startup
+  login, whether the business could be locked out.
+
+#### Login-readiness verification (F6)
+
+* `StaffAccountRepository.checkLoginReadiness` is now surfaced in the UI and
+  covered by tests; enabling startup PIN login still refuses when the owner
+  account is incomplete.
+
+### Changed
+
+* **Schema v14 → v15.** Adds `business_settings.inactivity_timeout_minutes`
+  with a `0` default. The migration is additive: no existing row is modified,
+  and the Phase D `login_required` flag survives the upgrade.
+* **Backup schema version 14 → 15.** The backup payload now carries the
+  inactivity timeout. The field is **optional on read**, so pre-v15 backups
+  still restore (with the timeout defaulting to `0`).
+* **The v15 migration is guarded** by a table-existence and column-existence
+  check, matching the v14 block, so a database without a `business_settings`
+  table no longer aborts the whole migration.
+* **Backup schema-version assertions** in the test suite now compare against
+  `AppDatabase.currentSchemaVersion` instead of a hard-coded number, closing
+  the §5.3 mirror-drift risk recorded in the plan.
+
+### Fixed
+
+* **The inactivity lock can no longer be bypassed by a stray tap.** Previously
+  `resetActivity()` also unlocked a locked session.
+* **Activity tracking no longer causes listener/timer churn.** Activity updates
+  the timestamp without notifying listeners; the shell restarts its timer
+  directly. This removes a per-interaction database query, `setState`, and
+  cart-restore cycle.
+* **The lock dialog no longer leaks a `FocusNode`** — a fresh `FocusNode` was
+  allocated on every rebuild and never disposed. It is now a single, disposed
+  node, and the PIN field takes focus when the dialog appears.
+* **The lock dialog is not dismissible** by the system back button
+  (`PopScope(canPop: false)`) or a predictive-back gesture.
+
+### Verification
+
+* `flutter analyze --no-pub` — 0 issues
+* `flutter test` — **243 tests passing** (36 new Phase F tests, 2 new v15
+  migration tests)
+* `flutter build web --release` — succeeds
+
+### Known limitations
+
+* UI-level role gating is still not implemented (authorization is enforced at
+  the repository/service layer) — the same limitation carried from Phase E.
+* The inactivity clock uses the device clock; rolling it back extends an
+  unlocked session.
+* The backup schema-version mirror is now covered by tests, but the
+  `_currentSchemaVersion` constant itself is still hand-maintained.
+
+---
+
 ## [1.5.0] — Polish, Reliability & Low-Stock Alerts
 
 ### Added

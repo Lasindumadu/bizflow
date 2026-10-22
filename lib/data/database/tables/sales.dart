@@ -19,6 +19,10 @@ class Sales extends Table {
 
   DateTimeColumn get createdAt => dateTime()();
 
+  /// The authenticated staff member who completed the sale. Null for legacy
+  /// records and for operations performed while login enforcement is disabled.
+  TextColumn get staffId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

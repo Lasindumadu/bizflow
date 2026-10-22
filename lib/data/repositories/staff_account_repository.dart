@@ -5,6 +5,7 @@ import 'package:bcrypt/bcrypt.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../core/session/session_controller.dart';
 import '../database/app_database.dart';
 import 'audit_repository.dart';
 
@@ -68,7 +69,10 @@ class StaffAccountSummary {
 /// [newRecoveryCode] is the rotated plaintext code, returned only after the
 /// new verifier has been committed. The previous code stops working.
 class RecoveredOwnerPin {
-  const RecoveredOwnerPin({required this.account, required this.newRecoveryCode});
+  const RecoveredOwnerPin({
+    required this.account,
+    required this.newRecoveryCode,
+  });
 
   final StaffAccountSummary account;
   final String newRecoveryCode;
@@ -108,11 +112,7 @@ enum StaffAuthStatus {
 
 /// Result of [StaffAccountRepository.verifyPin].
 class StaffAuthResult {
-  const StaffAuthResult({
-    required this.status,
-    this.account,
-    this.lockedUntil,
-  });
+  const StaffAuthResult({required this.status, this.account, this.lockedUntil});
 
   final StaffAuthStatus status;
 
@@ -279,21 +279,59 @@ class StaffAccountRepository {
     createdAt: row.createdAt,
   );
 
+  /// Session-derived authority for owner-only staff administration.
+  ///
+  /// Phase E hardening: the caller-supplied `asOwner` boolean and
+  /// `actingUsername` string are NOT proof of authority — anyone can pass
+  /// them. When an authenticated session exists, the session identity is
+  /// authoritative and is re-verified against the database here:
+  /// - account deleted or deactivated → the session is signed out and the
+  ///   call throws (stale sessions cannot administer staff);
+  /// - account is not the owner → the call throws.
+  ///
+  /// Returns the verified acting owner for audit attribution, or null when
+  /// no session exists (login-disabled/bootstrap mode). In that legacy
+  /// path the pre-Phase-E `asOwner` + `actingUsername` checks remain in
+  /// force, preserving every existing caller and test.
+  Future<StaffAccountSummary?> _requireOwnerAuthority(String operation) async {
+    final current = sessionController.current;
+    if (current == null) {
+      return null;
+    }
+
+    final row = await _findById(current.id);
+    if (row == null || !row.isActive) {
+      sessionController.signOut();
+      throw StateError(
+        'The account "${current.username}" is deactivated or no longer '
+        'exists. Please sign in again with an active account.',
+      );
+    }
+    if (row.role != StaffRole.owner.name) {
+      throw StateError(
+        'Insufficient permissions for $operation: '
+        '${row.role} is not authorized.',
+      );
+    }
+    return _summary(row);
+  }
+
   Future<StaffAccount?> _findByUsername(String normalizedUsername) {
-    return (database.select(database.staffAccounts)
-          ..where((t) => t.username.equals(normalizedUsername)))
-        .getSingleOrNull();
+    return (database.select(
+      database.staffAccounts,
+    )..where((t) => t.username.equals(normalizedUsername))).getSingleOrNull();
   }
 
   Future<StaffAccount?> _findById(String id) {
-    return (database.select(database.staffAccounts)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    return (database.select(
+      database.staffAccounts,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
   }
 
   Future<void> _clearFailures(String id) async {
-    await (database.update(database.staffAccounts)..where((t) => t.id.equals(id)))
-        .write(
+    await (database.update(
+      database.staffAccounts,
+    )..where((t) => t.id.equals(id))).write(
       const StaffAccountsCompanion(
         failedPinAttempts: Value(0),
         pinLockedUntil: Value(null),
@@ -332,6 +370,12 @@ class StaffAccountRepository {
     bool isActive = true,
     String? actor,
   }) async {
+    // Owner-only when an authenticated session exists (staff administration).
+    // With no session (first-run bootstrap, login-disabled mode) the
+    // pre-Phase-E behavior is preserved so the first owner can still be
+    // created before any session can exist.
+    final verifiedOwner = await _requireOwnerAuthority('create staff accounts');
+
     final normalizedUsername = normalizeUsername(username);
     final usernameError = validateUsername(normalizedUsername);
     if (usernameError != null) {
@@ -368,9 +412,9 @@ class StaffAccountRepository {
       if (role == StaffRole.owner) {
         // Exactly one owner row may ever exist so owner recovery always
         // targets a single, unambiguous account.
-        final owners = await (database.select(database.staffAccounts)
-              ..where((t) => t.role.equals(StaffRole.owner.name)))
-            .get();
+        final owners = await (database.select(
+          database.staffAccounts,
+        )..where((t) => t.role.equals(StaffRole.owner.name))).get();
         if (owners.isNotEmpty) {
           throw StateError(
             'An owner account already exists. Recover its PIN instead of '
@@ -380,26 +424,28 @@ class StaffAccountRepository {
       }
 
       final now = _now();
-      await database.into(database.staffAccounts).insert(
-        StaffAccountsCompanion.insert(
-          id: id,
-          username: normalizedUsername,
-          displayName: Value(displayName.trim()),
-          role: role.name,
-          isActive: Value(isActive),
-          pinVerifier: pinHash,
-          recoveryCodeVerifier: Value(recoveryCodeHash),
-          pinChangedAt: now,
-          createdAt: now,
-        ),
-      );
+      await database
+          .into(database.staffAccounts)
+          .insert(
+            StaffAccountsCompanion.insert(
+              id: id,
+              username: normalizedUsername,
+              displayName: Value(displayName.trim()),
+              role: role.name,
+              isActive: Value(isActive),
+              pinVerifier: pinHash,
+              recoveryCodeVerifier: Value(recoveryCodeHash),
+              pinChangedAt: now,
+              createdAt: now,
+            ),
+          );
       final inserted = await _findById(id);
       return inserted!;
     });
 
     await _audit.log(
       action: 'staff.create',
-      actor: actor ?? 'Owner',
+      actor: verifiedOwner?.username ?? actor ?? 'Owner',
       summary: "Created ${role.name} account '$normalizedUsername'",
       entityType: 'staff',
       entityId: id,
@@ -414,9 +460,9 @@ class StaffAccountRepository {
   /// Lists all staff accounts, ordered by username.
   /// Never includes credential verifiers.
   Future<List<StaffAccountSummary>> listStaff() async {
-    final rows = await (database.select(database.staffAccounts)
-          ..orderBy([(t) => OrderingTerm.asc(t.username)]))
-        .get();
+    final rows = await (database.select(
+      database.staffAccounts,
+    )..orderBy([(t) => OrderingTerm.asc(t.username)])).get();
     return rows.map(_summary).toList();
   }
 
@@ -498,9 +544,9 @@ class StaffAccountRepository {
     final attempts = row.failedPinAttempts + 1;
     if (attempts >= maxFailedPinAttempts) {
       final lockedUntil = _now().add(pinLockoutDuration);
-      await (database.update(database.staffAccounts)
-            ..where((t) => t.id.equals(row.id)))
-          .write(
+      await (database.update(
+        database.staffAccounts,
+      )..where((t) => t.id.equals(row.id))).write(
         StaffAccountsCompanion(
           failedPinAttempts: const Value(0),
           pinLockedUntil: Value(lockedUntil),
@@ -508,7 +554,8 @@ class StaffAccountRepository {
       );
       await _audit.log(
         action: 'staff.pin_lock',
-        summary: "Locked account '${row.username}' after "
+        summary:
+            "Locked account '${row.username}' after "
             '$attempts failed PIN attempts',
         entityType: 'staff',
         entityId: row.id,
@@ -553,6 +600,13 @@ class StaffAccountRepository {
     bool asOwner = false,
     String? actor,
   }) async {
+    // Owner-initiated resets must come from an authenticated owner session;
+    // self-service changes are authorized by knowledge of the current PIN
+    // and stay available in every mode.
+    final verifiedOwner = asOwner
+        ? await _requireOwnerAuthority("reset account '$username' PIN")
+        : null;
+
     final row = await _findByUsername(normalizeUsername(username));
     if (row == null) {
       throw StateError(
@@ -561,9 +615,7 @@ class StaffAccountRepository {
     }
     if (!asOwner) {
       if (currentPin == null || currentPin.isEmpty) {
-        throw StateError(
-          'The current PIN is required to change your own PIN.',
-        );
+        throw StateError('The current PIN is required to change your own PIN.');
       }
       if (!await _checkPinOffload(currentPin, row.pinVerifier)) {
         throw StateError('The current PIN is incorrect.');
@@ -578,9 +630,9 @@ class StaffAccountRepository {
     final now = _now();
     await database.transaction(() async {
       _maybeFailStaffWriteForTest();
-      await (database.update(database.staffAccounts)
-            ..where((t) => t.id.equals(row.id)))
-          .write(
+      await (database.update(
+        database.staffAccounts,
+      )..where((t) => t.id.equals(row.id))).write(
         StaffAccountsCompanion(
           pinVerifier: Value(newHash),
           failedPinAttempts: const Value(0),
@@ -592,7 +644,7 @@ class StaffAccountRepository {
 
     await _audit.log(
       action: asOwner ? 'staff.pin_reset' : 'staff.pin_change',
-      actor: actor ?? 'Owner',
+      actor: verifiedOwner?.username ?? actor ?? 'Owner',
       summary: asOwner
           ? "Owner reset the PIN of account '${row.username}'"
           : "Changed the PIN of account '${row.username}'",
@@ -613,6 +665,7 @@ class StaffAccountRepository {
     if (!asOwner) {
       throw StateError('Only the owner can change staff roles.');
     }
+    final verifiedOwner = await _requireOwnerAuthority('change staff roles');
     final row = await _findByUsername(normalizeUsername(username));
     if (row == null) {
       throw StateError(
@@ -644,8 +697,9 @@ class StaffAccountRepository {
 
     await _audit.log(
       action: 'staff.role_change',
-      actor: actor ?? 'Owner',
-      summary: "Changed role of account '${row.username}' "
+      actor: verifiedOwner?.username ?? actor ?? 'Owner',
+      summary:
+          "Changed role of account '${row.username}' "
           "from ${row.role} to ${role.name}",
       entityType: 'staff',
       entityId: row.id,
@@ -669,6 +723,9 @@ class StaffAccountRepository {
     if (!asOwner) {
       throw StateError('Only the owner can activate staff accounts.');
     }
+    final verifiedOwner = await _requireOwnerAuthority(
+      'activate / deactivate staff accounts',
+    );
     final row = await _findByUsername(normalizeUsername(username));
     if (row == null) {
       throw StateError(
@@ -693,7 +750,7 @@ class StaffAccountRepository {
 
     await _audit.log(
       action: isActive ? 'staff.activate' : 'staff.deactivate',
-      actor: actor ?? 'Owner',
+      actor: verifiedOwner?.username ?? actor ?? 'Owner',
       summary: isActive
           ? "Reactivated account '${row.username}'"
           : "Deactivated account '${row.username}'",
@@ -722,6 +779,7 @@ class StaffAccountRepository {
     if (!asOwner) {
       throw StateError('Only the owner can edit staff details.');
     }
+    final verifiedOwner = await _requireOwnerAuthority('edit staff details');
     final row = await _findByUsername(normalizeUsername(username));
     if (row == null) {
       throw StateError(
@@ -742,7 +800,7 @@ class StaffAccountRepository {
 
     await _audit.log(
       action: 'staff.display_name_change',
-      actor: actor ?? 'Owner',
+      actor: verifiedOwner?.username ?? actor ?? 'Owner',
       summary: "Changed display name of account '${row.username}'",
       entityType: 'staff',
       entityId: row.id,
@@ -767,9 +825,9 @@ class StaffAccountRepository {
     required String newPin,
     String? actor,
   }) async {
-    final rows = await (database.select(database.staffAccounts)
-          ..where((t) => t.role.equals(StaffRole.owner.name)))
-        .get();
+    final rows = await (database.select(
+      database.staffAccounts,
+    )..where((t) => t.role.equals(StaffRole.owner.name))).get();
     if (rows.isEmpty) {
       throw StateError('No owner account exists to recover.');
     }
@@ -793,9 +851,9 @@ class StaffAccountRepository {
 
     final StaffAccount committed = await database.transaction(() async {
       _maybeFailStaffWriteForTest();
-      await (database.update(database.staffAccounts)
-            ..where((t) => t.id.equals(owner.id)))
-          .write(
+      await (database.update(
+        database.staffAccounts,
+      )..where((t) => t.id.equals(owner.id))).write(
         StaffAccountsCompanion(
           pinVerifier: Value(newPinHash),
           recoveryCodeVerifier: Value(newRecoveryHash),
@@ -859,9 +917,9 @@ class StaffAccountRepository {
   /// A staff row's mere existence is NOT treated as proof of recovery
   /// capability — the verifiers themselves are checked.
   Future<({bool ready, String message})> checkLoginReadiness() async {
-    final rows = await (database.select(database.staffAccounts)
-          ..where((t) => t.role.equals(StaffRole.owner.name)))
-        .get();
+    final rows = await (database.select(
+      database.staffAccounts,
+    )..where((t) => t.role.equals(StaffRole.owner.name))).get();
     if (rows.isEmpty) {
       return (
         ready: false,
@@ -875,14 +933,16 @@ class StaffAccountRepository {
     if (!owner.isActive) {
       return (
         ready: false,
-        message: "The owner account '${owner.username}' is deactivated and "
+        message:
+            "The owner account '${owner.username}' is deactivated and "
             'could not sign in. Reactivate it before enabling PIN login.',
       );
     }
     if (owner.pinVerifier.isEmpty) {
       return (
         ready: false,
-        message: "The owner account '${owner.username}' has no PIN set. Set "
+        message:
+            "The owner account '${owner.username}' has no PIN set. Set "
             'an owner PIN before enabling PIN login.',
       );
     }
@@ -916,10 +976,16 @@ class StaffAccountRepository {
     String? actor,
   }) async {
     if (!asOwner) {
-      throw StateError(
-        'Only the owner can change the PIN-login requirement.',
-      );
+      throw StateError('Only the owner can change the PIN-login requirement.');
     }
+    // Phase E: when a session exists, its identity is authoritative — the
+    // caller-supplied [actingUsername] is NOT accepted as proof, so a
+    // cashier session cannot spoof the owner's username to flip this
+    // setting. With no session (bootstrap), the [actingUsername] lookup
+    // below remains the verification, preserving Phase D behavior.
+    final verifiedOwner = await _requireOwnerAuthority(
+      'change the PIN-login requirement',
+    );
     final row = await _findByUsername(normalizeUsername(actingUsername));
     if (row == null) {
       throw StateError(
@@ -945,7 +1011,7 @@ class StaffAccountRepository {
 
     await _audit.log(
       action: enable ? 'settings.login_enable' : 'settings.login_disable',
-      actor: actor ?? row.username,
+      actor: verifiedOwner?.username ?? actor ?? row.username,
       summary: enable
           ? 'Enabled required PIN login at startup'
           : 'Disabled required PIN login at startup',

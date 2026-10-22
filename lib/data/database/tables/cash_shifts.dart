@@ -24,6 +24,12 @@ class CashShifts extends Table {
 
   BoolColumn get isOpen => boolean().withDefault(const Constant(true))();
 
+  /// The staff member who opened this shift.
+  TextColumn get openedById => text().nullable()();
+
+  /// The staff member who closed this shift (null while open).
+  TextColumn get closedById => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

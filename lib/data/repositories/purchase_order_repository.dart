@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../database/app_database.dart';
+import '../../core/session/session_authorization.dart';
 import 'audit_repository.dart';
 import 'product_repository.dart';
 import 'stock_movement_repository.dart';
@@ -191,6 +192,13 @@ class PurchaseOrderRepository {
       throw ArgumentError('A purchase order must have at least one line.');
     }
 
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager},
+      'create purchase order',
+    );
+
     return database.transaction(() async {
       final id = 'po_${DateTime.now().microsecondsSinceEpoch}';
       final now = DateTime.now();
@@ -204,6 +212,7 @@ class PurchaseOrderRepository {
         PurchaseOrdersCompanion.insert(
           id: id,
           supplierId: supplierId,
+          staffId: Value(actor.staff?.id),
           supplierReference: Value(supplierReference),
           status: const Value('draft'),
           subtotal: Value(subtotal),
@@ -236,6 +245,7 @@ class PurchaseOrderRepository {
 
       await _audit.log(
         action: 'purchase_order.create',
+        actor: actor.staff?.username ?? 'Owner',
         entityType: 'purchase_order',
         entityId: id,
         summary: 'Created PO $id for supplier $supplierId with ${lines.length} line(s)',
@@ -243,6 +253,7 @@ class PurchaseOrderRepository {
           'supplierId': supplierId,
           'lineCount': lines.length,
           'total': total,
+          'staffId': actor.staff?.id,
         },
       );
 
@@ -259,6 +270,13 @@ class PurchaseOrderRepository {
     DateTime? expectedDate,
     String notes = '',
   }) async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager},
+      'update purchase order',
+    );
+
     final existing = await getPurchaseOrderById(id);
     if (existing == null) {
       throw StateError('Purchase order not found.');
@@ -314,6 +332,7 @@ class PurchaseOrderRepository {
 
       await _audit.log(
         action: 'purchase_order.update',
+        actor: actor.staff?.username ?? 'Owner',
         entityType: 'purchase_order',
         entityId: id,
         summary: 'Updated PO $id',
@@ -321,6 +340,7 @@ class PurchaseOrderRepository {
           'supplierId': supplierId,
           'lineCount': lines.length,
           'total': total,
+          'staffId': actor.staff?.id,
         },
       );
 
@@ -349,6 +369,13 @@ class PurchaseOrderRepository {
     required Map<String, int> receivedQuantities,
     String notes = '',
   }) async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager},
+      'receive stock',
+    );
+
     final existing = await getPurchaseOrderById(id);
     if (existing == null) {
       throw StateError('Purchase order not found.');
@@ -411,12 +438,14 @@ class PurchaseOrderRepository {
 
       await _audit.log(
         action: 'purchase_order.receive',
+        actor: actor.staff?.username ?? 'Owner',
         entityType: 'purchase_order',
         entityId: id,
         summary: 'Received stock for PO $id (status: $newStatus)',
         after: {
           'receivedQuantities': receivedQuantities,
           'newStatus': newStatus,
+          'staffId': actor.staff?.id,
         },
       );
 
@@ -426,6 +455,13 @@ class PurchaseOrderRepository {
 
   /// Deletes a draft purchase order.
   Future<void> deletePurchaseOrder(String id) async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner},
+      'delete purchase order',
+    );
+
     final existing = await getPurchaseOrderById(id);
     if (existing == null) {
       throw StateError('Purchase order not found.');
@@ -444,6 +480,7 @@ class PurchaseOrderRepository {
 
     await _audit.log(
       action: 'purchase_order.delete',
+      actor: actor.staff?.username ?? 'Owner',
       entityType: 'purchase_order',
       entityId: id,
       summary: 'Deleted draft PO $id',
@@ -451,6 +488,13 @@ class PurchaseOrderRepository {
   }
 
   Future<PurchaseOrderRecord> _updateStatus(String id, String newStatus, String summary) async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager},
+      'purchase order status change',
+    );
+
     final existing = await getPurchaseOrderById(id);
     if (existing == null) {
       throw StateError('Purchase order not found.');
@@ -479,10 +523,11 @@ class PurchaseOrderRepository {
 
     await _audit.log(
       action: 'purchase_order.status_change',
+      actor: actor.staff?.username ?? 'Owner',
       entityType: 'purchase_order',
       entityId: id,
       summary: summary,
-      after: {'newStatus': newStatus},
+      after: {'newStatus': newStatus, 'staffId': actor.staff?.id},
     );
 
     return getPurchaseOrderById(id) as Future<PurchaseOrderRecord>;

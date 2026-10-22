@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:drift/drift.dart' hide Column;
 
@@ -43,12 +42,11 @@ class UniversalSearchService {
   final AppDatabase _db;
   UniversalSearchService(this._db);
 
-  Future<List<ProductRow>> getProducts() =>
-      _db.select(_db.products).get();
+  Future<List<ProductRow>> getProducts() => _db.select(_db.products).get();
   Future<List<Customer>> getCustomers() => _db.select(_db.customers).get();
-  Future<List<Sale>> getSales() =>
-      (_db.select(_db.sales)..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-          .get();
+  Future<List<Sale>> getSales() => (_db.select(
+    _db.sales,
+  )..orderBy([(t) => OrderingTerm.desc(t.createdAt)])).get();
 }
 
 /// Full-screen blurred command-palette search across Products, Customers and
@@ -66,14 +64,17 @@ class UniversalSearchOverlay extends StatefulWidget {
             const UniversalSearchOverlay(),
         transitionsBuilder: (_, animation, secondaryAnimation, child) =>
             FadeTransition(
-          opacity: animation,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: 0.96, end: 1).animate(
-              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.96, end: 1).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
+                child: child,
+              ),
             ),
-            child: child,
-          ),
-        ),
       ),
     );
   }
@@ -155,8 +156,7 @@ class _UniversalSearchOverlayState extends State<UniversalSearchOverlay> {
       }
     }
     for (final c in customers) {
-      if (c.name.toLowerCase().contains(lower) ||
-          c.phone.contains(query)) {
+      if (c.name.toLowerCase().contains(lower) || c.phone.contains(query)) {
         results.add(
           SearchResult(
             category: SearchCategory.customer,
@@ -166,9 +166,7 @@ class _UniversalSearchOverlayState extends State<UniversalSearchOverlay> {
             icon: Icons.person_rounded,
             gradient: AppDecor.violetGradient,
             onOpen: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const CustomersScreen(),
-              ),
+              MaterialPageRoute<void>(builder: (_) => const CustomersScreen()),
             ),
           ),
         );
@@ -176,8 +174,7 @@ class _UniversalSearchOverlayState extends State<UniversalSearchOverlay> {
       }
     }
     for (final s in sales) {
-      if (s.id.contains(query) ||
-          (s.status.toLowerCase().contains(lower))) {
+      if (s.id.contains(query) || (s.status.toLowerCase().contains(lower))) {
         results.add(
           SearchResult(
             category: SearchCategory.sale,
@@ -206,16 +203,16 @@ class _UniversalSearchOverlayState extends State<UniversalSearchOverlay> {
   }
 
   Product _toProduct(ProductRow row) => Product(
-        id: row.id,
-        name: row.name,
-        sku: row.sku,
-        category: row.category,
-        purchasePrice: row.purchasePrice,
-        sellingPrice: row.sellingPrice,
-        stockQuantity: row.stockQuantity,
-        lowStockThreshold: row.lowStockThreshold,
-        barcode: row.barcode,
-      );
+    id: row.id,
+    name: row.name,
+    sku: row.sku,
+    category: row.category,
+    purchasePrice: row.purchasePrice,
+    sellingPrice: row.sellingPrice,
+    stockQuantity: row.stockQuantity,
+    lowStockThreshold: row.lowStockThreshold,
+    barcode: row.barcode,
+  );
 
   void _openResult(SearchResult r) {
     Navigator.of(context).pop();
@@ -272,8 +269,11 @@ class _UniversalSearchOverlayState extends State<UniversalSearchOverlay> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.search_rounded,
-                              color: scheme.primary, size: 22),
+                          Icon(
+                            Icons.search_rounded,
+                            color: scheme.primary,
+                            size: 22,
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: TextField(
@@ -285,12 +285,17 @@ class _UniversalSearchOverlayState extends State<UniversalSearchOverlay> {
                               decoration: InputDecoration.collapsed(
                                 hintText: 'Search products, customers, sales…',
                                 hintStyle: AppTextStyles.bodyMedium.copyWith(
-                                  color: scheme.onSurface.withValues(alpha: 0.45),
+                                  color: scheme.onSurface.withValues(
+                                    alpha: 0.45,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                          _KbdHint(label: 'ESC', onTap: () => Navigator.pop(context)),
+                          _KbdHint(
+                            label: 'ESC',
+                            onTap: () => Navigator.pop(context),
+                          ),
                         ],
                       ),
                     ),
@@ -433,8 +438,10 @@ class _SearchRow extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: result.gradient,
                   borderRadius: BorderRadius.circular(11),
-                  boxShadow: AppDecor.glow(result.gradient.colors.first,
-                      alpha: 0.25),
+                  boxShadow: AppDecor.glow(
+                    result.gradient.colors.first,
+                    alpha: 0.25,
+                  ),
                 ),
                 child: Icon(result.icon, color: Colors.white, size: 19),
               ),
@@ -459,10 +466,10 @@ class _SearchRow extends StatelessWidget {
                         color: scheme.onSurface.withValues(alpha: 0.55),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

@@ -17,6 +17,9 @@ class StockMovements extends Table {
 
   DateTimeColumn get createdAt => dateTime()();
 
+  /// The staff member who recorded this stock movement.
+  TextColumn get staffId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

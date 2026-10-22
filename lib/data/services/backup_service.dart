@@ -3,21 +3,40 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:file_saver/file_saver.dart';
 
+import '../../core/session/session_authorization.dart';
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
+import '../repositories/audit_repository.dart';
 
 class BackupService {
   final AppDatabase _database;
+  final AuditRepository _audit;
 
-  BackupService([AppDatabase? database]) : _database = database ?? appDatabase;
+  BackupService([AppDatabase? database, AuditRepository? audit])
+    : _database = database ?? appDatabase,
+      _audit = audit ?? AuditRepository(database ?? appDatabase);
 
   /// Keep in sync with `AppDatabase.schemaVersion`.
-  static const int _currentSchemaVersion = 9;
+  ///
+  /// Bumped to 15 in Phase F: the payload now carries the inactivity
+  /// timeout setting (`businessSettings.inactivityTimeoutMinutes`).
+  static const int _currentSchemaVersion = 15;
 
   /// The oldest schema version this build can still restore from.
   static const int _oldestSupportedSchemaVersion = 4;
 
+  /// Resolves the acting staff and enforces owner-only authorization for
+  /// backup export, restore, and database reset (all expose or destroy the
+  /// entire business dataset, including sensitive financial records).
+  ///
+  /// In login-disabled mode this is a no-op, preserving Phase D behavior.
+  Future<StaffAccountSummary?> _authorizeOwner(String operation) async {
+    return requireOwner(_database, operation);
+  }
+
   Future<String> createBackupJson() async {
+    await _authorizeOwner('backup export');
+
     final products = await _database.select(_database.products).get();
     final categories = await _database.select(_database.categories).get();
     final sales = await _database.select(_database.sales).get();
@@ -63,6 +82,7 @@ class BackupService {
             'paidAmount': sale.paidAmount,
             'paymentMethod': sale.paymentMethod,
             'status': sale.status,
+            'staffId': sale.staffId,
             'createdAt': sale.createdAt.toUtc().toIso8601String(),
           };
         }).toList(),
@@ -109,6 +129,7 @@ class BackupService {
             'previousStock': movement.previousStock,
             'newStock': movement.newStock,
             'note': movement.note,
+            'staffId': movement.staffId,
             'createdAt': movement.createdAt.toUtc().toIso8601String(),
           };
         }).toList(),
@@ -128,6 +149,7 @@ class BackupService {
             'receiptShowPhone': settings.receiptShowPhone,
             'receiptShowAddress': settings.receiptShowAddress,
             'receiptNote': settings.receiptNote,
+            'inactivityTimeoutMinutes': settings.inactivityTimeoutMinutes,
           };
         }).toList(),
       },
@@ -137,6 +159,7 @@ class BackupService {
   }
 
   Future<String> saveBackup() async {
+    final actor = await _authorizeOwner('backup export');
     final json = await createBackupJson();
     final bytes = Uint8List.fromList(utf8.encode(json));
 
@@ -147,6 +170,14 @@ class BackupService {
       bytes: bytes,
       fileExtension: 'json',
       mimeType: MimeType.json,
+    );
+
+    await _audit.log(
+      action: 'backup.save',
+      actor: actor?.username ?? 'Owner',
+      summary: 'Exported a database backup to "$savedPath"',
+      entityType: 'backup',
+      entityId: timestamp,
     );
 
     return savedPath;
@@ -326,6 +357,11 @@ class BackupService {
             requireString('paymentMethod');
             requireString('status');
             requireDate('createdAt');
+            // Staff attribution was added in schema v14, so it is optional:
+            // backups taken before that version must still validate.
+            if (item.containsKey('staffId')) {
+              requireNullableString('staffId');
+            }
 
           case 'saleItems':
             for (final field in ['id', 'saleId', 'productId', 'productName']) {
@@ -357,6 +393,10 @@ class BackupService {
               requireInt(field);
             }
             requireDate('createdAt');
+            // Optional for the same reason as `sales.staffId` (schema v14).
+            if (item.containsKey('staffId')) {
+              requireNullableString('staffId');
+            }
 
           case 'businessSettings':
             for (final field in [
@@ -379,6 +419,12 @@ class BackupService {
             if (item.containsKey('loyaltyRedeemValue')) {
               requireNumber('loyaltyRedeemValue');
             }
+            // Phase F: the inactivity auto-lock timeout is optional so
+            // pre-v15 backups (which never carried it) still validate and
+            // restore with the default of 0 (auto-lock disabled).
+            if (item.containsKey('inactivityTimeoutMinutes')) {
+              requireNumber('inactivityTimeoutMinutes');
+            }
         }
       }
     }
@@ -387,6 +433,7 @@ class BackupService {
   }
 
   Future<void> resetAllData() async {
+    final actor = await _authorizeOwner('database reset');
     await _database.transaction(() async {
       await _database.delete(_database.saleItems).go();
       await _database.delete(_database.sales).go();
@@ -398,9 +445,19 @@ class BackupService {
       await _database.delete(_database.businessSettings).go();
       await _database.delete(_database.staffAccounts).go();
     });
+
+    await _audit.log(
+      action: 'backup.reset',
+      actor: actor?.username ?? 'Owner',
+      summary: 'Reset all business data (database cleared)',
+      entityType: 'backup',
+      entityId: 'reset',
+    );
   }
 
   Future<void> restoreBackup(Uint8List bytes) async {
+    final actor = await _authorizeOwner('backup restore');
+
     // Validate before opening a transaction or modifying existing data.
     final backup = await validateBackupJson(bytes);
     final data = backup['data'] as Map<String, dynamic>;
@@ -517,6 +574,7 @@ class BackupService {
               paidAmount: (item['paidAmount'] as num).toDouble(),
               paymentMethod: Value(item['paymentMethod'] as String),
               status: Value(item['status'] as String),
+              staffId: Value(item['staffId'] as String?),
               createdAt: DateTime.parse(item['createdAt'] as String),
             );
           }).toList(),
@@ -578,6 +636,7 @@ class BackupService {
               previousStock: item['previousStock'] as int,
               newStock: item['newStock'] as int,
               note: Value(item['note'] as String),
+              staffId: Value(item['staffId'] as String?),
               createdAt: DateTime.parse(item['createdAt'] as String),
             );
           }).toList(),
@@ -598,9 +657,7 @@ class BackupService {
               phone: Value(item['phone'] as String),
               email: Value(item['email'] as String),
               currency: Value(item['currency'] as String),
-              loyaltyEnabled: Value(
-                (item['loyaltyEnabled'] as bool?) ?? true,
-              ),
+              loyaltyEnabled: Value((item['loyaltyEnabled'] as bool?) ?? true),
               loyaltyEarnRate: Value(
                 (item['loyaltyEarnRate'] as num?)?.toDouble() ?? 1.0,
               ),
@@ -611,9 +668,7 @@ class BackupService {
                 (item['receiptHeader'] as String?) ??
                     'Thank you for your purchase!',
               ),
-              receiptFooter: Value(
-                (item['receiptFooter'] as String?) ?? '',
-              ),
+              receiptFooter: Value((item['receiptFooter'] as String?) ?? ''),
               receiptShowPhone: Value(
                 (item['receiptShowPhone'] as bool?) ?? true,
               ),
@@ -621,11 +676,23 @@ class BackupService {
                 (item['receiptShowAddress'] as bool?) ?? true,
               ),
               receiptNote: Value((item['receiptNote'] as String?) ?? ''),
+              // Phase F: absent in pre-v15 backups → 0 (auto-lock disabled).
+              inactivityTimeoutMinutes: Value(
+                (item['inactivityTimeoutMinutes'] as num?)?.toInt() ?? 0,
+              ),
             );
           }).toList(),
         );
       });
     });
+
+    await _audit.log(
+      action: 'backup.restore',
+      actor: actor?.username ?? 'Owner',
+      summary: 'Restored the database from a backup file',
+      entityType: 'backup',
+      entityId: 'restore',
+    );
   }
 
   /// Derives the tier name from lifetime points. Mirrors LoyaltyService so a
@@ -638,7 +705,8 @@ class BackupService {
     return 'Bronze';
   }
 
-  String _backupTimestamp(DateTime dateTime) {    final year = dateTime.year.toString().padLeft(4, '0');
+  String _backupTimestamp(DateTime dateTime) {
+    final year = dateTime.year.toString().padLeft(4, '0');
     final month = dateTime.month.toString().padLeft(2, '0');
     final day = dateTime.day.toString().padLeft(2, '0');
     final hour = dateTime.hour.toString().padLeft(2, '0');

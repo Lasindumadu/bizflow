@@ -33,7 +33,9 @@ void main() {
 
       expect(backup['application'], 'BizFlow');
       expect(backup['backupFormatVersion'], 1);
-      expect(backup['databaseSchemaVersion'], 9);
+      // Asserted against the live schema constant so the backup metadata can
+      // never drift from the database schema (STARTUP_AUTH_PLAN §5.3).
+      expect(backup['databaseSchemaVersion'], AppDatabase.currentSchemaVersion);
 
       final data = backup['data'] as Map<String, dynamic>;
       expect(data['categories'], hasLength(1));
@@ -383,71 +385,85 @@ void main() {
       expect(settings.single.email, 'store@example.com');
     });
 
-    test('resetAllData deletes staff accounts alongside business data', () async {
-      await database
-          .into(database.staffAccounts)
-          .insert(StaffAccountsCompanion.insert(
-            id: 'staff-1',
-            username: 'cashier1',
-            role: 'cashier',
-            pinVerifier: '\$2a\$12\$N4v7k9m2p1q8r3t6y9u4w2a1s3d5f',
-            pinChangedAt: DateTime(2024, 1, 10),
-            createdAt: DateTime(2024, 1, 10),
-          ));
+    test(
+      'resetAllData deletes staff accounts alongside business data',
+      () async {
+        await database
+            .into(database.staffAccounts)
+            .insert(
+              StaffAccountsCompanion.insert(
+                id: 'staff-1',
+                username: 'cashier1',
+                role: 'cashier',
+                pinVerifier: '\$2a\$12\$N4v7k9m2p1q8r3t6y9u4w2a1s3d5f',
+                pinChangedAt: DateTime(2024, 1, 10),
+                createdAt: DateTime(2024, 1, 10),
+              ),
+            );
 
-      await database
-          .into(database.categories)
-          .insert(CategoriesCompanion.insert(id: 'cat-temp', name: 'Temporary'));
+        await database
+            .into(database.categories)
+            .insert(
+              CategoriesCompanion.insert(id: 'cat-temp', name: 'Temporary'),
+            );
 
-      await backupService.resetAllData();
+        await backupService.resetAllData();
 
-      expect(await database.select(database.staffAccounts).get(), isEmpty);
-      expect(await database.select(database.categories).get(), isEmpty);
-    });
+        expect(await database.select(database.staffAccounts).get(), isEmpty);
+        expect(await database.select(database.categories).get(), isEmpty);
+      },
+    );
 
-    test('exported backup does not contain staff accounts or verifier data', () async {
-      await database
-          .into(database.staffAccounts)
-          .insert(StaffAccountsCompanion.insert(
-            id: 'staff-1',
-            username: 'cashier1',
-            role: 'cashier',
-            pinVerifier: '\$2a\$12\$N4v7k9m2p1q8r3t6y9u4w2a1s3d5f',
-            recoveryCodeVerifier: Value('\$2a\$12\$R3c0v3ryH4shV3r1f13r'),
-            pinChangedAt: DateTime(2024, 1, 10),
-            createdAt: DateTime(2024, 1, 10),
-          ));
+    test(
+      'exported backup does not contain staff accounts or verifier data',
+      () async {
+        await database
+            .into(database.staffAccounts)
+            .insert(
+              StaffAccountsCompanion.insert(
+                id: 'staff-1',
+                username: 'cashier1',
+                role: 'cashier',
+                pinVerifier: '\$2a\$12\$N4v7k9m2p1q8r3t6y9u4w2a1s3d5f',
+                recoveryCodeVerifier: Value('\$2a\$12\$R3c0v3ryH4shV3r1f13r'),
+                pinChangedAt: DateTime(2024, 1, 10),
+                createdAt: DateTime(2024, 1, 10),
+              ),
+            );
 
-      await database
-          .into(database.categories)
-          .insert(CategoriesCompanion.insert(id: 'cat-1', name: 'Groceries'));
+        await database
+            .into(database.categories)
+            .insert(CategoriesCompanion.insert(id: 'cat-1', name: 'Groceries'));
 
-      final json = await backupService.createBackupJson();
-      final backup = jsonDecode(json);
-      final data = backup['data'] as Map<String, dynamic>;
+        final json = await backupService.createBackupJson();
+        final backup = jsonDecode(json);
+        final data = backup['data'] as Map<String, dynamic>;
 
-      expect(data.containsKey('staffAccounts'), isFalse);
-      expect(json, isNot(contains('pin_verifier')));
-      expect(json, isNot(contains('recovery_code_verifier')));
-      expect(json, isNot(contains('pinVerifier')));
-      expect(json, isNot(contains('recoveryCodeVerifier')));
-      expect(data['categories'], hasLength(1));
-    });
+        expect(data.containsKey('staffAccounts'), isFalse);
+        expect(json, isNot(contains('pin_verifier')));
+        expect(json, isNot(contains('recovery_code_verifier')));
+        expect(json, isNot(contains('pinVerifier')));
+        expect(json, isNot(contains('recoveryCodeVerifier')));
+        expect(data['categories'], hasLength(1));
+      },
+    );
 
     test('restoring backup preserves existing staff accounts', () async {
       final now = DateTime(2024, 1, 15);
 
       await database
           .into(database.staffAccounts)
-          .insert(StaffAccountsCompanion.insert(
-            id: 'staff-owner',
-            username: 'owner',
-            role: 'owner',
-            pinVerifier: '\$2a\$12\$OwN3rH4shV3r1f13rS4lt',
-            recoveryCodeVerifier: Value('\$2a\$12\$R3c0v3ryS3cr3tK3y'),
-            pinChangedAt: now,
-            createdAt: now,
-          ));
+          .insert(
+            StaffAccountsCompanion.insert(
+              id: 'staff-owner',
+              username: 'owner',
+              role: 'owner',
+              pinVerifier: '\$2a\$12\$OwN3rH4shV3r1f13rS4lt',
+              recoveryCodeVerifier: Value('\$2a\$12\$R3c0v3ryS3cr3tK3y'),
+              pinChangedAt: now,
+              createdAt: now,
+            ),
+          );
 
       await database
           .into(database.categories)
@@ -463,8 +479,7 @@ void main() {
       expect(staff, hasLength(1));
       expect(staff.single.username, 'owner');
       expect(staff.single.role, 'owner');
-      expect(staff.single.pinVerifier,
-          '\$2a\$12\$OwN3rH4shV3r1f13rS4lt');
+      expect(staff.single.pinVerifier, '\$2a\$12\$OwN3rH4shV3r1f13rS4lt');
 
       // Business data restored.
       final categories = await database.select(database.categories).get();
@@ -472,27 +487,30 @@ void main() {
       expect(categories.single.name, 'Groceries');
     });
 
-    test('restoring into fresh database does not create staff accounts', () async {
-      await database
-          .into(database.categories)
-          .insert(CategoriesCompanion.insert(id: 'cat-1', name: 'Groceries'));
+    test(
+      'restoring into fresh database does not create staff accounts',
+      () async {
+        await database
+            .into(database.categories)
+            .insert(CategoriesCompanion.insert(id: 'cat-1', name: 'Groceries'));
 
-      final json = await backupService.createBackupJson();
-      final bytes = Uint8List.fromList(utf8.encode(json));
+        final json = await backupService.createBackupJson();
+        final bytes = Uint8List.fromList(utf8.encode(json));
 
-      final freshDb = AppDatabase(NativeDatabase.memory());
-      final freshBackup = BackupService(freshDb);
+        final freshDb = AppDatabase(NativeDatabase.memory());
+        final freshBackup = BackupService(freshDb);
 
-      await freshBackup.restoreBackup(bytes);
+        await freshBackup.restoreBackup(bytes);
 
-      final staff = await freshDb.select(freshDb.staffAccounts).get();
-      expect(staff, isEmpty);
+        final staff = await freshDb.select(freshDb.staffAccounts).get();
+        expect(staff, isEmpty);
 
-      final categories = await freshDb.select(freshDb.categories).get();
-      expect(categories, hasLength(1));
-      expect(categories.single.name, 'Groceries');
+        final categories = await freshDb.select(freshDb.categories).get();
+        expect(categories, hasLength(1));
+        expect(categories.single.name, 'Groceries');
 
-      await freshDb.close();
-    });
+        await freshDb.close();
+      },
+    );
   });
 }

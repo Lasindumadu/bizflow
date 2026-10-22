@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
+import '../../core/session/session_authorization.dart';
 import '../../models/sale.dart' as model;
 import '../../models/sale_item.dart' as model;
 import '../database/app_database.dart' as db;
@@ -14,6 +17,17 @@ class SaleRepository {
   final void Function(String productName, int remainingStock)? onLowStock;
 
   SaleRepository(this.database, {this.onLowStock});
+
+  /// Resolves the acting staff and enforces cashier-or-above authorization.
+  Future<ResolvedActor> _authorizeCashier() async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager, StaffRole.cashier},
+      'sale operations',
+    );
+    return actor;
+  }
 
   Stream<List<model.Sale>> watchSales() {
     final query = database.select(database.sales)
@@ -89,6 +103,8 @@ class SaleRepository {
       throw StateError('Paid amount is less than the sale total.');
     }
 
+    final actor = await _authorizeCashier();
+
     return database.transaction(() async {
       final Map<String, int> productQuantities = {};
 
@@ -131,6 +147,7 @@ class SaleRepository {
             db.SalesCompanion.insert(
               id: saleId,
               customerId: Value(customerId),
+              staffId: Value(actor.staff?.id),
               subtotal: subtotal,
               discount: Value(discount),
               total: total,
@@ -194,6 +211,7 @@ class SaleRepository {
                 previousStock: previousStock,
                 newStock: newStock,
                 note: Value('Sale $saleId'),
+                staffId: Value(actor.staff?.id),
                 createdAt: createdAt,
               ),
             );
@@ -206,9 +224,39 @@ class SaleRepository {
         }
       }
 
+      // Audit the completed sale (best-effort — never blocks the sale).
+      try {
+        await database
+            .into(database.auditLogs)
+            .insert(
+              db.AuditLogsCompanion.insert(
+                id: 'aud_${DateTime.now().microsecondsSinceEpoch}',
+                action: 'sale.complete',
+                actor: Value(actor.staff?.username ?? 'Owner'),
+                summary: Value(
+                  'Completed sale $saleId for ${total.toStringAsFixed(2)} '
+                  'via $paymentMethod',
+                ),
+                entityType: Value('sale'),
+                entityId: Value(saleId),
+                afterJson: Value(
+                  jsonEncode({
+                    'total': total,
+                    'paymentMethod': paymentMethod,
+                    'staffId': actor.staff?.id,
+                  }),
+                ),
+                createdAt: createdAt,
+              ),
+            );
+      } catch (_) {
+        // Auditing must never block a completed sale.
+      }
+
       return model.Sale(
         id: saleId,
         customerId: customerId,
+        staffId: actor.staff?.id,
         subtotal: subtotal,
         discount: discount,
         total: total,
@@ -221,6 +269,8 @@ class SaleRepository {
   }
 
   Future<void> cancelSale(String saleId) async {
+    final actor = await _authorizeCashier();
+
     await database.transaction(() async {
       final saleQuery = database.select(database.sales)
         ..where((table) => table.id.equals(saleId));
@@ -293,6 +343,7 @@ class SaleRepository {
                 previousStock: previousStock,
                 newStock: newStock,
                 note: Value('Cancellation of sale $saleId'),
+                staffId: Value(actor.staff?.id),
                 createdAt: DateTime.now(),
               ),
             );
@@ -311,6 +362,7 @@ class SaleRepository {
               db.AuditLogsCompanion.insert(
                 id: 'aud_${DateTime.now().microsecondsSinceEpoch}',
                 action: 'sale.cancel',
+                actor: Value(actor.staff?.username ?? 'Owner'),
                 entityType: const Value('sale'),
                 entityId: Value(saleId),
                 summary: Value(
@@ -329,6 +381,13 @@ class SaleRepository {
   }
 
   Future<void> deleteSale(String id) async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner},
+      'delete sale',
+    );
+
     await database.transaction(() async {
       await (database.delete(
         database.saleItems,
@@ -337,6 +396,25 @@ class SaleRepository {
       await (database.delete(
         database.sales,
       )..where((table) => table.id.equals(id))).go();
+
+      // Audit the deletion (best-effort).
+      try {
+        await database
+            .into(database.auditLogs)
+            .insert(
+              db.AuditLogsCompanion.insert(
+                id: 'aud_${DateTime.now().microsecondsSinceEpoch}',
+                action: 'sale.delete',
+                actor: Value(actor.staff?.username ?? 'Owner'),
+                summary: Value('Deleted sale $id'),
+                entityType: Value('sale'),
+                entityId: Value(id),
+                createdAt: DateTime.now(),
+              ),
+            );
+      } catch (_) {
+        // Auditing must never block deletion.
+      }
     });
   }
 
@@ -344,6 +422,7 @@ class SaleRepository {
     return model.Sale(
       id: row.id,
       customerId: row.customerId,
+      staffId: row.staffId,
       subtotal: row.subtotal,
       discount: row.discount,
       total: row.total,

@@ -38,6 +38,9 @@ class PurchaseOrders extends Table {
   /// Actual received date (when fully received).
   DateTimeColumn get receivedAt => dateTime().nullable()();
 
+  /// The staff member who created this purchase order.
+  TextColumn get staffId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

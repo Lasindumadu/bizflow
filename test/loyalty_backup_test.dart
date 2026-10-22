@@ -58,7 +58,10 @@ void main() {
       final json = await service.createBackupJson();
       final decoded = jsonDecode(json) as Map<String, dynamic>;
 
-      expect(decoded['databaseSchemaVersion'], 9);
+      expect(
+        decoded['databaseSchemaVersion'],
+        AppDatabase.currentSchemaVersion,
+      );
     });
 
     test('records both lifetime points and spendable balance', () async {

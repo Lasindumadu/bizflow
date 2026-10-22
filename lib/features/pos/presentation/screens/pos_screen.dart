@@ -453,6 +453,47 @@ class PosScreenState extends State<PosScreen> {
     }
   }
 
+  /// Parks the current POS cart to the [parkedSalesStore] if it is not empty.
+  ///
+  /// Used by the app shell when the session locks or signs out so an active
+  /// cart is preserved across the lock boundary. Returns true if a cart was
+  /// parked, false if the cart was empty.
+  bool parkActiveCart() {
+    if (_cart.isEmpty) return false;
+    _parkCurrentSale();
+    return true;
+  }
+
+  /// Restores the most recently parked sale into the current cart.
+  ///
+  /// Used by the app shell when the session unlocks or a staff member signs
+  /// back in, so an in-progress sale can be resumed. Returns the restored
+  /// [ParkedSale], or null if there are no parked sales.
+  ParkedSale? restoreLastParkedCart() {
+    final sales = parkedSalesStore.sales;
+    if (sales.isEmpty) return null;
+    final recalled = parkedSalesStore.recall(sales.length - 1);
+    if (recalled == null) return null;
+
+    setState(() {
+      for (final parked in recalled.items) {
+        final product = _products.where((p) => p.id == parked.productId).firstOrNull;
+        if (product == null) continue;
+        final existingIndex = _cart.indexWhere((item) => item.product.id == parked.productId);
+        if (existingIndex >= 0) {
+          _cart[existingIndex] = _CartItem(
+            product: product,
+            quantity: _cart[existingIndex].quantity + parked.qty,
+          );
+        } else {
+          _cart.add(_CartItem(product: product, quantity: parked.qty));
+        }
+      }
+    });
+
+    return recalled;
+  }
+
   Future<void> _showHeldSales() async {
     await showModalBottomSheet<void>(
       context: context,

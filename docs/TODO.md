@@ -121,3 +121,50 @@ Plan: `docs/PLAN_v1.4.0.md`
 - [x] `flutter analyze` 0 issues · `flutter test` 120 green ·
       `flutter build web --release` succeeds
 - [x] Version 1.5.0+5 + CHANGELOG entry
+
+---
+
+# v1.1.0 — Startup Login, Session Security & Owner Recovery
+
+Plan: `docs/STARTUP_AUTH_PLAN.md` (§15 — Phase F report)
+
+## Phase F — Session security hardening
+- [x] F1. Inactivity auto-lock: `business_settings.inactivity_timeout_minutes`
+      column (default `0` = disabled) + a one-shot session timer; lifecycle
+      aware, so a timeout that elapses in the background locks on resume
+- [x] F2. Owner-only configuration of the timeout (repository-enforced,
+      audited as `settings.inactivity_timeout_change`)
+- [x] F3. Locked sessions authorize nothing — `resolveActor` throws while
+      locked, blocking every repository at one choke point
+- [x] F4. POS sale preservation: the active cart is parked on lock/sign-out
+      and restored exactly once on unlock/sign-in (no duplication)
+- [x] F5. Staff management + owner recovery UI ("Staff & Access" screen):
+      list, create, role change, activate/deactivate, PIN reset, and
+      owner-PIN recovery via the one-time recovery code (rotated on use)
+- [x] F6. Login-readiness pre-flight surfaced in the UI and covered by tests
+- [x] PIN-only unlock: `resetActivity` can no longer clear a lock, so the
+      inactivity lock is not bypassable by a stray tap
+- [x] Session menu in the shell header: Lock now / Staff & access / Sign out
+- [x] Lock dialog is not dismissible (no barrier tap, no back button)
+
+## Schema & data
+- [x] Database schema v14 → v15 (guarded, additive migration)
+- [x] Backup schema version 14 → 15; the timeout is carried in the payload
+      and optional-on-read so pre-v15 backups still restore
+- [x] Backup schema-version assertions now bound to
+      `AppDatabase.currentSchemaVersion` (closes the §5.3 mirror-drift risk)
+
+## Verification
+- [x] `flutter analyze --no-pub` — 0 issues
+- [x] `flutter test` — 243 green (36 new Phase F + 2 new migration tests)
+- [x] `flutter build web --release` succeeds
+- [x] `docs/STARTUP_AUTH_PLAN.md` §15 report + CHANGELOG v1.1.0 entry
+
+## Deferred (see §15.8)
+- [ ] UI-level role gating (hide/disable screens per role) — still
+      repository-layer only
+- [ ] Richer activity tracking (pointer movement / raw key events) beyond
+      the tap-based gesture detector
+- [ ] Persisting the parked POS cart across an application restart
+- [ ] An owner-recovery escape hatch inside the lock dialog itself
+- [ ] Automated e2e of the lock flow through the UI

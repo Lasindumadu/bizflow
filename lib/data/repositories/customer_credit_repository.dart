@@ -1,8 +1,10 @@
+import 'package:bizflow/core/session/session_controller.dart';
 import 'package:drift/drift.dart';
 
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
 import 'audit_repository.dart';
+import 'package:bizflow/data/repositories/business_settings_repository.dart';
 
 class CustomerCreditRecord {
   final int id;
@@ -198,6 +200,35 @@ class CustomerCreditRepository {
     );
   }
 
+/// Ensure the session is authorized for credit operations.
+  /// Throws [StateError] if the session is locked or login is required but no session exists.
+  Future<void> _requireCreditOperationAuthorizaton() async {
+    // If session is locked, block all operations (Phase F)
+    if (sessionController.isLocked) {
+      throw StateError('Cannot perform credit operations on a locked session. Unlock first.');
+    }
+    // If no session exists, check if login is required
+    if (sessionController.current == null) {
+      // Check business settings for login requirement
+      final settings = await BusinessSettingsRepository(db).getSettings();
+      if (settings.loginRequired) {
+        throw StateError('Login required to perform credit operations.');
+      }
+      // If login is not required, allow backward compatibility (createdBy = null)
+    }
+  }
+
+  /// Resolve the acting staff member from the current session.
+  /// Returns the staff ID to use as [createdBy], or [null] if no session and login is not required.
+  int? _resolveCreatedBy() {
+    // If we have a session, resolve the actor from it (use the staff member's ID)
+    if (sessionController.current != null) {
+      return int.tryParse(sessionController.current!.id);
+    }
+    // If login is not required and no session, allow backward compatibility with null
+    // (This should only be reached if requireAuthorization already passed)
+    return null;
+  }
   /// Add a transaction (invoice, payment, adjustment, credit_note)
   Future<void> addTransaction({
     required int accountId,
@@ -207,6 +238,15 @@ class CustomerCreditRepository {
     String? description,
     int? createdBy,
   }) async {
+    // Ensure the session is authorized for credit operations
+    await _requireCreditOperationAuthorizaton();
+
+    // Resolve the acting staff member from the current session
+    final resolvedCreatedBy = _resolveCreatedBy();
+
+    // Use resolved createdBy if provided, otherwise fall back to the method parameter
+    final effectiveCreatedBy = createdBy ?? resolvedCreatedBy;
+
     // Get current balance
     final account = await (db.select(db.customerCreditAccounts)
           ..where((t) => t.id.equals(accountId)))
@@ -225,7 +265,7 @@ class CustomerCreditRepository {
         amount: Value(amount),
         balanceAfter: Value(newBalance),
         description: Value(description),
-        createdBy: createdBy != null ? Value(createdBy) : const Value.absent(),
+        createdBy: effectiveCreatedBy != null ? Value(effectiveCreatedBy) : const Value.absent(),
       ),
     );
 

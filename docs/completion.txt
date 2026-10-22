@@ -1,0 +1,27 @@
+Phase 0
+Summary
+The headline: the job-profitability implementation is real and correct — don't rebuild it. But its UI is unreachable, and that's one of 5 critical defects.
+
+Job profitability (verified, do not rebuild)
+
+Per-job card: JobController.php:297-315 — parts cost (quantity × unit_cost snapshot), labour cost (hours × rate snapshot), invoiced (excludes cancelled), profit, margin (null when invoiced = 0). Card renders at jobs/show.blade.php:1105-1151.
+Fleet report: BuildProfitabilityReport.php — three independent grouped queries, so multi-invoice jobs never double-count costs. ProfitabilityReportTest (13 tests) is fully green.
+5 critical defects found
+
+D2 — jobs/show.blade.php:499 posts to route('jobs.notes.store'), which doesn't exist (the only notes POST registers as technician.jobs.notes.store). The job page 500s for every user — this is the single root cause of all 6 test failures and makes the profitability card unreachable. JobController::addWorkNote() already exists, unrouted.
+D1 — routes/web.php:162 uses JobAdditionalWorkApprovalController without a use import. route:list crashes outright. (route:cache succeeds — I verified and corrected my own initial claim — so the defect is invisible to route-cached deployments.)
+D4 — 2 migrations pending; service_jobs has 16 columns live, missing all 16 intake/completion columns the code writes to.
+D3 — the pending migration has ->after('handed_over_by'), a self-reference. It will fail on MySQL. Invisible to the suite because phpunit runs on SQLite.
+D16 — the entire Api\* layer has no role/policy/ability checks. Any Sanctum token of any role reaches every record including destroy.
+MySQL root error — historical, already resolved. The 8 log hits are at lines 2768–3154 of a log last written 2026-10-13. Cause was an empty DB_PASSWORD (as .env.example still ships). Current .env has a working password; migrate:status connects fine. No owner action needed for DB access. Residual risk: .env.example still has an empty password, so a fresh clone reproduces it.
+
+Baseline: 6 failed, 62 passed (231 assertions), 7.39s — all 6 failures are D2.
+
+Two things needing your decision:
+
+There is no Git repository (fatal: not a git repository). Nothing to overwrite, but no rollback net for Phase 1. git init + initial commit is the highest-leverage safety step.
+2FA and passkeys are schema-only — columns and a passkeys table exist, but Features::twoFactorAuthentication() is not enabled and there are zero two-factor/passkey references in app/ or resources/. Either implement or explicitly defer; the current state implies a capability that doesn't exist.
+Live data (4 jobs, 3 customers, 2 invoices, 2 payments, 3 parts) is untouched; seeders are idempotent. The only file I created is the audit document.
+
+phase 1
+

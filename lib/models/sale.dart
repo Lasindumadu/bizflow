@@ -1,6 +1,7 @@
 class Sale {
   final String id;
   final String? customerId;
+  final String? staffId;
   final double subtotal;
   final double discount;
   final double total;
@@ -12,6 +13,7 @@ class Sale {
   const Sale({
     required this.id,
     this.customerId,
+    this.staffId,
     required this.subtotal,
     required this.discount,
     required this.total,

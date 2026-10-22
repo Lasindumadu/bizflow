@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
+import '../../core/session/session_authorization.dart';
 import '../../models/product.dart';
 import '../database/app_database.dart';
 
@@ -7,6 +10,18 @@ class ProductRepository {
   final AppDatabase database;
 
   ProductRepository(this.database);
+
+  /// Resolves the acting staff and enforces owner-or-manager authorization
+  /// for stock adjustments.
+  Future<ResolvedActor> _authorizeStockAdjustment() async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager},
+      'stock adjustment',
+    );
+    return actor;
+  }
 
   Future<bool> isBarcodeTaken(
     String barcode, {
@@ -111,10 +126,13 @@ class ProductRepository {
     required String type,
     String note = '',
   }) async {
+    final actor = await _authorizeStockAdjustment();
+
     if (quantity == 0) {
       throw ArgumentError('Stock quantity cannot be zero.');
     }
 
+    final now = DateTime.now();
     await database.transaction(() async {
       final productQuery = database.select(database.products)
         ..where((table) => table.id.equals(productId));
@@ -140,16 +158,47 @@ class ProductRepository {
           .into(database.stockMovements)
           .insert(
             StockMovementsCompanion.insert(
-              id: DateTime.now().microsecondsSinceEpoch.toString(),
+              id: '${now.microsecondsSinceEpoch}',
               productId: productId,
               type: type,
               quantity: quantity.abs(),
               previousStock: previousStock,
               newStock: newStock,
+              staffId: Value(actor.staff?.id),
               note: Value(note),
-              createdAt: DateTime.now(),
+              createdAt: now,
             ),
           );
+
+      // Audit the stock adjustment (best-effort).
+      try {
+        await database
+            .into(database.auditLogs)
+            .insert(
+              AuditLogsCompanion.insert(
+                id: 'aud_${now.microsecondsSinceEpoch}',
+                action: 'stock.change',
+                actor: Value(actor.staff?.username ?? 'Owner'),
+                summary: Value(
+                    'Adjusted stock of product $productId by $quantity '
+                    '(type: $type)',
+                ),
+                entityType: Value('product'),
+                entityId: Value(productId),
+                afterJson: Value(
+                  jsonEncode({
+                    'previousStock': previousStock,
+                    'newStock': newStock,
+                    'type': type,
+                    'staffId': actor.staff?.id,
+                  }),
+                ),
+                createdAt: now,
+              ),
+            );
+      } catch (_) {
+        // Auditing must never block a stock adjustment.
+      }
     });
   }
 

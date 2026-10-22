@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../core/session/session_authorization.dart';
 import '../database/app_database.dart';
 import '../database/database_provider.dart';
 
@@ -11,19 +12,35 @@ class DemoDataService {
 
   static const _demoPrefix = 'demo_';
 
+  /// Resolves the acting staff and enforces owner-or-manager authorization
+  /// for demo import/clear (both bulk-modify business data).
+  ///
+  /// Returns the resolved actor so the demo rows it creates can carry the
+  /// same staff attribution as any other business record.
+  Future<ResolvedActor> _authorizeDemo() async {
+    final actor = await resolveActor(_database);
+    requireRole(actor.staff, {
+      StaffRole.owner,
+      StaffRole.manager,
+    }, 'demo data import / clear');
+    return actor;
+  }
+
   Future<void> loadDemoData() async {
+    final actor = await _authorizeDemo();
     await _clearDemoData();
 
     await _insertBusinessSettings();
     await _insertCategories();
     await _insertCustomers();
     await _insertProducts();
-    await _insertSales();
+    await _insertSales(staffId: actor.staff?.id);
     await _insertExpenses();
-    await _insertStockMovements();
+    await _insertStockMovements(staffId: actor.staff?.id);
   }
 
   Future<void> clearDemoData() async {
+    await _authorizeDemo();
     await _clearDemoData();
   }
 
@@ -289,7 +306,7 @@ class DemoDataService {
     }
   }
 
-  Future<void> _insertSales() async {
+  Future<void> _insertSales({String? staffId}) async {
     final now = DateTime.now();
 
     final sales = [
@@ -483,6 +500,7 @@ class DemoDataService {
               paidAmount: sale.paidAmount,
               paymentMethod: Value(sale.paymentMethod),
               status: const Value('completed'),
+              staffId: Value(staffId),
               createdAt: createdAt,
             ),
           );
@@ -587,7 +605,7 @@ class DemoDataService {
     }
   }
 
-  Future<void> _insertStockMovements() async {
+  Future<void> _insertStockMovements({String? staffId}) async {
     final now = DateTime.now();
 
     final movements = [
@@ -813,6 +831,7 @@ class DemoDataService {
               previousStock: movement.previousStock,
               newStock: movement.newStock,
               note: Value(movement.note),
+              staffId: Value(staffId),
               createdAt: createdAt,
             ),
           );

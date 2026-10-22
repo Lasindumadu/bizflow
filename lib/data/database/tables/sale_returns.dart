@@ -28,6 +28,10 @@ class SaleReturns extends Table {
 
   DateTimeColumn get createdAt => dateTime()();
 
+  /// The authenticated staff member who processed the return. Null for legacy
+  /// records and for operations performed while login enforcement is disabled.
+  TextColumn get staffId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

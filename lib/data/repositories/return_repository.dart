@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../database/app_database.dart';
+import '../../core/session/session_authorization.dart';
 import 'audit_repository.dart';
 
 /// One line the caller wants to return.
@@ -61,6 +62,18 @@ class ReturnRepository {
   ReturnRepository(this.database, {AuditRepository? audit})
     : _audit = audit ?? AuditRepository(database);
 
+  /// Resolves the acting staff and enforces cashier-or-above authorization
+  /// for refund operations.
+  Future<ResolvedActor> _authorizeCashier() async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager, StaffRole.cashier},
+      'refund / return operations',
+    );
+    return actor;
+  }
+
   /// For each product on [saleId], how many units remain returnable, taking
   /// previously recorded returns into account.
   Future<Map<String, int>> getReturnableQuantities(String saleId) async {
@@ -103,6 +116,8 @@ class ReturnRepository {
       throw ArgumentError('A return must include at least one item.');
     }
 
+    final actor = await _authorizeCashier();
+
     return database.transaction(() async {
       final sale = await (database.select(
         database.sales,
@@ -140,6 +155,7 @@ class ReturnRepository {
               id: returnId,
               saleId: saleId,
               customerId: Value(sale.customerId),
+              staffId: Value(actor.staff?.id),
               refundAmount: refundAmount,
               refundMethod: Value(refundMethod),
               restocked: Value(restock),
@@ -171,12 +187,14 @@ class ReturnRepository {
             productId: line.productId,
             quantity: line.quantity,
             returnId: returnId,
+            staffId: actor.staff?.id,
           );
         }
       }
 
       await _audit.log(
         action: 'refund.create',
+        actor: actor.staff?.username ?? 'Owner',
         entityType: 'sale',
         entityId: saleId,
         summary:
@@ -187,6 +205,7 @@ class ReturnRepository {
           'refundAmount': refundAmount,
           'method': refundMethod,
           'restocked': restock,
+          'staffId': actor.staff?.id,
         },
       );
 
@@ -252,6 +271,7 @@ class ReturnRepository {
     required String productId,
     required int quantity,
     required String returnId,
+    String? staffId,
   }) async {
     final product = await (database.select(
       database.products,
@@ -278,6 +298,7 @@ class ReturnRepository {
             previousStock: previousStock,
             newStock: newStock,
             note: Value('Return $returnId'),
+            staffId: Value(staffId),
             createdAt: DateTime.now(),
           ),
         );

@@ -15,6 +15,9 @@ class CashMovements extends Table {
 
   DateTimeColumn get createdAt => dateTime()();
 
+  /// The staff member who recorded this cash movement.
+  TextColumn get staffId => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

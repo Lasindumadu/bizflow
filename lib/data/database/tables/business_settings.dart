@@ -52,6 +52,14 @@ class BusinessSettings extends Table {
   BoolColumn get loginRequired =>
       boolean().withDefault(const Constant(false))();
 
+  /// Phase F: inactivity auto-lock timeout in minutes. `0` means the
+  /// inactivity lock is disabled. When non-zero and the session is
+  /// authenticated, the app shell locks the session after this many minutes
+  /// of no user activity, requiring PIN re-entry via [SessionController.unlock].
+  /// Defaults to 0 (off) so existing installations keep today's behavior.
+  IntColumn get inactivityTimeoutMinutes =>
+      integer().withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 
 import '../database/app_database.dart';
+import '../../core/session/session_authorization.dart';
 import 'audit_repository.dart';
 
 /// A computed reconciliation of a shift's cash position.
@@ -49,6 +50,13 @@ class CashShiftRepository {
 
   /// Opens a new shift. Throws if a shift is already open.
   Future<CashShift> openShift({required double openingFloat}) async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager, StaffRole.cashier},
+      'open shift',
+    );
+
     final existing = await getOpenShift();
     if (existing != null) {
       throw StateError(
@@ -57,21 +65,24 @@ class CashShiftRepository {
     }
 
     final count = (await database.select(database.cashShifts).get()).length;
+    final now = DateTime.now();
 
     await database
         .into(database.cashShifts)
         .insert(
           CashShiftsCompanion.insert(
-            id: 'shift_${DateTime.now().microsecondsSinceEpoch}',
+            id: 'shift_${now.microsecondsSinceEpoch}',
             shiftNumber: count + 1,
             openingFloat: Value(openingFloat),
-            openedAt: DateTime.now(),
+            openedById: Value(actor.staff?.id),
+            openedAt: now,
           ),
         );
 
     final shift = await getOpenShift();
     await _audit.log(
       action: 'shift.open',
+      actor: actor.staff?.username ?? 'Owner',
       entityType: 'shift',
       entityId: shift!.shift.id,
       summary:
@@ -87,6 +98,13 @@ class CashShiftRepository {
     required double amount,
     String note = '',
   }) async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager, StaffRole.cashier},
+      'cash movement',
+    );
+
     if (amount <= 0) {
       throw ArgumentError('Cash movement amount must be positive.');
     }
@@ -99,21 +117,24 @@ class CashShiftRepository {
       throw StateError('No open shift to record a cash movement against.');
     }
 
+    final now = DateTime.now();
     await database
         .into(database.cashMovements)
         .insert(
           CashMovementsCompanion.insert(
-            id: 'cash_${DateTime.now().microsecondsSinceEpoch}',
+            id: 'cash_${now.microsecondsSinceEpoch}',
             shiftId: open.shift.id,
+            staffId: Value(actor.staff?.id),
             direction: direction,
             amount: amount,
             note: Value(note),
-            createdAt: DateTime.now(),
+            createdAt: now,
           ),
         );
 
     await _audit.log(
       action: 'cash.$direction',
+      actor: actor.staff?.username ?? 'Owner',
       entityType: 'shift',
       entityId: open.shift.id,
       summary:
@@ -168,6 +189,13 @@ class CashShiftRepository {
     required double countedCash,
     String discrepancyReason = '',
   }) async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager, StaffRole.cashier},
+      'close shift',
+    );
+
     final open = await getOpenShift();
     if (open == null) {
       throw StateError('No open shift to close.');
@@ -175,6 +203,7 @@ class CashShiftRepository {
 
     final reconciliation = open.reconciliation;
     final discrepancy = reconciliation.discrepancyVs(countedCash);
+    final now = DateTime.now();
 
     await (database.update(
       database.cashShifts,
@@ -182,13 +211,15 @@ class CashShiftRepository {
       CashShiftsCompanion(
         closingCount: Value(countedCash),
         discrepancyReason: Value(discrepancyReason),
-        closedAt: Value(DateTime.now()),
+        closedById: Value(actor.staff?.id),
+        closedAt: Value(now),
         isOpen: const Value(false),
       ),
     );
 
     await _audit.log(
       action: 'shift.close',
+      actor: actor.staff?.username ?? 'Owner',
       entityType: 'shift',
       entityId: open.shift.id,
       summary:
@@ -201,6 +232,7 @@ class CashShiftRepository {
         'counted': countedCash,
         'expected': reconciliation.expectedCash,
         'discrepancy': discrepancy,
+        'closedBy': actor.staff?.id,
       },
     );
 

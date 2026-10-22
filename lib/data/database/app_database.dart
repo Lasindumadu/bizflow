@@ -61,9 +61,9 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 15;
 
-  static const int currentSchemaVersion = 13;
+  static const int currentSchemaVersion = 15;
 
   @override
   MigrationStrategy get migration {
@@ -158,10 +158,79 @@ class AppDatabase extends _$AppDatabase {
         if (from < 13) {
           // Phase D: optional startup PIN login. Default false so every
           // existing installation keeps its current no-login behavior.
-          await m.addColumn(
-            businessSettings,
-            businessSettings.loginRequired,
-          );
+          await m.addColumn(businessSettings, businessSettings.loginRequired);
+        }
+
+        if (from < 14) {
+          // Phase E: staff attribution for accountable business operations.
+          // All columns are nullable so historical records keep working with
+          // null attribution; new records written through the repository
+          // layer capture the authenticated staff member.
+          //
+          // Each addition is guarded by a PRAGMA table_info check because
+          // some of these tables are created *within this migration ladder*
+          // (sale_returns at v7, cash shifts at v8, purchase orders at v10)
+          // from the current table definitions, which already include the
+          // attribution columns — a plain ADD COLUMN would crash with
+          // "duplicate column name" on upgrades from those older versions.
+          Future<void> addColumnIfMissing(
+            String table,
+            String column,
+            String ddl,
+          ) async {
+            // Skip tables that don't exist yet in this database — they may be
+            // created by a later migration gate, or may never have existed
+            // (e.g. older databases predating some tables).
+            final tableExists = await customSelect(
+              "SELECT name FROM sqlite_master "
+              "WHERE type = 'table' AND name = '$table'",
+            ).get();
+            if (tableExists.isEmpty) return;
+
+            final existing = await customSelect(
+              "SELECT name FROM pragma_table_info('$table') "
+              "WHERE name = '$column'",
+            ).get();
+            if (existing.isEmpty) {
+              await customStatement(
+                'ALTER TABLE "$table" ADD COLUMN "$column" $ddl',
+              );
+            }
+          }
+
+          await addColumnIfMissing('sales', 'staff_id', 'TEXT');
+          await addColumnIfMissing('sale_returns', 'staff_id', 'TEXT');
+          await addColumnIfMissing('cash_shifts', 'opened_by_id', 'TEXT');
+          await addColumnIfMissing('cash_shifts', 'closed_by_id', 'TEXT');
+          await addColumnIfMissing('cash_movements', 'staff_id', 'TEXT');
+          await addColumnIfMissing('stock_movements', 'staff_id', 'TEXT');
+          await addColumnIfMissing('purchase_orders', 'staff_id', 'TEXT');
+        }
+
+        if (from < 15) {
+          // Phase F: inactivity auto-lock timeout (minutes, default 0 = off).
+          //
+          // Guarded by a table-existence check for the same reason as the v14
+          // block: a database may not have a `business_settings` table at all
+          // (e.g. a hand-built or partially-created database), and a plain
+          // ADD COLUMN would fail with "no such table" and abort the whole
+          // migration. The column is also skipped when it already exists.
+          final businessSettingsExists = await customSelect(
+            "SELECT name FROM sqlite_master "
+            "WHERE type = 'table' AND name = 'business_settings'",
+          ).get();
+          if (businessSettingsExists.isNotEmpty) {
+            final existing = await customSelect(
+              "SELECT name FROM pragma_table_info('business_settings') "
+              "WHERE name = 'inactivity_timeout_minutes'",
+            ).get();
+            if (existing.isEmpty) {
+              await customStatement(
+                'ALTER TABLE "business_settings" ADD COLUMN '
+                '"inactivity_timeout_minutes" INTEGER NOT NULL DEFAULT 0',
+              );
+            }
+          }
         }
       },
     );

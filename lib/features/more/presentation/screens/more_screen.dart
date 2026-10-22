@@ -17,6 +17,7 @@ import '../../../purchase_orders/presentation/screens/purchase_orders_screen.dar
 import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../returns/presentation/screens/returns_screen.dart';
 import '../../../settings/presentation/screens/settings_screen.dart';
+import '../../../staff/presentation/screens/staff_management_screen.dart';
 import '../../../shifts/presentation/screens/cash_shift_screen.dart';
 import '../../../suppliers/presentation/screens/suppliers_screen.dart';
 
@@ -84,8 +85,7 @@ class MoreScreen extends StatelessWidget {
             subtitle: 'Reorder suggestions, dead stock & valuation',
             icon: Icons.insights_rounded,
             gradient: AppDecor.tealGradient,
-            onTap: () =>
-                _open(context, const InventoryIntelligenceScreen()),
+            onTap: () => _open(context, const InventoryIntelligenceScreen()),
           ),
           _MoreTile(
             title: 'Suppliers',
@@ -159,6 +159,13 @@ class MoreScreen extends StatelessWidget {
             onTap: () => _open(context, const ProductImportScreen()),
           ),
           _MoreTile(
+            title: 'Staff & Access',
+            subtitle: 'Staff accounts, roles & owner recovery',
+            icon: Icons.group_rounded,
+            gradient: AppDecor.indigoGradient,
+            onTap: () => _open(context, const StaffManagementScreen()),
+          ),
+          _MoreTile(
             title: 'Settings',
             subtitle: 'Business profile, receipts & backups',
             icon: Icons.tune_rounded,
@@ -227,82 +234,83 @@ class _MoreTile extends StatelessWidget {
             padding: const EdgeInsets.all(AppDimensions.spacingLg),
             child: Row(
               children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  gradient: gradient,
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: gradient.colors.first.withValues(alpha: 0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Icon(icon, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: AppDimensions.spacingLg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: AppTextStyles.titleMedium.copyWith(
-                        color: colorScheme.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: AppTextStyles.bodySmall.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (trailingCount > 0)
                 Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
-                    color: AppColors.rose,
-                    borderRadius: BorderRadius.circular(999),
+                    gradient: gradient,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: gradient.colors.first.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    trailingCount > 9 ? '9+' : '$trailingCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                  child: Icon(icon, color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: AppDimensions.spacingLg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: AppTextStyles.titleMedium.copyWith(
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: AppTextStyles.bodySmall.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (trailingCount > 0)
+                  Container(
+                    margin: const EdgeInsets.only(right: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.rose,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      trailingCount > 9 ? '9+' : '$trailingCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
-                ),
-              Container(
-                padding: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.7,
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withValues(
+                      alpha: 0.7,
+                    ),
+                    shape: BoxShape.circle,
                   ),
-                  shape: BoxShape.circle,
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    size: 20,
+                    color: colorScheme.onSurface.withValues(alpha: 0.5),
+                  ),
                 ),
-                child: Icon(
-                  Icons.chevron_right_rounded,
-                  size: 20,
-                  color: colorScheme.onSurface.withValues(alpha: 0.5),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
 }
 

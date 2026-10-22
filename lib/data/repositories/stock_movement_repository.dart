@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../core/session/session_authorization.dart';
 import '../database/app_database.dart';
 
 class StockMovementRepository {
@@ -29,6 +30,12 @@ class StockMovementRepository {
     return query.get();
   }
 
+  /// Records a direct stock-movement entry (manual inventory adjustment).
+  ///
+  /// Owner-or-manager only: this is the raw movement entry point, separate
+  /// from the sale/refund/purchase flows which record their own movements
+  /// after their own authorization checks. The acting staff member is
+  /// captured from the verified session, never from caller input.
   Future<void> addMovement({
     required String id,
     required String productId,
@@ -39,6 +46,12 @@ class StockMovementRepository {
     String note = '',
     required DateTime createdAt,
   }) async {
+    final actor = await resolveActor(database);
+    requireRole(actor.staff, {
+      StaffRole.owner,
+      StaffRole.manager,
+    }, 'stock adjustment');
+
     await database
         .into(database.stockMovements)
         .insert(
@@ -50,6 +63,7 @@ class StockMovementRepository {
             previousStock: previousStock,
             newStock: newStock,
             note: Value(note),
+            staffId: Value(actor.staff?.id),
             createdAt: createdAt,
           ),
         );

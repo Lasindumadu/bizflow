@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../core/session/session_authorization.dart';
 import '../database/app_database.dart';
 
 class SalesReport {
@@ -143,7 +144,22 @@ class ReportRepository {
 
   ReportRepository(this.database);
 
-  Future<SalesReport> getTodayReport() {
+  /// Resolves the acting staff and enforces owner-or-manager authorization
+  /// for report access (sensitive financial information).
+  ///
+  /// Cashiers are POS-only per the documented role matrix; the gate lives
+  /// here so direct repository invocation cannot bypass the reports UI.
+  Future<ResolvedActor> _authorizeReports() async {
+    final actor = await resolveActor(database);
+    requireRole(actor.staff, {
+      StaffRole.owner,
+      StaffRole.manager,
+    }, 'view reports');
+    return actor;
+  }
+
+  Future<SalesReport> getTodayReport() async {
+    await _authorizeReports();
     final now = DateTime.now();
 
     final start = DateTime(now.year, now.month, now.day);
@@ -153,7 +169,8 @@ class ReportRepository {
     return _getSalesReport(start: start, end: end);
   }
 
-  Future<SalesReport> getThisWeekReport() {
+  Future<SalesReport> getThisWeekReport() async {
+    await _authorizeReports();
     final now = DateTime.now();
 
     final today = DateTime(now.year, now.month, now.day);
@@ -167,7 +184,8 @@ class ReportRepository {
     return _getSalesReport(start: start, end: end);
   }
 
-  Future<SalesReport> getThisMonthReport() {
+  Future<SalesReport> getThisMonthReport() async {
+    await _authorizeReports();
     final now = DateTime.now();
 
     final start = DateTime(now.year, now.month, 1);
@@ -178,6 +196,7 @@ class ReportRepository {
   }
 
   Future<double> getTotalExpenses() async {
+    await _authorizeReports();
     final expenses = await database.select(database.expenses).get();
 
     return expenses.fold<double>(
@@ -187,6 +206,7 @@ class ReportRepository {
   }
 
   Future<double> getMonthlyExpenses() async {
+    await _authorizeReports();
     final now = DateTime.now();
 
     final start = DateTime(now.year, now.month, 1);
@@ -209,6 +229,7 @@ class ReportRepository {
   }
 
   Future<List<ExpenseCategoryTotal>> getExpenseCategoryTotals() async {
+    await _authorizeReports();
     final expenses = await database.select(database.expenses).get();
 
     final Map<String, double> totals = {};
@@ -233,6 +254,7 @@ class ReportRepository {
   Future<List<BestSellingProduct>> getBestSellingProducts({
     int limit = 5,
   }) async {
+    await _authorizeReports();
     final salesQuery = database.select(database.sales)
       ..where((table) => table.status.equals('completed'));
 
@@ -284,6 +306,7 @@ class ReportRepository {
   }
 
   Future<double> getStockValue() async {
+    await _authorizeReports();
     final products = await database.select(database.products).get();
 
     return products.fold<double>(
@@ -294,6 +317,7 @@ class ReportRepository {
   }
 
   Future<int> getLowStockProductCount() async {
+    await _authorizeReports();
     final products = await database.select(database.products).get();
 
     return products.where((product) {
@@ -303,6 +327,7 @@ class ReportRepository {
 
   /// Revenue split by payment method across all completed sales.
   Future<List<PaymentMethodTotal>> getPaymentMethodBreakdown() async {
+    await _authorizeReports();
     final sales = await (database.select(
       database.sales,
     )..where((t) => t.status.equals('completed'))).get();
@@ -325,6 +350,7 @@ class ReportRepository {
 
   /// Top customers by total amount spent (all-time, completed sales).
   Future<List<CustomerInsight>> getCustomerInsights({int limit = 5}) async {
+    await _authorizeReports();
     final sales = await (database.select(
       database.sales,
     )..where((t) => t.status.equals('completed'))).get();
@@ -352,6 +378,7 @@ class ReportRepository {
 
   /// Profit & margin grouped by product, highest profit first.
   Future<List<MarginRow>> getMarginByProduct({int limit = 10}) async {
+    await _authorizeReports();
     final rows = await _salesInRange(null, null);
     final grouped = <String, _MarginAccumulator>{};
 
@@ -386,6 +413,7 @@ class ReportRepository {
 
   /// Profit & margin grouped by category, highest profit first.
   Future<List<MarginRow>> getMarginByCategory() async {
+    await _authorizeReports();
     final products = await database.select(database.products).get();
     final categoryByProduct = {
       for (final p in products)
@@ -423,6 +451,7 @@ class ReportRepository {
   /// This period vs the immediately preceding period of equal length.
   Future<({PeriodComparison current, PeriodComparison previous})>
   getPeriodComparison({required int days, String label = 'This period'}) async {
+    await _authorizeReports();
     final now = DateTime.now();
     final currentStart = DateTime(
       now.year,
@@ -490,6 +519,8 @@ class ReportRepository {
   }
 
   Future<ReportSummary> getSummary() async {
+    await _authorizeReports();
+
     final today = await getTodayReport();
 
     final thisWeek = await getThisWeekReport();
@@ -526,6 +557,7 @@ class ReportRepository {
 
   /// Total value refunded across all recorded returns.
   Future<double> getTotalRefunded() async {
+    await _authorizeReports();
     final rows = await database.select(database.saleReturns).get();
     return rows.fold<double>(0, (s, r) => s + r.refundAmount);
   }

@@ -191,14 +191,17 @@ No change is made in Phase A.
 
 ### 5.1 Current schema version and migration conventions
 
+> **Phase E update (2026-10-21):** the schema is now **v14** and the backup
+> constant is **in sync at 14** — the gap described in §5.3 is closed. See §14.
+
 `lib/data/database/app_database.dart` (class `AppDatabase`):
 
-- `int get schemaVersion => 12;` (line 64) and mirror constant
-  `static const int currentSchemaVersion = 12;` (line 66).
+- `int get schemaVersion => 14;` (line 64) and mirror constant
+  `static const int currentSchemaVersion = 14;` (line 66).
 - `MigrationStrategy` (line 69):
-  - `onCreate` (71–73): `m.createAll()` — a fresh install gets the full v12
+  - `onCreate` (71–73): `m.createAll()` — a fresh install gets the full v14
     schema directly.
-  - `onUpgrade` (75–156): a **sequential `if (from < N)` ladder** v2 → v12,
+  - `onUpgrade` (75–208): a **sequential `if (from < N)` ladder** v2 → v14,
     each block idempotent by guard and strictly additive:
     - v2 `sales.status` (76–78) · v3 `saleItems.purchasePrice` (80–82) ·
       v4 `businessSettings` table (84–86) · v5 loyalty columns (88–98) ·
@@ -207,32 +210,69 @@ No change is made in Phase A.
       v7 returns + audit tables (112–117) · v8 shifts + cash movements
       (119–123) · v9 receipt branding columns (125–138) · v10 suppliers/POs
       (140–145) · v11 credit tables (147–151) · **v12 `staffAccounts`**
-      (153–156).
+      (153–156) · **v13 `businessSettings.loginRequired`** (158–162, Phase D) ·
+      **v14 staff-attribution columns** (164–208, Phase E).
   - No `beforeOpen` hook — Drift defaults apply.
 - **Convention for future changes:** bump `schemaVersion` by 1, append one more
   `if (from < N)` block (additive `addColumn`/`createTable`, data backfills via
   guarded `customStatement`), regenerate `app_database.g.dart`, and add a raw
   `user_version` upgrade test.
 - Existing installations upgrade **automatically on first open** (the gate's
-  `SELECT 1`) — old `user_version` is below 12, Drift runs `onUpgrade` from
-  that version to 12 in one transaction.
+  `SELECT 1`) — old `user_version` is below 14, Drift runs `onUpgrade` from
+  that version to 14 in one transaction.
+- **v14 is the first step that cannot use a plain `m.addColumn(...)`.**
+  Several of the tables receiving attribution columns are *created inside this
+  same migration ladder* from the current table definitions — `sale_returns`
+  at v7 (112–117), `cash_shifts`/`cash_movements` at v8 (119–123),
+  `purchase_orders` at v10 (140–145) — and those definitions already contain
+  the attribution columns. A plain `ADD COLUMN` would therefore fail with
+  "duplicate column name" when upgrading from v6/v7/v9. The v14 block solves
+  this with a local `addColumnIfMissing(table, column, ddl)` helper
+  (176–199) that checks `sqlite_master` for the table and `pragma_table_info`
+  for the column before issuing `ALTER TABLE ... ADD COLUMN`. All seven
+  additions are guarded: `sales.staff_id` (201), `sale_returns.staff_id` (202),
+  `cash_shifts.opened_by_id` (203), `cash_shifts.closed_by_id` (204),
+  `cash_movements.staff_id` (205), `stock_movements.staff_id` (206),
+  `purchase_orders.staff_id` (207).
 
 ### 5.2 Migration tests (executed this session)
 
-`test/migration_test.dart` — 3 tests in 3 groups, built on `prepareRawDb()`
+`test/migration_test.dart` — 5 tests in 4 groups, built on `prepareRawDb()`
 that writes `user_version` with raw SQL before opening `AppDatabase`:
 
 - group `schema migration v5 -> v6` → `backfills points_balance from existing loyalty_points` (83–84)
 - group `schema migration v11 -> v12` → `creates staffAccounts table when upgrading from v11` (125–126)
 - group `schema migration v5 -> v12` → `applies every migration from v5 through v12` (300–301)
+- group `schema migration v13 -> v14` → `adds the staff attribution columns to existing tables` (393–393) and `pre-existing rows survive the upgrade with null attribution` (485–485) — **added in Phase E**
 
 Run: `flutter test test/migration_test.dart test/backup_service_test.dart`
-→ **14/14 passed** (3 migration + 11 backup).
+→ **16/16 passed** (5 migration + 11 backup).
 
-### 5.3 The known gap: DB `schemaVersion = 12` vs `BackupService._currentSchemaVersion = 9`
+> **Phase E note:** the first three group names still say "v12", but the ladder
+> they exercise now runs all the way to **v14** — `AppDatabase` opens at
+> whatever `schemaVersion` the class declares (14), so these tests
+> transitively cover the v13 (`loginRequired`) and v14 (staff attribution)
+> steps as well. The v5→v12 group is the important regression case for the
+> guarded `addColumnIfMissing` helper (§5.1): it starts from a database that
+> has **none** of the attribution tables, so every guarded addition must
+> gracefully no-op for missing tables and add the column for the ones that do
+> exist.
+>
+> The two **v13→v14** tests were added in Phase E because the pre-existing
+> tests never asserted the *attribution columns themselves*. The first builds a
+> v13 database whose tables all exist but lack the new columns, then asserts
+> via `pragma_table_info` that all seven columns were added. The second
+> inserts a pre-upgrade sale row and asserts it survives with `staffId == null`
+> — proving the upgrade is additive and does not rewrite historical data.
 
-**Finding: same concept, one stale mirror value — not two different version
-concepts.**
+### 5.3 The schema 12 vs backup 9 gap — **CLOSED in Phase E**
+
+> **Status: resolved.** `AppDatabase.schemaVersion` and
+> `BackupService._currentSchemaVersion` are now **both 14**. The original
+> finding is preserved below for audit history.
+
+**Finding (Phase A): same concept, one stale mirror value — not two different
+version concepts.**
 
 Evidence in `lib/data/services/backup_service.dart`:
 
@@ -245,33 +285,58 @@ Evidence in `lib/data/services/backup_service.dart`:
 `_currentSchemaVersion` is intended to mirror `AppDatabase.schemaVersion`
 (it is the schema version *declared inside backup JSON*, written at export and
 checked at restore). History confirms drift: `docs/PLAN_v1.4.0.md:24` records
-the earlier “backups record `databaseSchemaVersion: 4` while the schema is v6”
+the earlier "backups record `databaseSchemaVersion: 4` while the schema is v6"
 defect; the fix raised the constant to 9 **when the schema was 9**. The schema
 then advanced to v10 (suppliers/POs), v11 (credit), v12 (staff) while the
 backup constant stayed at 9 — it was never re-synced.
 
-**Why nothing breaks today (verified):**
+**Why nothing broke in Phase A (verified):**
 
 1. Export *always writes* the constant 9, so any backup this build produces
    passes its own `[4, 9]` restore check — round trip is self-consistent.
 2. Tables introduced in v10–v12 (suppliers, POs, credit, staff) are **not part
-   of backup export/restore**, so restoring a “9”-labelled backup into a v12
+   of backup export/restore**, so restoring a "9"-labelled backup into a v12
    database copies exactly the tables it contains; migration state of the
    target DB is untouched by restore.
 3. Staff are deliberately excluded from backups (see §6.4) — restore preserves
    existing staff rows (verified by tests), so login state survives restore.
 
-**Risk carried forward:** the metadata understates the producer's real schema.
-The moment any v10+ table is added to the export payload, `_currentSchemaVersion`
-and the accepted window **must** be raised together (with an export/restore
-test), or restore validation starts lying/rejecting. Deferred by constraint —
-**neither value is changed in Phase A.**
+**How Phase E closed it:**
+
+- `BackupService._currentSchemaVersion` raised **9 → 14**
+  (`backup_service.dart:24`), keeping the mirror in step with
+  `AppDatabase.schemaVersion` (`app_database.dart:64`).
+- `_oldestSupportedSchemaVersion` stays **4** (`backup_service.dart:27`), so
+  the accepted restore window is now `[4, 14]`. **Older backups still restore**
+  — the window only widened, it did not move.
+- The v14 payload change is *backward-compatible by construction*: the two new
+  fields (`sales.staffId`, `stockMovements.staffId`) are **optional on read**
+  (`if (item.containsKey('staffId')) requireNullableString('staffId')`,
+  `backup_service.dart:362–363` and `396–398`), and on write they default to
+  `null` (`Value(item['staffId'] as String?)`, lines 571 and 633). A pre-v14
+  backup restores with `null` attribution; a v14 backup round-trips its
+  attribution exactly.
+- Export now emits the attribution (`'staffId': sale.staffId` line 86,
+  `'staffId': movement.staffId` line 133), so the declared version finally
+  reflects what the payload actually contains.
+
+> **Residual risk (unchanged):** the mirror is maintained by hand. Any future
+> schema bump that adds a table to the export payload must raise
+> `_currentSchemaVersion` **together with** `AppDatabase.schemaVersion`, with
+> an export/restore test. The two constants now agree, but nothing enforces
+> that mechanically — there is no test asserting
+> `AppDatabase.schemaVersion == BackupService._currentSchemaVersion`.
+> Candidate for a Phase F hardening test.
 
 ---
 
 ## 6. A5 — Business records and attribution
 
 ### 6.1 Schema: no staff-identity columns on business records
+
+> **Phase E update (2026-10-21):** the table below records the **Phase A
+> survey**. The attribution columns it reports as missing **now exist** —
+> see §14.2 for the implemented schema.
 
 Inspected every relevant table definition:
 
@@ -309,6 +374,9 @@ identity, and there is no session concept to source it from. Sales creation is
 not audited at all.
 
 ### 6.3 Where Phase E authorization must be enforced (identified, not implemented)
+
+> **Phase E update (2026-10-21):** the targets listed below **are now
+> implemented**. See §14.3 for the enforced role matrix.
 
 Repository mutation boundaries visible from signatures:
 
@@ -462,6 +530,9 @@ Legend: **[EXISTING]** = already in the codebase (evidence above),
    (§5.3), but any future inclusion of v10–v12 tables in backup payloads must
    update `_currentSchemaVersion` + validation window together with tests.
    Explicitly out of scope this phase.
+   → **RESOLVED in Phase E** — both constants are 14 and the payload now
+   declares what it contains (§5.3). The *process* risk remains: the mirror is
+   hand-maintained and nothing asserts the two agree.
 5. **Staff are never in backups** (verified, `backup_service.dart:399` +
    tests): after `resetAllData`, staff are gone; after *restore*, existing
    staff survive. With `loginRequired = true`, operators must understand that
@@ -476,9 +547,16 @@ Legend: **[EXISTING]** = already in the codebase (evidence above),
 8. **Audit rows keep default `'Owner'` when no actor is passed** — Phase E
    threading is additive; historical rows remain `'Owner'`. `audit_logs.actor`
    column already exists (no schema change).
+   → **RESOLVED in Phase E** — the audit `actor` is now populated from the
+   verified session username on every protected operation (§14.3). Rows written
+   before Phase E (and rows written in login-disabled mode) keep `'Owner'`.
 9. **Analyzer baseline:** the only pre-existing diagnostics are 10 in
    `lib/core/features/search/universal_search.dart` (forbidden file — never
    touched). All other files are clean; keep it that way.
+   → **RESOLVED in Phase E** — the file's committed version did not compile
+   (5 syntax errors at lines 462–469). The working-tree version fixes the
+   unbalanced brackets and `dart format` normalization, and
+   `flutter analyze --no-pub` now reports **no issues found** (§14.6).
 10. **Test-runner constraint:** `flutter test` is required (tests use
     `dart:ui`); plain `dart test` fails. Do not “fix” tests to pass — earlier
     fixes corrected genuinely wrong assertions (`throwsA` on enums,
@@ -491,6 +569,10 @@ Legend: **[EXISTING]** = already in the codebase (evidence above),
 > Phase B is already implemented and verified (StartupGate + 4 tests) — no
 > further B work beyond the additive initializer step in D1 if/when Phase D
 > lands. Phases below are plans only; none is started.
+>
+> **Status update (2026-10-21):** Phase D and Phase E are now **implemented**
+> (§13 and §14). The Phase E plan below is retained as the original design
+> intent; §14 records what was actually built and where it differs.
 
 **Phase D — optional local login (minimal):**
 1. Schema v13: `businessSettings.loginRequired` default `false` + one
@@ -530,6 +612,11 @@ Legend: **[EXISTING]** = already in the codebase (evidence above),
 3. Docs: security notes in `docs/` + CHANGELOG; keep backup metadata policy
    (§9.4) documented for the next schema-touching backup change.
 
+> **Phase F status (2026-10-22): COMPLETE.** The delivered scope, the
+> security model, the timer design, the migration/backup compatibility notes
+> and the verification record are in **§15**. Items 1–3 above are all
+> implemented; the residual limitations are listed in §15.8.
+
 ---
 
 ## 11. Evidence — files inspected and commands executed
@@ -564,6 +651,11 @@ Direct reads or targeted pattern searches with line-number output:
 
 ### 11.2 Commands executed this session
 
+> **Note:** this table is the **Phase A** record and is preserved verbatim for
+> audit purposes. Its counts reflect the state of the tree *during Phase A*
+> (schema v12, backup constant 9, 171 tests). The Phase E counts are in
+> §14.7.
+
 | Command | Result |
 |---|---|
 | `flutter test test/startup_gate_test.dart` | **4/4 passed** |
@@ -588,19 +680,31 @@ No test was altered in Phase A to produce a passing result; no files outside
 
 ## 12. Unresolved uncertainties / explicitly deferred
 
+> **Phase E status of each item (2026-10-21):** items 4 and 5 are **resolved**
+> in Phase E (§14). The rest remain open.
+
 1. **Real-device/web runtime behavior** of the gate (WASM worker open path) was
    not exercised here — all verification ran on the Flutter test host. Web
    build compiles (verified in earlier phases) but has no automated e2e.
-2. **Drift downgrade path** (opening a DB whose `user_version` > 12) is not
+2. **Drift downgrade path** (opening a DB whose `user_version` > 14) is not
    covered by tests; Drift is expected to refuse — untested, low risk.
 3. **`'stock.change'` audit** has no writer (§6.2) — noted as a pre-existing
    product gap, not touched.
 4. **Full role matrix** (exact manager vs cashier capabilities per screen) is
    intentionally left to Phase E; §10 proposes a conservative starting matrix.
+   → **RESOLVED in Phase E** — the enforced matrix is in §14.3.
 5. **Backup schema-version sync (9→12)** and adding any new table to backup
    payloads: deferred by this phase's constraints (§5.3, §9.4).
+   → **RESOLVED in Phase E** — both constants are now 14 (§5.3).
 6. Whether `loginRequired` should also gate **app resume after backgrounding**
    (mobile) vs only cold start: product decision for Phase F.
+7. **UI-level role gating** (hiding/disabling screens per role) is **not**
+   implemented in Phase E — the enforcement is at the repository/service
+   layer only. A cashier can still *see* a screen they may not act on; the
+   action is rejected with a `StateError`. Layering the UI is deferred.
+8. **No test asserts** `AppDatabase.schemaVersion ==
+   BackupService._currentSchemaVersion` — the mirror is maintained by hand
+   (§5.3 residual risk).
 
 *End of Phase A report.*
 
@@ -635,7 +739,453 @@ No test was altered in Phase A to produce a passing result; no files outside
 - **Migration `from < 13`:** adds `loginRequired` boolean column with `Constant(false)` default
 - **No data modified, deleted, or reset.** Existing staff records and business data preserved.
 - Backup service schema version (`_currentSchemaVersion = 9`) was **not** changed.
+  → **Superseded in Phase E:** the backup constant was raised to **14** in
+  Phase E and now matches `AppDatabase.schemaVersion` (§5.3).
+---
+
+## 14. Phase E — Staff Attribution & Authorization Implementation Report
+
+**Status:** Phase E COMPLETE — verified 2026-10-21 against actual source.
+
+**Goal:** link business operations and audit records to *authenticated* staff
+members, and enforce role-based authorization at the repository/service
+boundary — without breaking the Phase D single-operator experience for
+installations that never enable login.
+
+### 14.1 Scope Delivered
+
+| Item | Status | Primary evidence |
+|------|--------|------------------|
+| Shared authorization core | **COMPLETE** | `lib/core/session/session_authorization.dart` (new) — `resolveActor`, `canPerform`, `requireRole`, `requireOwner`, `ResolvedActor` |
+| Staff attribution columns (schema v14) | **COMPLETE** | `tables/sales.dart`, `tables/sale_returns.dart`, `tables/stock_movements.dart`, `tables/cash_movements.dart`, `tables/cash_shifts.dart`, `tables/purchase_orders.dart` |
+| Sale attribution (create + cancel restock) | **COMPLETE** | `sale_repository.dart:23` (authorize), `:150` & `:214` (attribution), `:346` (cancel restock) |
+| Return attribution + restock movement | **COMPLETE** | `return_repository.dart:68`, `:158`, `:301` |
+| Stock adjustment attribution | **COMPLETE** | `product_repository.dart:17`, `:167`; `stock_movement_repository.dart:49`, `:66` |
+| Expense attribution (audit actor) | **COMPLETE** | `expense_repository.dart:16`, `:89`, `:150`, `:184` |
+| Shift / cash-movement attribution | **COMPLETE** | `cash_shift_repository.dart:53`, `:77` (`openedById`), `:101`, `:127`, `:192`, `:214` (`closedById`) |
+| Purchase order attribution | **COMPLETE** | `purchase_order_repository.dart:19`, `:215`, `:458`, `:491` |
+| Demo data attribution + gating | **COMPLETE** | `demo_data_service.dart:21`, `:37`, `:39`, `:503`, `:834` |
+| Backup export/restore/reset authorization | **COMPLETE** | `backup_service.dart:34`, `:39`, `:162`, `:430`, `:453` |
+| Backup payload carries attribution | **COMPLETE** | `backup_service.dart:86`, `:133`, `:362–363`, `:396–398`, `:571`, `:633` |
+| Backup schema version sync (9 → 14) | **COMPLETE** | `backup_service.dart:24` now matches `app_database.dart:64` |
+| Staff-admin authorization hardening | **COMPLETE** | `staff_account_repository.dart:296` (`_requireOwnerAuthority`) |
+| Settings security gate (`loginRequired`) | **COMPLETE** | `business_settings_repository.dart:99` (`_guardSecurityChange`) |
+| Phase E tests | **COMPLETE** | `test/phase_e_test.dart` — 11 tests |
+| Phase E migration tests | **COMPLETE** | `test/migration_test.dart` — 2 new v13→v14 tests |
+
+### 14.2 Implemented Schema (v14)
+
+Seven **nullable** columns were added. Nullable is the backward-compatibility
+contract: historical rows keep working with `null` attribution, and new rows
+written while login enforcement is disabled are also `null`.
+
+| Table | Column | Written by |
+|---|---|---|
+| `sales` | `staffId` | `sale_repository.dart:150` (complete), `:214` (cancel) |
+| `sale_returns` | `staffId` | `return_repository.dart:158` |
+| `stock_movements` | `staffId` | `product_repository.dart:167`, `stock_movement_repository.dart:66`, `sale_repository.dart:346` (cancel restock), `return_repository.dart:301` (return restock) |
+| `cash_shifts` | `openedById` | `cash_shift_repository.dart:77` |
+| `cash_shifts` | `closedById` | `cash_shift_repository.dart:214` |
+| `cash_movements` | `staffId` | `cash_shift_repository.dart:127` |
+| `purchase_orders` | `staffId` | `purchase_order_repository.dart:215` |
+
+**Audit `actor`** (`audit_logs.actor`) was reused rather than adding a column —
+it already existed. It is now populated with the *verified session username*
+instead of the hard-coded `'Owner'` on every protected operation.
+
+**Migration ladder:** see §5.1 for the full v2 → v14 ladder and the guarded
+`addColumnIfMissing` helper (176–199) that makes the v14 step safe to run on
+databases that predate several of the affected tables.
 
 
 
+
+
+
+
+### 14.3 Enforced Role Matrix
+
+`resolveActor` (`session_authorization.dart:28`) resolves the acting identity
+for every protected operation:
+
+1. **A session exists** → the account is re-read from the database. If it was
+   **deleted or deactivated**, the session is **signed out** and a `StateError`
+   is thrown — a stale session can never authorize an action. Otherwise the
+   actor is that account.
+2. **No session** → `business_settings.loginRequired` is read. If login is
+   **enforced**, a `StateError` is thrown ("Authentication required"). If login
+   is **disabled**, a null-staff actor is returned — the legacy single-operator
+   mode, in which every role is implicitly permitted.
+
+The matrix (each cell = `requireRole` call site):
+
+| Operation | Owner | Manager | Cashier | Evidence |
+|---|:--:|:--:|:--:|---|
+| Complete sale | ✅ | ✅ | ✅ | `sale_repository.dart:24` (via `completeSale`) |
+| Cancel sale | ✅ | ✅ | ✅ | `sale_repository.dart:24` (via `cancelSale`) |
+| Delete sale | ✅ | ❌ | ❌ | `sale_repository.dart:385` |
+| Refund / return | ✅ | ✅ | ✅ | `return_repository.dart:69` |
+| Stock adjustment | ✅ | ✅ | ❌ | `product_repository.dart:18`, `stock_movement_repository.dart:50` |
+| Open / close shift, cash movement | ✅ | ✅ | ✅ | `cash_shift_repository.dart:54`, `:102`, `:193` |
+| Record expense | ✅ | ✅ | ❌ | `expense_repository.dart:17` |
+| Supplier management | ✅ | ✅ | ❌ | `supplier_repository.dart:65` |
+| Create / update / receive purchase order | ✅ | ✅ | ❌ | `purchase_order_repository.dart:196`, `:274`, `:373` |
+| Change purchase-order status | ✅ | ✅ | ❌ | `purchase_order_repository.dart:492` |
+| Delete purchase order | ✅ | ❌ | ❌ | `purchase_order_repository.dart:459` |
+| View reports | ✅ | ✅ | ❌ | `report_repository.dart:154` |
+| Demo data import / clear | ✅ | ✅ | ❌ | `demo_data_service.dart:22` |
+| Backup export / restore / reset | ✅ | ❌ | ❌ | `backup_service.dart:34` (`requireOwner`) |
+| Change `loginRequired` setting | ✅ | ❌ | ❌ | `business_settings_repository.dart:99` |
+| Staff administration | ✅ | ❌ | ❌ | `staff_account_repository.dart:296` (`_requireOwnerAuthority`) |
+
+**Owner-only operations** go through `requireOwner` /
+`_requireOwnerAuthority`, which re-verifies the account against the database
+rather than trusting a caller-supplied flag.
+
+> **Note on the staff-admin path:** `StaffAccountRepository` previously
+> accepted an `asOwner: true` boolean and an `actingUsername` string from the
+> caller. **Neither is proof of authority** — any caller could pass them.
+> Phase E keeps those parameters for backward compatibility (so existing
+> callers and tests still compile) but, whenever a session exists, the
+> **session identity is authoritative** and is re-verified against the
+> database: deactivated/deleted → sign out + throw; non-owner → throw. With no
+> session (first-run bootstrap / login-disabled mode) the pre-Phase-E checks
+> remain in force so the first owner can still be created before any session
+> can exist.
+
+
+### 14.4 Backup Compatibility
+
+- `_currentSchemaVersion` raised **9 → 14** (`backup_service.dart:24`),
+  matching `AppDatabase.schemaVersion` (`app_database.dart:64`).
+- `_oldestSupportedSchemaVersion` remains **4** → the accepted restore window
+  is now **[4, 14]**. The window only widened, so **older backups still
+  restore**.
+- The two new payload fields are **optional on read**
+  (`if (item.containsKey('staffId')) requireNullableString('staffId')`,
+  lines 362–363 and 396–398) and default to `null` on write
+  (`Value(item['staffId'] as String?)`, lines 571 and 633). A pre-v14 backup
+  restores with `null` attribution; a v14 backup round-trips attribution
+  exactly.
+- Export/restore/reset are now **owner-only** and write their own audit rows
+  (`backup.save` line 176, `backup.reset` line 444, `backup.restore` line 680).
+  The owner check lives in `_authorizeOwner` (line 34), which delegates to
+  `requireOwner` (line 35); it is called at export (line 39), restore
+  (line 453) and reset.
+
+### 14.5 Files Changed
+
+| File | Change |
+|---|---|
+| `lib/core/session/session_authorization.dart` | **New** — the authorization core (`resolveActor`, `canPerform`, `requireRole`, `requireOwner`) |
+| `lib/data/database/app_database.dart` | `schemaVersion` 12 → 14; new `from < 14` guarded migration block |
+| `lib/data/database/app_database.g.dart` | Regenerated by Drift |
+| `lib/data/database/tables/sales.dart` | `+ staffId` (nullable) |
+| `lib/data/database/tables/sale_returns.dart` | `+ staffId` (nullable) |
+| `lib/data/database/tables/stock_movements.dart` | `+ staffId` (nullable) |
+| `lib/data/database/tables/cash_movements.dart` | `+ staffId` (nullable) |
+| `lib/data/database/tables/cash_shifts.dart` | `+ openedById`, `+ closedById` (nullable) |
+| `lib/data/database/tables/purchase_orders.dart` | `+ staffId` (nullable) |
+| `lib/data/repositories/sale_repository.dart` | Actor resolution, attribution, owner-only delete |
+| `lib/data/repositories/return_repository.dart` | Actor resolution, attribution, restock attribution |
+| `lib/data/repositories/product_repository.dart` | Actor resolution, attribution, role gate |
+| `lib/data/repositories/stock_movement_repository.dart` | Actor resolution, attribution, role gate |
+| `lib/data/repositories/expense_repository.dart` | Actor resolution, role gate, audit actor |
+| `lib/data/repositories/cash_shift_repository.dart` | Actor resolution, attribution, audit actor |
+| `lib/data/repositories/purchase_order_repository.dart` | Actor resolution, attribution, role gates |
+| `lib/data/repositories/supplier_repository.dart` | Actor resolution, role gate, audit actor |
+| `lib/data/repositories/report_repository.dart` | Actor resolution, owner/manager gate on reports |
+| `lib/data/repositories/staff_account_repository.dart` | `_requireOwnerAuthority` session-based hardening |
+| `lib/data/repositories/business_settings_repository.dart` | `_guardSecurityChange` owner gate on `loginRequired`; audit rows |
+| `lib/data/services/backup_service.dart` | Owner-only export/restore/reset; version 9 → 14; `staffId` in payload |
+| `lib/data/demo/demo_data_service.dart` | Actor resolution, owner/manager gate, attribution |
+| `lib/models/sale.dart` | `+ staffId` on the domain model |
+| `test/phase_e_test.dart` | **New** — 11 Phase E tests |
+| `test/migration_test.dart` | **New** — 2 v13→v14 migration tests (attribution columns + legacy-row preservation) |
+| `test/backup_service_test.dart` | Updated for the new backup schema version |
+| `test/loyalty_backup_test.dart` | Updated for the new backup schema version |
+| `docs/STARTUP_AUTH_PLAN.md` | This report + corrected schema/migration documentation |
+| `lib/core/widgets/universal_search.dart` | **Unrelated to Phase E** — fixes pre-existing syntax errors (§14.6) |
+
+
+### 14.6 Unrelated Fix Retained — `universal_search.dart`
+
+This file was modified in the working tree during the session. It was
+investigated and the change was **reviewed and retained**, for these reasons:
+
+- The **committed (HEAD) version does not compile.** Restored into the package
+  and analyzed: **5 syntax errors** at lines 462–469
+  (`Expected to find ']'`, `Expected to find ';'`, `missing_identifier`,
+  `unexpected_token`) plus a `dead_code` warning and an `empty_statements`
+  info — 10 diagnostics total, exactly matching the "analyzer baseline"
+  noted in §9 item 9.
+- The working-tree version fixes the **unbalanced brackets** in the
+  `_SearchRow` widget and applies `dart format` normalization. The diff is
+  **purely mechanical**: bracket balance + whitespace/line-wrapping, plus the
+  removal of an unnecessary `package:flutter/services.dart` import.
+- **No behavior change** — no logic, no string literals, no control flow, no
+  API surface was altered.
+- `flutter analyze --no-pub` now reports **"No issues found!"** across the
+  whole project, versus 10 diagnostics before.
+
+The file is **not** part of the Phase E feature, and it is kept as a separate,
+clearly-labeled change so the Phase E diff stays reviewable.
+
+### 14.7 Verification
+
+| Command | Result |
+|---|---|
+| `flutter test` (full suite) | **205/205 passed** |
+| `flutter test test/phase_e_test.dart` | **11/11 passed** |
+| `flutter test test/migration_test.dart` | **5/5 passed** (2 of them new in Phase E) |
+| `flutter test test/migration_test.dart test/backup_service_test.dart` | **16/16 passed** (5 migration + 11 backup) |
+| `flutter analyze --no-pub` | **No issues found** |
+
+**The 11 Phase E tests** (`test/phase_e_test.dart`) cover:
+
+*Attribution (group `Phase E - Staff attribution on business records`):*
+1. sale records the acting staff member
+2. stock adjustment records the acting staff member
+3. return and its restock movement record the acting staff member
+4. sale cancellation restock movement records the acting staff member
+5. expense audit records the acting staff member as actor
+6. records stay unattributed when login enforcement is disabled *(legacy
+   single-operator behavior preserved)*
+
+*Authorization (group `Phase E - Authorization boundaries`):*
+7. cashier cannot record an expense
+8. cashier cannot adjust stock
+9. cashier can complete a sale
+10. operations are rejected when login is required but nobody signed in
+11. a deactivated staff member cannot perform operations *(and the stale
+    session is signed out)*
+
+**The 2 new migration tests** (`test/migration_test.dart`, group
+`schema migration v13 -> v14`):
+
+12. `adds the staff attribution columns to existing tables` — builds a v13
+    database whose six affected tables exist *without* the attribution
+    columns, then asserts via `pragma_table_info` that all seven columns
+    (`sales.staff_id`, `sale_returns.staff_id`, `stock_movements.staff_id`,
+    `cash_shifts.opened_by_id`, `cash_shifts.closed_by_id`,
+    `cash_movements.staff_id`, `purchase_orders.staff_id`) were added.
+13. `pre-existing rows survive the upgrade with null attribution` — inserts a
+    sale row *before* the upgrade and asserts it survives with
+    `staffId == null`, proving the migration is additive and does not rewrite
+    historical data.
+
+### 14.8 Known Limitations
+
+1. **UI-level role gating is not implemented.** Authorization is enforced at
+   the repository/service layer. A cashier can still *navigate to* a screen
+   they may not act on; the action itself is rejected with a `StateError`.
+   Layering the UI is deferred (§12 item 7).
+2. **The backup schema-version mirror is hand-maintained.** Both constants are
+   14 and agree, but no test asserts `AppDatabase.schemaVersion ==
+   BackupService._currentSchemaVersion` (§5.3 residual risk).
+3. **`'stock.change'` audit still has no writer** (§6.2) — a pre-existing
+   product gap, untouched by Phase E.
+4. **Audit rows written before Phase E** keep `'Owner'`, as do rows written
+   while login enforcement is disabled. This is intentional — historical data
+   is not rewritten.
+5. **Customer credit operations** (`customer_credit_repository.dart`) were not
+   brought under the Phase E gate; they still write the default `'Owner'`
+   actor. Left for a follow-up phase.
+6. **No automated e2e** of the role matrix through the UI — all Phase E
+   verification is at the repository layer on the Flutter test host.
+
+*End of Phase E report.*
+
+---
+
+## 15. Phase F — Session Security Hardening Implementation Report
+
+**Status:** Phase F COMPLETE — verified 2026-10-22 against actual source.
+
+**Goal:** make an authenticated session safe to leave unattended — an
+inactivity auto-lock, an explicit lock, PIN-only unlock, POS sale
+preservation across the lock boundary, owner-only recovery, and a visible
+login-readiness pre-flight — without weakening the Phase D/E guarantees.
+
+### 15.1 Scope Delivered
+
+| Item | Status | Primary evidence |
+|------|--------|------------------|
+| F1 — Inactivity timeout column + session timer | **COMPLETE** | `tables/business_settings.dart:60` (`inactivityTimeoutMinutes`, default `0`); `app_database.dart:210` (v14→v15 migration); `app_shell.dart` `_armInactivityTimer` / `_evaluateInactivity` |
+| F2 — Owner-gated timeout configuration | **COMPLETE** | `business_settings_repository.dart` `_guardInactivityTimeoutChange` → `requireOwner`; audited as `settings.inactivity_timeout_change` |
+| F3 — Locked sessions cannot authorize operations | **COMPLETE** | `session_authorization.dart` `resolveActor` throws while `session.isLocked`; `requireOwner` inherits it |
+| F4 — POS sale preservation across lock/sign-out | **COMPLETE** | `app_shell.dart` `_preservePosCart` / `_restorePosCart` (guarded by `_hasParkedCart`); `pos_screen.dart` `parkActiveCart` / `restoreLastParkedCart` |
+| F5 — Owner-only staff recovery + management UI | **COMPLETE** | `features/staff/presentation/screens/staff_management_screen.dart`; `staff_account_repository.dart` `recoverOwnerPin` (rotates the code) |
+| F6 — Login-readiness verification surfaced | **COMPLETE** | `staff_account_repository.dart` `checkLoginReadiness`; readiness card in the staff screen |
+| Phase F tests | **COMPLETE** | `test/phase_f_test.dart` (36 tests); `test/migration_test.dart` (2 v14→v15 tests) |
+
+### 15.2 Security Model
+
+Phase F introduces a **third** session state alongside *signed out* and
+*unlocked*:
+
+| State | `isAuthenticated` | `isLocked` | Business operations | Unlock path |
+|-------|-------------------|------------|---------------------|-------------|
+| `signedOut` | false | false | only when `loginRequired == false` | sign in with a PIN |
+| `unlocked` | true | false | allowed (subject to the role matrix) | — |
+| `locked` | **true** | **true** | **rejected** (`StateError`) | **PIN re-entry only** |
+
+Four invariants define the phase:
+
+1. **Only a PIN unlocks.** `SessionController.resetActivity` updates the
+   activity timestamp and *never* clears the lock. A stray tap on an
+   unattended terminal cannot release the lock.
+2. **A locked session authorizes nothing.** `resolveActor` throws while the
+   session is locked, so every repository that resolves an actor
+   (sales, returns, stock, expenses, shifts, purchase orders, suppliers,
+   reports, backups, settings) is blocked at a single choke point rather
+   than at each call site.
+3. **The timeout is owner-only.** A manager or cashier cannot shorten,
+   lengthen, or disable the auto-lock on the terminal they are using —
+   the repository rejects the change with a `StateError`.
+4. **The lock is not dismissible.** The lock dialog uses
+   `barrierDismissible: false` and `PopScope(canPop: false)`, so neither
+   the barrier tap nor the system back button nor a predictive-back
+   gesture releases it.
+
+### 15.3 Timer Design
+
+The inactivity timer is **not** a repeating timer and is **not** re-armed by
+the session listener on every activity event. The design avoids the churn a
+naive implementation produces:
+
+| Concern | Resolution |
+|---------|------------|
+| A settings query per user interaction | The timeout is read **once** per session change (`_loadInactivityTimeout`) and cached in `_inactivityTimeoutMinutes`. |
+| A `setState` + full shell rebuild per tap | `SessionController.resetActivitySilently` updates the timestamp **without notifying listeners**. The shell restarts its own timer directly. |
+| A cart restore on every activity event | Cart parking/restoration is driven by the *session state transition*, not by activity. |
+| A timer firing while the app is suspended | `didChangeAppLifecycleState` re-evaluates the elapsed wall-clock time on resume and locks immediately if the timeout elapsed in the background. |
+| The timer outliving the session | The timer is cancelled when the session signs out or locks, and on `dispose`. |
+
+`_armInactivityTimer` is a **one-shot** timer: it fires once and locks the
+session. It is re-armed on activity, on unlock, and on resume.
+
+### 15.4 POS Cart Semantics
+
+The park/restore pair is guarded by an explicit `_hasParkedCart` flag so the
+"exactly once" contract is observable rather than incidental:
+
+* **Park** (`_preservePosCart`) — called on lock and on sign-out. Parks the
+  active cart into the in-memory `parkedSalesStore` and clears it from the
+  POS screen. The guard makes a second park a no-op.
+* **Restore** (`_restorePosCart`) — called on unlock and on sign-in. Recalls
+  the most recently parked sale **once**. The guard prevents a repeated
+  unlock from recalling a *different* parked sale.
+
+`ParkedSalesStore.recall` removes the sale from the store, so even without
+the guard a recall could not duplicate items — the guard exists so that a
+second unlock cannot silently pick up an unrelated held sale.
+
+### 15.5 Migration & Backup Compatibility
+
+- **Schema version 14 → 15.** `business_settings.inactivity_timeout_minutes`
+  is added with `DEFAULT 0`. The migration is guarded by a table-existence
+  and column-existence check, matching the v14 block, so a database without
+  a `business_settings` table does not abort the whole upgrade.
+- **Backup schema version 14 → 15.** The payload now carries
+  `inactivityTimeoutMinutes`. The field is **optional on read** and defaults
+  to `0` on restore, so a pre-v15 backup still restores cleanly.
+- **The schema-version mirror is now test-covered.** `backup_service_test.dart`
+  and `loyalty_backup_test.dart` assert against
+  `AppDatabase.currentSchemaVersion` rather than a literal, which closes the
+  §5.3 / §12-item-8 residual risk recorded earlier in this document.
+- **Additive only.** No existing row is modified. The Phase D
+  `login_required` flag survives the v15 upgrade (asserted by a migration
+  test).
+
+### 15.6 Files Changed
+
+| File | Change |
+|------|--------|
+| `lib/core/session/session_controller.dart` | Added `SessionLockState.locked`; `lock()`, `unlock()`; `resetActivity` no longer unlocks; added `resetActivitySilently` |
+| `lib/core/session/session_authorization.dart` | `resolveActor` rejects a locked session |
+| `lib/core/widgets/app_shell.dart` | Lifecycle observer; one-shot inactivity timer; guarded cart park/restore; lock dialog; session menu; lock-now / sign-out actions |
+| `lib/data/database/tables/business_settings.dart` | `+ inactivityTimeoutMinutes` (default `0`) |
+| `lib/data/database/app_database.dart` | `schemaVersion` 14 → 15; guarded v15 migration |
+| `lib/data/database/app_database.g.dart` | Regenerated by Drift |
+| `lib/data/repositories/business_settings_repository.dart` | `_guardInactivityTimeoutChange` (owner-only) + audit row |
+| `lib/data/services/backup_service.dart` | `_currentSchemaVersion` 14 → 15; payload carries the timeout; optional-on-read validation; restore default `0` |
+| `lib/features/pos/presentation/screens/pos_screen.dart` | `parkActiveCart()` / `restoreLastParkedCart()` |
+| `lib/features/settings/presentation/screens/settings_screen.dart` | Inactivity auto-lock dropdown; owner-only note; correct revert-on-failure |
+| `lib/features/staff/presentation/screens/staff_management_screen.dart` | **New** — staff admin, owner recovery, login readiness |
+| `lib/features/more/presentation/screens/more_screen.dart` | "Staff & Access" entry point |
+| `test/phase_f_test.dart` | **New** — 36 Phase F tests |
+| `test/migration_test.dart` | + 2 v14→v15 migration tests |
+| `test/backup_service_test.dart`, `test/loyalty_backup_test.dart` | Schema-version assertions bound to `AppDatabase.currentSchemaVersion` |
+| `docs/STARTUP_AUTH_PLAN.md` | This report |
+| `CHANGELOG.md` | v1.1.0 entry |
+
+### 15.7 Verification
+
+| Command | Result |
+|---------|--------|
+| `flutter analyze --no-pub` | **No issues found** |
+| `flutter test` (full suite) | **243/243 passed** |
+| `flutter test test/phase_f_test.dart` | **36/36 passed** |
+| `flutter test test/migration_test.dart` | **7/7 passed** (2 new in Phase F) |
+| `flutter build web --release` | **succeeds** |
+
+**The 36 Phase F tests** (`test/phase_f_test.dart`) cover:
+
+*Session lock state* (group `Phase F - Session lock state`): the three lock
+states; lock/unlock transitions; lock and unlock no-ops; sign-out clearing the
+identity; **activity never unlocking a locked session**; the timestamp
+updates; `resetActivitySilently` updating the timestamp without notifying
+listeners; activity being ignored when signed out.
+
+*Locked sessions cannot authorize* (group `Phase F - Locked sessions cannot
+authorize operations`): a locked session is rejected by `addExpense`; the
+ability to operate returns after unlocking; `resolveActor` and `requireOwner`
+throw while locked.
+
+*Timeout configuration* (group `Phase F - Inactivity timeout configuration`):
+the default of `0`; persistence; preservation across unrelated saves;
+negative values rejected; **the owner can change it**; **a manager and a
+cashier cannot**; the change is audited with the owner as the actor.
+
+*PIN unlock and recovery* (group `Phase F - PIN unlock and owner recovery`):
+the correct PIN verifies and unlocks; a wrong PIN does not unlock; a
+deactivated account cannot unlock; **owner recovery rotates the recovery code
+and the old code stops working**; login readiness reports a missing owner,
+succeeds for a complete owner, and fails when the recovery code is absent.
+
+*Backup compatibility* (group `Phase F - Backup compatibility`): the payload
+carries the timeout; a backup without the field still restores; the timeout
+round-trips.
+
+*POS cart preservation* (group `Phase F - POS cart preservation across a
+lock`): a cart is parked once and restored once; the parked contents are
+preserved; a locked session does not clear the parked sale.
+
+**The 2 new migration tests** (`test/migration_test.dart`, group
+`schema migration v14 -> v15`): the column is added with a disabled default;
+pre-existing settings rows survive with their `loginRequired` flag intact.
+
+### 15.8 Known Limitations
+
+1. **UI-level role gating is still not implemented** (§14.8 item 1) — carried
+   forward unchanged.
+2. **The inactivity clock uses the device clock.** Rolling the clock back
+   extends an unlocked session, exactly as the PIN lockout already does
+   (§14.8 / the Phase D security notes).
+3. **Activity is tracked by tap only.** A long-running keyboard interaction
+   (typing a long note) resets the clock on each keypress through the
+   shell's gesture detector, but pointer movement without a tap does not.
+   A full pointer/keyboard activity stream is a candidate for a later phase.
+4. **The parked cart is in-memory only.** It does not survive an application
+   restart — the same constraint that applies to the Phase D session. A
+   restart therefore discards an in-progress sale, exactly as before Phase F.
+5. **No automated e2e** of the lock flow through the UI — all Phase F
+   verification is at the repository/session layer on the Flutter test host.
+6. **The lock dialog has no owner-recovery escape hatch.** A user who is
+   locked out of their own PIN must use the "Staff & Access" screen, which is
+   reachable from the More Tools menu. Surfacing recovery directly in the
+   lock dialog is deferred.
+
+*End of Phase F report.*
 
