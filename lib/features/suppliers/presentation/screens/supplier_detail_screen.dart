@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
-import '../../../../core/theme/app_text_styles.dart';
-import '../../../../core/widgets/modern_widgets.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/supplier_repository.dart';
 
@@ -91,7 +91,8 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
           email: _emailController.text.trim(),
           address: _addressController.text.trim(),
           taxNumber: _taxNumberController.text.trim(),
-          paymentTermsDays: int.tryParse(_paymentTermsController.text.trim()) ?? 30,
+          paymentTermsDays:
+              int.tryParse(_paymentTermsController.text.trim()) ?? 30,
           notes: _notesController.text.trim(),
         );
       } else {
@@ -102,7 +103,8 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
           email: _emailController.text.trim(),
           address: _addressController.text.trim(),
           taxNumber: _taxNumberController.text.trim(),
-          paymentTermsDays: int.tryParse(_paymentTermsController.text.trim()) ?? 30,
+          paymentTermsDays:
+              int.tryParse(_paymentTermsController.text.trim()) ?? 30,
           notes: _notesController.text.trim(),
         );
       }
@@ -124,125 +126,212 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
     final isEditing = widget.supplier != null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isEditing ? 'Edit Supplier' : 'Add Supplier')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(AppDimensions.screenPadding),
-          children: [
-            Text('Basic Information', style: AppTextStyles.heading3),
-            const SizedBox(height: AppDimensions.spacingMd),
-            TextFormField(
-              controller: _nameController,
-              textInputAction: TextInputAction.next,
-              validator: (v) => _validateRequired(v, 'Supplier name'),
-              decoration: const InputDecoration(
-                labelText: 'Supplier Name *',
-                hintText: 'e.g. Acme Wholesale',
-                prefixIcon: Icon(Icons.business_outlined),
+      body: BrandBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              BrandPageHeader(
+                eyebrow: 'Supply chain',
+                title: isEditing ? 'Edit supplier' : 'New supplier',
+                subtitle: isEditing
+                    ? 'Update contact and payment details.'
+                    : 'Record who you buy stock from.',
+                icon: Icons.local_shipping_rounded,
               ),
-            ),
-            const SizedBox(height: AppDimensions.spacingMd),
-            TextFormField(
-              controller: _contactPersonController,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Contact Person',
-                hintText: 'e.g. John Smith',
-                prefixIcon: Icon(Icons.person_outline_rounded),
+              Expanded(
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 760),
+                        child: Column(
+                          children: [
+                            BrandFormSection(
+                              title: 'Company',
+                              subtitle: 'Legal name and main contact person.',
+                              icon: Icons.business_rounded,
+                              accent: AppColors.cyan,
+                              child: Column(
+                                children: [
+                                  TextFormField(
+                                    controller: _nameController,
+                                    textInputAction: TextInputAction.next,
+                                    validator: (v) =>
+                                        _validateRequired(v, 'Supplier name'),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Supplier name *',
+                                      hintText: 'e.g. Acme Wholesale',
+                                      prefixIcon: Icon(Icons.business_outlined),
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: AppDimensions.spacingMd,
+                                  ),
+                                  TextFormField(
+                                    controller: _contactPersonController,
+                                    textInputAction: TextInputAction.next,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Contact person',
+                                      hintText: 'e.g. John Smith',
+                                      prefixIcon: Icon(
+                                        Icons.person_outline_rounded,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            BrandFormSection(
+                              title: 'Reach them',
+                              subtitle:
+                                  'How to place orders and follow up on delivery.',
+                              icon: Icons.call_rounded,
+                              accent: AppColors.brandMint,
+                              child: Column(
+                                children: [
+                                  TextFormField(
+                                    controller: _phoneController,
+                                    textInputAction: TextInputAction.next,
+                                    keyboardType: TextInputType.phone,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Phone',
+                                      hintText: 'e.g. +1 555-0123',
+                                      prefixIcon: Icon(Icons.phone_outlined),
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: AppDimensions.spacingMd,
+                                  ),
+                                  TextFormField(
+                                    controller: _emailController,
+                                    textInputAction: TextInputAction.next,
+                                    keyboardType: TextInputType.emailAddress,
+                                    validator: _validateEmail,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Email',
+                                      hintText: 'e.g. orders@acme.com',
+                                      prefixIcon: Icon(
+                                        Icons.alternate_email_rounded,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: AppDimensions.spacingMd,
+                                  ),
+                                  TextFormField(
+                                    controller: _addressController,
+                                    textInputAction: TextInputAction.next,
+                                    maxLines: 2,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Address',
+                                      hintText: 'Supplier address',
+                                      prefixIcon: Icon(
+                                        Icons.location_on_outlined,
+                                      ),
+                                      alignLabelWithHint: true,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            BrandFormSection(
+                              title: 'Commercial terms',
+                              subtitle:
+                                  'Used for purchase orders and payment reminders.',
+                              icon: Icons.handshake_outlined,
+                              accent: AppColors.brandAmber,
+                              child: Column(
+                                children: [
+                                  TextFormField(
+                                    controller: _taxNumberController,
+                                    textInputAction: TextInputAction.next,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Tax / VAT number',
+                                      hintText: 'Optional tax identification',
+                                      prefixIcon: Icon(
+                                        Icons.receipt_outlined,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(
+                                    height: AppDimensions.spacingMd,
+                                  ),
+                                  TextFormField(
+                                    controller: _paymentTermsController,
+                                    textInputAction: TextInputAction.next,
+                                    keyboardType: TextInputType.number,
+                                    validator: (v) {
+                                      if (v == null || v.trim().isEmpty) {
+                                        return 'Required';
+                                      }
+                                      final n = int.tryParse(v.trim());
+                                      if (n == null || n < 0) {
+                                        return 'Enter a valid number of days';
+                                      }
+                                      return null;
+                                    },
+                                    decoration: const InputDecoration(
+                                      labelText: 'Payment terms (days) *',
+                                      hintText: 'e.g. 30 for Net-30',
+                                      prefixIcon: Icon(Icons.schedule_outlined),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            BrandFormSection(
+                              title: 'Notes',
+                              subtitle: 'Anything the team should know.',
+                              icon: Icons.notes_rounded,
+                              accent: AppColors.accent,
+                              child: TextFormField(
+                                controller: _notesController,
+                                maxLines: 3,
+                                decoration: const InputDecoration(
+                                  labelText: 'Internal notes',
+                                  hintText:
+                                      'Delivery quirks, minimum order value, contacts…',
+                                  alignLabelWithHint: true,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-
-            Text('Contact Details', style: AppTextStyles.heading3),
-            const SizedBox(height: AppDimensions.spacingMd),
-            TextFormField(
-              controller: _phoneController,
-              textInputAction: TextInputAction.next,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone',
-                hintText: 'e.g. +1 555-0123',
-                prefixIcon: Icon(Icons.phone_outlined),
+              BrandStickyBar(
+                child: FilledButton.icon(
+                  onPressed: _isSaving ? null : _save,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.check_rounded, size: 19),
+                  label: Text(
+                    _isSaving
+                        ? 'Saving…'
+                        : isEditing
+                        ? 'Save changes'
+                        : 'Create supplier',
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: AppDimensions.spacingMd),
-            TextFormField(
-              controller: _emailController,
-              textInputAction: TextInputAction.next,
-              keyboardType: TextInputType.emailAddress,
-              validator: _validateEmail,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                hintText: 'e.g. orders@acme.com',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingMd),
-            TextFormField(
-              controller: _addressController,
-              textInputAction: TextInputAction.next,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Address',
-                hintText: 'Supplier address',
-                prefixIcon: Icon(Icons.location_on_outlined),
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-
-            Text('Business Details', style: AppTextStyles.heading3),
-            const SizedBox(height: AppDimensions.spacingMd),
-            TextFormField(
-              controller: _taxNumberController,
-              textInputAction: TextInputAction.next,
-              decoration: const InputDecoration(
-                labelText: 'Tax / VAT Number',
-                hintText: 'Optional tax identification',
-                prefixIcon: Icon(Icons.receipt_outlined),
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingMd),
-            TextFormField(
-              controller: _paymentTermsController,
-              textInputAction: TextInputAction.next,
-              keyboardType: TextInputType.number,
-              validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Required';
-                final n = int.tryParse(v.trim());
-                if (n == null || n < 0) return 'Enter a valid number of days';
-                return null;
-              },
-              decoration: const InputDecoration(
-                labelText: 'Payment Terms (days) *',
-                hintText: 'e.g. 30 for Net-30',
-                prefixIcon: Icon(Icons.schedule_outlined),
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-
-            Text('Notes', style: AppTextStyles.heading3),
-            const SizedBox(height: AppDimensions.spacingMd),
-            TextFormField(
-              controller: _notesController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Internal Notes',
-                hintText: 'Any additional information about this supplier',
-                prefixIcon: Icon(Icons.notes_outlined),
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingXl),
-
-            GradientButton(
-              label: _isSaving ? 'Saving…' : (widget.supplier != null ? 'Save Changes' : 'Create Supplier'),
-              icon: Icons.save_rounded,
-              isLoading: _isSaving,
-              onPressed: _isSaving ? null : _save,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

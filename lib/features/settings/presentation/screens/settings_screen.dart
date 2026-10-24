@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/theme_controller.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../data/services/backup_service.dart';
 import '../../../../data/services/csv_export_service.dart';
@@ -59,6 +60,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loginRequired = false;
   int _inactivityTimeoutMinutes = 0;
 
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _appearanceKey = GlobalKey();
+  final GlobalKey _businessKey = GlobalKey();
+  final GlobalKey _loyaltyKey = GlobalKey();
+  final GlobalKey _receiptKey = GlobalKey();
+  final GlobalKey _dataKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -76,6 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _receiptHeaderController.dispose();
     _receiptFooterController.dispose();
     _receiptNoteController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -997,24 +1006,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildThemeSection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Card(
+    return BrandCard(
+      padding: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(AppDimensions.screenPadding),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Appearance',
-              style: AppTextStyles.heading2.copyWith(
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingXs),
-            Text(
-              'Choose how BizFlow looks on your device.',
-              style: AppTextStyles.bodySecondary.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
+            const SectionHeading(
+              title: 'Appearance',
+              subtitle: 'Theme, type scale and motion for this device.',
+              icon: Icons.palette_outlined,
             ),
             const SizedBox(height: AppDimensions.spacingMd),
 
@@ -1206,24 +1208,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildReceiptSection(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Receipt Branding',
-          style: AppTextStyles.heading2.copyWith(color: colorScheme.onSurface),
-        ),
-        const SizedBox(height: AppDimensions.spacingXs),
-        Text(
-          'Control what appears on printed and PDF receipts.',
-          style: AppTextStyles.bodySmall.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+        const SectionHeading(
+          title: 'Receipt branding',
+          subtitle: 'Control what appears on printed and PDF receipts.',
+          icon: Icons.receipt_long_outlined,
         ),
         const SizedBox(height: AppDimensions.spacingMd),
-        Card(
+        BrandCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(AppDimensions.screenPadding),
             child: Column(
@@ -1296,19 +1291,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Loyalty Programme',
-          style: AppTextStyles.heading2.copyWith(color: colorScheme.onSurface),
-        ),
-        const SizedBox(height: AppDimensions.spacingXs),
-        Text(
-          'Reward repeat customers with points on every sale.',
-          style: AppTextStyles.bodySmall.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
+        const SectionHeading(
+          title: 'Loyalty programme',
+          subtitle: 'Reward repeat customers with points on every sale.',
+          icon: Icons.workspace_premium_outlined,
         ),
         const SizedBox(height: AppDimensions.spacingMd),
-        Card(
+        BrandCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(AppDimensions.screenPadding),
             child: Column(
@@ -1412,12 +1402,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Business Configuration',
-          style: AppTextStyles.heading2.copyWith(color: colorScheme.onSurface),
+        const SectionHeading(
+          title: 'Business configuration',
+          subtitle: 'Identity, contact details and currency.',
+          icon: Icons.storefront_outlined,
         ),
         const SizedBox(height: AppDimensions.spacingMd),
-        Card(
+        BrandCard(
+          padding: EdgeInsets.zero,
           child: Padding(
             padding: const EdgeInsets.all(AppDimensions.screenPadding),
             child: _isLoadingSettings
@@ -1734,9 +1726,181 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildSectionTitle(BuildContext context, String title) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Text(
-      title,
-      style: AppTextStyles.heading2.copyWith(color: colorScheme.onSurface),
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 2),
+      child: Row(
+        children: [
+          Container(
+            width: 22,
+            height: 3,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [AppColors.gradientStart, AppColors.brandMint],
+              ),
+              borderRadius: BorderRadius.circular(999),
+            ),
+          ),
+          const SizedBox(width: 9),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.3,
+              color: colorScheme.onSurface.withValues(alpha: 0.55),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _jumpToSection(GlobalKey key) {
+    final sectionContext = key.currentContext;
+
+    if (sectionContext == null) {
+      return;
+    }
+
+    Scrollable.ensureVisible(
+      sectionContext,
+      duration: const Duration(milliseconds: 450),
+      curve: Curves.easeOutCubic,
+      alignment: 0.02,
+    );
+  }
+
+  /// Compact identity card that anchors the settings page.
+  Widget _buildBusinessSummary(BuildContext context) {
+    final name = _businessNameController.text.trim();
+
+    return AnimatedBuilder(
+      animation: themeController,
+      builder: (context, _) {
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF151133), Color(0xFF322569), Color(0xFF1D3C63)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+          ),
+          child: Row(
+            children: [
+              const BrandMark(size: 46, showShadow: false),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name.isEmpty ? 'Your business' : name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: AppTextStyles.displayFont,
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$_currency  •  ${themeController.themeMode.name} theme',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.66),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: const Text(
+                  'WORKSPACE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildQuickNav(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final items = <(String, IconData, GlobalKey)>[
+      ('Appearance', Icons.palette_outlined, _appearanceKey),
+      ('Business', Icons.storefront_outlined, _businessKey),
+      ('Loyalty', Icons.workspace_premium_outlined, _loyaltyKey),
+      ('Receipts', Icons.receipt_long_outlined, _receiptKey),
+      ('Data', Icons.storage_rounded, _dataKey),
+    ];
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: items.map((item) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Material(
+              color: scheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(999),
+                side: BorderSide(color: scheme.outline),
+              ),
+              child: InkWell(
+                onTap: () => _jumpToSection(item.$3),
+                borderRadius: BorderRadius.circular(999),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(item.$2, size: 14, color: scheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        item.$1,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface.withValues(alpha: 0.75),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
@@ -1748,30 +1912,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required VoidCallback? onTap,
     required bool isLoading,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final palette = <IconData, List<Color>>{
+      Icons.backup_outlined: [Color(0xFF34D399), Color(0xFF059669)],
+      Icons.restore_outlined: [Color(0xFF38BDF8), Color(0xFF0284C7)],
+      Icons.inventory_2_outlined: [Color(0xFF818CF8), Color(0xFF4F46E5)],
+      Icons.point_of_sale_outlined: [Color(0xFFC084FC), Color(0xFF7C3AED)],
+      Icons.people_outline: [Color(0xFFF472B6), Color(0xFFDB2777)],
+      Icons.receipt_long_outlined: [Color(0xFFFBBF24), Color(0xFFD97706)],
+      Icons.science_outlined: [Color(0xFF22D3EE), Color(0xFF0891B2)],
+      Icons.delete_sweep_outlined: [Color(0xFFFB7185), Color(0xFFE11D48)],
+    };
 
-    return Card(
-      child: ListTile(
-        leading: Icon(icon, color: colorScheme.primary),
-        title: Text(
-          title,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: TextStyle(color: colorScheme.onSurfaceVariant),
-        ),
-        trailing: isLoading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
+    final destructive =
+        icon == Icons.delete_sweep_outlined ||
+        icon == Icons.warning_amber_outlined;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: BrandActionTile(
+        icon: icon,
+        title: title,
+        subtitle: subtitle,
         onTap: onTap,
+        isLoading: isLoading,
+        destructive: destructive,
+        gradient:
+            palette[icon] ?? const [AppColors.primaryLight, AppColors.primary],
       ),
     );
   }
@@ -1779,27 +1945,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
-      body: ListView(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        children: [
-          _buildThemeSection(context),
+      body: BrandBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              BrandPageHeader(
+                eyebrow: 'Workspace',
+                title: 'Settings',
+                subtitle: 'Tune BizFlow to the way your shop actually runs.',
+                icon: Icons.tune_rounded,
+                showBack: Navigator.of(context).canPop(),
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 980),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildBusinessSummary(context),
+                          const SizedBox(height: 14),
+                          _buildQuickNav(context),
+                          const SizedBox(height: 18),
+                          KeyedSubtree(
+                            key: _appearanceKey,
+                            child: _buildThemeSection(context),
+                          ),
 
           const SizedBox(height: AppDimensions.spacingXl),
 
-          _buildBusinessConfigurationSection(context),
+                          KeyedSubtree(
+                            key: _businessKey,
+                            child: _buildBusinessConfigurationSection(context),
+                          ),
+
+                          const SizedBox(height: AppDimensions.spacingXl),
+
+                          KeyedSubtree(
+                            key: _loyaltyKey,
+                            child: _buildLoyaltySection(context),
+                          ),
+
+                          const SizedBox(height: AppDimensions.spacingXl),
+
+                          KeyedSubtree(
+                            key: _receiptKey,
+                            child: _buildReceiptSection(context),
+                          ),
 
           const SizedBox(height: AppDimensions.spacingXl),
 
-          _buildLoyaltySection(context),
-
-          const SizedBox(height: AppDimensions.spacingXl),
-
-          _buildReceiptSection(context),
-
-          const SizedBox(height: AppDimensions.spacingXl),
-
-          _buildSectionTitle(context, 'Backup & Restore'),
+                          KeyedSubtree(
+                            key: _dataKey,
+                            child: _buildSectionTitle(
+                              context,
+                              'Backup & Restore',
+                            ),
+                          ),
 
           const SizedBox(height: AppDimensions.spacingMd),
 
@@ -1966,7 +2172,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ? null
                 : _resetAllData,
           ),
-        ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

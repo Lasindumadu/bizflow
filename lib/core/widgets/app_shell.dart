@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../../../core/session/session_controller.dart';
 import '../../../core/services/notification_store.dart';
+import '../../../core/session/session_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decor.dart';
-import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/app_text_styles.dart';
 import '../../../core/theme/theme_controller.dart';
 import '../../../data/database/database_provider.dart';
@@ -24,7 +23,14 @@ import '../../features/reports/presentation/screens/reports_screen.dart';
 import '../../features/sales/presentation/screens/sales_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/staff/presentation/screens/staff_management_screen.dart';
+import 'brand_ui.dart';
+import 'universal_search.dart';
 
+/// The BizFlow application shell.
+///
+/// Desktop: a floating ink sidebar, a glass toolbar and an animated page
+/// canvas. Mobile: a compact brand bar and a floating bottom dock with the
+/// POS action at its centre.
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -32,9 +38,15 @@ class AppShell extends StatefulWidget {
   State<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
+class _AppShellState extends State<AppShell>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   bool _sidebarCollapsed = false;
+
+  /// Soft fade + lift applied whenever the active section changes.
+  late final AnimationController _pageController;
+  late final Animation<double> _pageOpacity;
+  late final Animation<Offset> _pageOffset;
 
   final GlobalKey<DashboardScreenState> _dashboardScreenKey =
       GlobalKey<DashboardScreenState>();
@@ -53,22 +65,12 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       GlobalKey<ReportsScreenState>();
 
   // ─────────────────────────────────────────────
-  // Phase F: session locking & inactivity auto-lock
+  // Session locking & inactivity auto-lock
   // ─────────────────────────────────────────────
 
-  /// The pending inactivity auto-lock. One-shot: it fires once and locks the
-  /// session. It is restarted on activity, not on every session notification.
   Timer? _inactivityTimer;
-
-  /// The configured auto-lock timeout, in minutes. `0` disables auto-lock.
   int _inactivityTimeoutMinutes = 0;
-
-  /// True while the lock dialog is on screen.
   bool _isShowingLockScreen = false;
-
-  /// True while a POS cart is parked and awaiting restoration. Guards the
-  /// park/restore pair so a cart can never be restored twice (which would
-  /// silently duplicate the customer's items).
   bool _hasParkedCart = false;
 
   @override
@@ -76,6 +78,22 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     sessionController.addListener(_onSessionChanged);
+    _pageController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 340),
+      value: 1,
+    );
+    _pageOpacity = CurvedAnimation(
+      parent: _pageController,
+      curve: Curves.easeOutCubic,
+    );
+    _pageOffset = Tween<Offset>(
+      begin: const Offset(0, 0.015),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _pageController,
+      curve: Curves.easeOutCubic,
+    ));
     unawaited(_loadInactivityTimeout());
   }
 
@@ -84,23 +102,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _inactivityTimer?.cancel();
     sessionController.removeListener(_onSessionChanged);
+    _pageController.dispose();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // The clock keeps running while the app is backgrounded, so a timeout
-      // that elapsed in the background must lock as soon as the app returns.
       _evaluateInactivity();
-      return;
     }
   }
 
-  /// Loads the persisted auto-lock timeout and (re)arms the timer.
-  ///
-  /// The timeout is read once per session change; it is NOT re-read on every
-  /// activity event, which would issue a database query per user interaction.
   Future<void> _loadInactivityTimeout() async {
     final settings = await BusinessSettingsRepository().getSettings();
     if (!mounted) return;
@@ -108,10 +120,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _armInactivityTimer();
   }
 
-  /// Arms the one-shot inactivity timer for the configured timeout.
-  ///
-  /// Does nothing when auto-lock is disabled (`0`) or when there is no
-  /// authenticated session — a signed-out session has nothing to lock.
   void _armInactivityTimer() {
     _inactivityTimer?.cancel();
     _inactivityTimer = null;
@@ -127,11 +135,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     });
   }
 
-  /// Locks the session when the inactivity timeout has already elapsed.
-  ///
-  /// Used when the app returns from the background: the Dart timer may not
-  /// have fired while suspended, so the elapsed wall-clock time is compared
-  /// against the configured timeout directly.
   void _evaluateInactivity() {
     if (!mounted) return;
     if (!sessionController.isAuthenticated) return;
@@ -157,16 +160,9 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _inactivityTimer = null;
   }
 
-  /// Called whenever the session changes (sign in, sign out, lock, unlock).
-  ///
-  /// Deliberately NOT called for ordinary activity: [resetActivity] uses
-  /// [SessionController.resetActivitySilently] for high-frequency events so
-  /// this listener is not invoked on every tap (which would rebuild the shell
-  /// and re-read the settings on each interaction).
   void _onSessionChanged() {
     if (!mounted) return;
 
-    // Signed out: preserve any active POS cart, then stop the timer.
     if (sessionController.current == null) {
       _preservePosCart();
       _cancelInactivityTimer();
@@ -176,7 +172,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
 
-    // Locked: preserve any active POS cart, show the lock screen.
     if (sessionController.isLocked) {
       _preservePosCart();
       _cancelInactivityTimer();
@@ -184,8 +179,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       return;
     }
 
-    // Unlocked and authenticated: restore the parked cart (exactly once) and
-    // re-arm the timer.
     _restorePosCart();
     _armInactivityTimer();
     setState(() {
@@ -193,13 +186,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     });
   }
 
-  /// Records user activity, resetting the inactivity clock.
-  ///
-  /// Called from a gesture detector wrapped around the shell body. The
-  /// activity timestamp is updated without notifying listeners (the shell
-  /// does not need to rebuild for a timestamp change); the timer is restarted
-  /// here instead. This keeps the interaction cheap: no `setState`, no
-  /// settings query, no cart restore.
   void _resetInactivity() {
     if (!mounted) return;
     if (!sessionController.isAuthenticated) return;
@@ -209,11 +195,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _armInactivityTimer();
   }
 
-  /// Parks the current POS cart (if any) so it survives a lock/sign-out.
-  ///
-  /// Parks at most once per lock/sign-out boundary: the cart is emptied by
-  /// parking, so a second call is a no-op anyway, but the explicit guard
-  /// makes the "exactly once" contract obvious and testable.
   void _preservePosCart() {
     if (_hasParkedCart) return;
     final posState = _posScreenKey.currentState;
@@ -223,12 +204,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     }
   }
 
-  /// Restores the parked POS cart (if any) after a lock.
-  ///
-  /// Restores at most once: the parked sale is removed from the store when it
-  /// is recalled, so a repeated call could not duplicate it — but the explicit
-  /// guard prevents the shell from recalling a *different* parked sale on a
-  /// second unlock.
   void _restorePosCart() {
     if (!_hasParkedCart) return;
     _hasParkedCart = false;
@@ -237,10 +212,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     posState.restoreLastParkedCart();
   }
 
-  /// Shows a modal lock screen requiring PIN re-entry to unlock the session.
-  ///
-  /// The dialog is not dismissible (no barrier tap, no back button) — the
-  /// only ways out are a successful PIN re-entry or an explicit sign-out.
   void _showLockScreen() {
     if (_isShowingLockScreen) return;
     _isShowingLockScreen = true;
@@ -252,8 +223,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
         return _LockScreenDialog(
           onUnlock: () {
             _isShowingLockScreen = false;
-            // The dialog closes itself; the session listener below restores
-            // the parked cart and re-arms the timer.
             sessionController.unlock();
           },
           onSignOut: () {
@@ -264,9 +233,6 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       },
     ).whenComplete(() {
       if (!mounted) return;
-      // The dialog can only be dismissed by unlocking or signing out, but
-      // guard anyway: a session that is still locked must show the dialog
-      // again rather than leaving an unauthenticated terminal unlocked.
       if (sessionController.isLocked) {
         _isShowingLockScreen = false;
         _showLockScreen();
@@ -281,15 +247,17 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       key: _dashboardScreenKey,
       onOpenSettings: _openSettings,
       onOpenPos: _openPos,
+      onNavigate: _onNavigationSelected,
+      showAppBar: false,
     ),
-    ProductsScreen(key: _productsScreenKey),
-    PosScreen(key: _posScreenKey),
-    SalesScreen(key: _salesScreenKey),
-    CustomersScreen(key: _customersScreenKey),
-    InventoryScreen(key: _inventoryScreenKey),
-    ExpensesScreen(key: _expensesScreenKey),
-    ReportsScreen(key: _reportsScreenKey),
-    const MoreScreen(),
+    ProductsScreen(key: _productsScreenKey, showAppBar: false),
+    PosScreen(key: _posScreenKey, showAppBar: false),
+    SalesScreen(key: _salesScreenKey, showAppBar: false),
+    CustomersScreen(key: _customersScreenKey, showAppBar: false),
+    InventoryScreen(key: _inventoryScreenKey, showAppBar: false),
+    ExpensesScreen(key: _expensesScreenKey, showAppBar: false),
+    ReportsScreen(key: _reportsScreenKey, showAppBar: false),
+    const MoreScreen(showAppBar: false),
   ];
 
   static const List<_NavItem> _navItems = [
@@ -308,7 +276,7 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
       1,
     ),
     _NavItem(
-      'Sales & Invoices',
+      'Sales',
       Icons.receipt_long_outlined,
       Icons.receipt_long_rounded,
       3,
@@ -325,32 +293,40 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     _NavItem('More Tools', Icons.apps_outlined, Icons.apps_rounded, 8),
   ];
 
+  _NavItem get _activeItem => _navItems.firstWhere(
+        (item) => item.index == _currentIndex,
+        orElse: () => _navItems.first,
+      );
+
   String get _currentSectionTitle {
     switch (_currentIndex) {
       case 0:
-        return 'Overview & Real-time Metrics';
+        return 'Overview & live metrics';
       case 1:
-        return 'Product Catalog & Pricing';
+        return 'Catalog, pricing & stock';
       case 2:
-        return 'Point of Sale Terminal';
+        return 'Fast checkout & payments';
       case 3:
-        return 'Transaction History & Receipts';
+        return 'Transactions & receipts';
       case 4:
-        return 'Customer Directory & Accounts';
+        return 'Directory & loyalty';
       case 5:
-        return 'Stock Levels & Movements';
+        return 'Stock levels & movements';
       case 6:
-        return 'Expenditure & Cost Tracking';
+        return 'Costs & spending';
       case 7:
-        return 'Business Reports & Insights';
+        return 'Reports & business insight';
       case 8:
-        return 'System Utilities & Extensions';
+        return 'Tools, settings & extensions';
       default:
-        return 'BizFlow';
+        return 'BizFlow workspace';
     }
   }
 
   void _onNavigationSelected(int index) {
+    if (index != _currentIndex) {
+      _pageController.forward(from: 0);
+    }
     if (index == 0) _dashboardScreenKey.currentState?.refreshBusinessSettings();
     if (index == 1) _productsScreenKey.currentState?.refreshBusinessSettings();
     if (index == 2) _posScreenKey.currentState?.refreshBusinessSettings();
@@ -376,27 +352,22 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
   }
 
   void _openSettings() {
-    Navigator.of(context)
-        .push(MaterialPageRoute(builder: (context) => const SettingsScreen()));
-  }
-
-  /// Phase F: opens the staff management screen (owner-only actions are
-  /// enforced in the repository, not in the UI).
-  void _openStaffManagement() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const StaffManagementScreen()),
+      MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
     );
   }
 
-  /// Phase F: locks the session immediately, exactly as the inactivity
-  /// timeout would. The user must re-enter their PIN to resume.
+  void _openStaffManagement() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const StaffManagementScreen()),
+    );
+  }
+
   void _lockNow() {
     if (!sessionController.isAuthenticated) return;
     sessionController.lock();
   }
 
-  /// Phase F: signs out of the current session. The startup gate returns to
-  /// the login screen when login is required.
   void _signOutNow() {
     if (!sessionController.isAuthenticated) return;
     sessionController.signOut();
@@ -407,469 +378,225 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
-        final isPhone = width < 680;
-        final isTablet = width >= 680 && width < 1100;
+        final isPhone = width < 760;
+        final isTablet = width >= 760 && width < 1180;
 
         final body = isPhone
             ? _buildMobileLayout(context)
             : _buildDesktopLayout(context, isTablet: isTablet);
 
-        // Phase F: wrap the shell body with a gesture detector so any user
-        // interaction resets the inactivity auto-lock clock.
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
-          onTap: _resetInactivity,
+          onTapDown: (_) => _resetInactivity(),
           child: body,
         );
       },
     );
   }
 
+  Widget _buildPageStack() {
+    return FadeTransition(
+      opacity: _pageOpacity,
+      child: SlideTransition(
+        position: _pageOffset,
+        child: IndexedStack(index: _currentIndex, children: _screens),
+      ),
+    );
+  }
+
   // ─────────────────────────────────────────────
-  // Mobile Layout
+  // Mobile
   // ─────────────────────────────────────────────
+
   Widget _buildMobileLayout(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: Stack(
-        children: [
-          IndexedStack(index: _currentIndex, children: _screens),
-          Positioned(
-            right: 16,
-            bottom: 84,
-            child: _MobileNotificationsButton(onTap: _openNotifications),
-          ),
-        ],
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.darkSurface : Colors.white,
-          border: Border(
-            top: BorderSide(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : AppColors.lightBorder,
-              width: 1,
-            ),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: isDark
-                  ? Colors.black.withValues(alpha: 0.45)
-                  : Colors.black.withValues(alpha: 0.05),
-              blurRadius: 18,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildMobileNavItem(
-                  0,
-                  Icons.home_outlined,
-                  Icons.home_rounded,
-                  'Home',
-                ),
-                _buildMobileNavItem(
-                  1,
-                  Icons.inventory_2_outlined,
-                  Icons.inventory_2_rounded,
-                  'Products',
-                ),
-                _buildMobilePosCenterButton(),
-                _buildMobileNavItem(
-                  3,
-                  Icons.receipt_long_outlined,
-                  Icons.receipt_long_rounded,
-                  'Sales',
-                ),
-                _buildMobileNavItem(
-                  8,
-                  Icons.grid_view_outlined,
-                  Icons.grid_view_rounded,
-                  'More',
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMobileNavItem(
-    int index,
-    IconData outline,
-    IconData filled,
-    String label,
-  ) {
-    final sel = _currentIndex == index;
-    final scheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: () => _onNavigationSelected(index),
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: sel
-              ? scheme.primary.withValues(alpha: 0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
-        ),
+      backgroundColor:
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      body: BrandBackdrop(
+        showArtwork: false,
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              sel ? filled : outline,
-              size: 22,
-              color: sel
-                  ? scheme.primary
-                  : scheme.onSurface.withValues(alpha: 0.55),
+            _MobileTopBar(
+              title: _activeItem.label,
+              subtitle: _currentSectionTitle,
+              onSearch: () => UniversalSearchOverlay.show(context),
+              onNotifications: _openNotifications,
+              onSettings: _openSettings,
             ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                color: sel
-                    ? scheme.primary
-                    : scheme.onSurface.withValues(alpha: 0.6),
-              ),
-            ),
+            Expanded(child: _buildPageStack()),
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildMobilePosCenterButton() {
-    return GestureDetector(
-      onTap: () => _onNavigationSelected(2),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          gradient: AppDecor.indigoGradient,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.primary.withValues(alpha: 0.4),
-              blurRadius: 14,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.point_of_sale_rounded,
-          color: Colors.white,
-          size: 24,
-        ),
+      bottomNavigationBar: _MobileDock(
+        currentIndex: _currentIndex,
+        onSelected: _onNavigationSelected,
       ),
     );
   }
 
   // ─────────────────────────────────────────────
-  // Desktop & Tablet Layout with Top Bar
+  // Desktop & tablet
   // ─────────────────────────────────────────────
-  Widget _buildDesktopLayout(BuildContext context, {required bool isTablet}) {
+
+  Widget _buildDesktopLayout(
+    BuildContext context, {
+    required bool isTablet,
+  }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sidebarWidth = _sidebarCollapsed ? 76.0 : (isTablet ? 220.0 : 256.0);
+    final sidebarWidth = _sidebarCollapsed ? 84.0 : (isTablet ? 224.0 : 252.0);
 
     return Scaffold(
-      body: Row(
-        children: [
-          // Sleek Left Sidebar
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeInOutCubic,
-            width: sidebarWidth,
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkSurface : Colors.white,
-              border: Border(
-                right: BorderSide(
-                  color: isDark
-                      ? Colors.white.withValues(alpha: 0.07)
-                      : AppColors.lightBorder,
-                  width: 1,
+      backgroundColor:
+          isDark ? AppColors.darkBackground : AppColors.lightBackground,
+      body: BrandBackdrop(
+        child: SafeArea(
+          child: Row(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 12, 0, 12),
+                child: _buildSidebar(sidebarWidth, isTablet),
+              ),
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildTopBar(context, isTablet: isTablet),
+                    Expanded(child: _buildPageStack()),
+                  ],
                 ),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: isDark
-                      ? Colors.black.withValues(alpha: 0.35)
-                      : Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 16,
-                  offset: const Offset(4, 0),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                _buildSidebarHeader(isDark),
-                const SizedBox(height: 8),
-                Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    children: _navItems.map((item) {
-                      return _buildSidebarItem(item, isDark);
-                    }).toList(),
-                  ),
-                ),
-                _buildSidebarFooter(isDark),
-              ],
-            ),
-          ),
-
-          // Main Canvas with Top Header Bar
-          Expanded(
-            child: Column(
-              children: [
-                _buildTopHeaderBar(context, isDark),
-                Expanded(
-                  child: IndexedStack(index: _currentIndex, children: _screens),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────
-  // Top Header Bar
-  // ─────────────────────────────────────────────
-  Widget _buildTopHeaderBar(BuildContext context, bool isDark) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      height: 68,
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        border: Border(
-          bottom: BorderSide(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.07)
-                : AppColors.lightBorder,
-            width: 1,
+            ],
           ),
         ),
       ),
-      child: Row(
-        children: [
-          // Breadcrumb Title & Subtitle
-          Expanded(
-            child: Row(
-              children: [
-                IconButton(
-                  tooltip: _sidebarCollapsed
-                      ? 'Expand Sidebar'
-                      : 'Collapse Sidebar',
-                  icon: Icon(
-                    _sidebarCollapsed
-                        ? Icons.menu_open_rounded
-                        : Icons.menu_rounded,
-                    size: 20,
-                    color: scheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _sidebarCollapsed = !_sidebarCollapsed;
-                    });
-                  },
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _navItems
-                          .firstWhere((it) => it.index == _currentIndex)
-                          .label,
-                      style: AppTextStyles.titleMedium.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.2,
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                    Text(
-                      _currentSectionTitle,
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: scheme.onSurface.withValues(alpha: 0.55),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+    );
+  }
 
-          // Quick Action: POS Launch
-          if (_currentIndex != 2) ...[
-            Padding(
-              padding: const EdgeInsets.only(right: 12),
-              child: FilledButton.icon(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  elevation: 0,
-                ),
-                onPressed: _openPos,
-                icon: const Icon(Icons.flash_on_rounded, size: 18),
-                label: const Text(
-                  'Quick POS',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                ),
-              ),
-            ),
-          ],
-
-          // Theme Mode Switcher
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : AppColors.lightSurfaceVariant,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : AppColors.lightBorder,
-              ),
-            ),
-            child: IconButton(
-              tooltip: themeController.isDark
-                  ? 'Switch to Light Mode'
-                  : 'Switch to Dark Mode',
-              icon: Icon(
-                themeController.isDark
-                    ? Icons.light_mode_rounded
-                    : Icons.dark_mode_rounded,
-                size: 19,
-                color: themeController.isDark
-                    ? AppColors.tertiary
-                    : scheme.onSurface.withValues(alpha: 0.75),
-              ),
-              onPressed: () {
-                themeController.toggle();
-              },
-            ),
-          ),
-
-          // Notifications Bell
-          _NotificationBell(onTap: _openNotifications),
-
-          const SizedBox(width: 8),
-
-          // Phase F: session controls (lock now, sign out, staff accounts).
-          if (sessionController.isAuthenticated) ...[
-            _SessionMenuButton(
-              onLockNow: _lockNow,
-              onSignOut: _signOutNow,
-              onOpenStaff: _openStaffManagement,
-            ),
-            const SizedBox(width: 8),
-          ],
-
-          // Settings Button
-          Container(
-            decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : AppColors.lightSurfaceVariant,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : AppColors.lightBorder,
-              ),
-            ),
-            child: IconButton(
-              tooltip: 'Settings & Business Config',
-              icon: Icon(
-                Icons.settings_outlined,
-                size: 20,
-                color: scheme.onSurface.withValues(alpha: 0.75),
-              ),
-              onPressed: _openSettings,
-            ),
+  Widget _buildSidebar(double width, bool isTablet) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeInOutCubic,
+      width: width,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF11162B), Color(0xFF0A0E1D), Color(0xFF090C18)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.32),
+            blurRadius: 40,
+            offset: const Offset(0, 18),
+            spreadRadius: -10,
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(26),
+        child: Stack(
+          children: [
+            Positioned(
+              top: -90,
+              right: -80,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.30),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -100,
+              left: -80,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.brandMint.withValues(alpha: 0.12),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Column(
+              children: [
+                _buildSidebarHeader(),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: ListView(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                    children: [
+                      if (!_sidebarCollapsed) const _SidebarLabel('WORKSPACE'),
+                      ..._navItems
+                          .where((item) => item.index == 0 ||
+                              item.index == 2 ||
+                              item.index == 1 ||
+                              item.index == 3 ||
+                              item.index == 4)
+                          .map(_buildSidebarItem),
+                      const SizedBox(height: 14),
+                      if (!_sidebarCollapsed) const _SidebarLabel('MANAGE'),
+                      ..._navItems
+                          .where((item) => item.index >= 5)
+                          .map(_buildSidebarItem),
+                    ],
+                  ),
+                ),
+                _buildSidebarFooter(),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // ─────────────────────────────────────────────
-  // Left Sidebar Components
-  // ─────────────────────────────────────────────
-  Widget _buildSidebarHeader(bool isDark) {
-    final scheme = Theme.of(context).colorScheme;
-
+  Widget _buildSidebarHeader() {
     return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: _sidebarCollapsed ? 12 : 18,
-        vertical: 18,
+      padding: EdgeInsets.fromLTRB(
+        _sidebarCollapsed ? 0 : 16,
+        16,
+        _sidebarCollapsed ? 0 : 10,
+        8,
       ),
       child: Row(
         mainAxisAlignment: _sidebarCollapsed
             ? MainAxisAlignment.center
             : MainAxisAlignment.start,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              gradient: AppDecor.indigoGradient,
-              borderRadius: BorderRadius.circular(14),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.35),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.bolt_rounded,
-              color: Colors.white,
-              size: 24,
-            ),
-          ),
+          const BrandMark(size: 38),
           if (!_sidebarCollapsed) ...[
-            const SizedBox(width: 12),
+            const SizedBox(width: 11),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Text(
+                      const Text(
                         'BizFlow',
-                        style: AppTextStyles.titleMedium.copyWith(
-                          fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                          letterSpacing: -0.3,
-                          color: scheme.onSurface,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          color: Colors.white,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.4,
                         ),
                       ),
                       const SizedBox(width: 6),
@@ -879,29 +606,40 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
                           vertical: 1.5,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(6),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF2DD4BF), Color(0xFF14B8A6)],
+                          ),
+                          borderRadius: BorderRadius.circular(5),
                         ),
-                        child: Text(
+                        child: const Text(
                           'PRO',
                           style: TextStyle(
-                            color: AppColors.primaryLight,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF04372F),
+                            fontSize: 8,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.4,
                           ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 2),
                   Text(
-                    'Smart POS & Retail',
-                    style: AppTextStyles.labelSmall.copyWith(
-                      color: scheme.onSurface.withValues(alpha: 0.5),
+                    'Retail operating system',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.40),
+                      fontSize: 9.5,
                       fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
                     ),
                   ),
                 ],
               ),
+            ),
+            _CollapseButton(
+              collapsed: _sidebarCollapsed,
+              onTap: () =>
+                  setState(() => _sidebarCollapsed = !_sidebarCollapsed),
             ),
           ],
         ],
@@ -909,195 +647,737 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildSidebarItem(_NavItem item, bool isDark) {
-    final sel = _currentIndex == item.index;
-    final scheme = Theme.of(context).colorScheme;
+  Widget _buildSidebarItem(_NavItem item) {
+    return _SidebarNavItem(
+      item: item,
+      selected: _currentIndex == item.index,
+      collapsed: _sidebarCollapsed,
+      onTap: () => _onNavigationSelected(item.index),
+    );
+  }
+
+  Widget _buildSidebarFooter() {
+    final current = sessionController.current;
+    final name = current == null
+        ? 'Local workspace'
+        : (current.displayName.trim().isEmpty
+            ? current.username
+            : current.displayName);
+    final role = current == null ? 'Owner mode' : current.role.name;
 
     if (_sidebarCollapsed) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
+        padding: const EdgeInsets.only(bottom: 14, top: 8),
         child: Tooltip(
-          message: item.label,
-          preferBelow: false,
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _onNavigationSelected(item.index),
-              borderRadius: BorderRadius.circular(14),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  gradient: sel && item.isProminent
-                      ? AppDecor.indigoGradient
-                      : null,
-                  color: sel && !item.isProminent
-                      ? scheme.primary.withValues(alpha: 0.12)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                  border: sel && !item.isProminent
-                      ? Border.all(
-                          color: scheme.primary.withValues(alpha: 0.3),
-                          width: 1,
-                        )
-                      : null,
-                ),
-                child: Center(
-                  child: Icon(
-                    sel ? item.filledIcon : item.outlinedIcon,
-                    size: 22,
-                    color: sel && item.isProminent
-                        ? Colors.white
-                        : sel
-                        ? scheme.primary
-                        : scheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-              ),
-            ),
+          message: name,
+          child: _SessionMenuButton(
+            compact: true,
+            onLockNow: _lockNow,
+            onSignOut: _signOutNow,
+            onOpenStaff: _openStaffManagement,
           ),
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.5),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => _onNavigationSelected(item.index),
-          borderRadius: BorderRadius.circular(14),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              gradient: sel && item.isProminent
-                  ? AppDecor.indigoGradient
-                  : null,
-              color: sel && !item.isProminent
-                  ? scheme.primary.withValues(alpha: 0.10)
-                  : Colors.transparent,
+              color: Colors.white.withValues(alpha: 0.04),
               borderRadius: BorderRadius.circular(14),
-              border: sel && !item.isProminent
-                  ? Border.all(
-                      color: scheme.primary.withValues(alpha: 0.25),
-                      width: 1,
-                    )
-                  : null,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
             ),
             child: Row(
               children: [
-                Icon(
-                  sel ? item.filledIcon : item.outlinedIcon,
-                  size: 20,
-                  color: sel && item.isProminent
-                      ? Colors.white
-                      : sel
-                      ? scheme.primary
-                      : scheme.onSurface.withValues(alpha: 0.65),
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: AppColors.brandMint,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x662DD4BF),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Offline ready',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'All data stays on this device',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.38),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+            ),
+            child: Row(
+              children: [
+                _Avatar(name: name, size: 34),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        role,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.40),
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                _SessionMenuButton(
+                  compact: true,
+                  onLockNow: _lockNow,
+                  onSignOut: _signOutNow,
+                  onOpenStaff: _openStaffManagement,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTopBar(BuildContext context, {required bool isTablet}) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      height: 76,
+      padding: const EdgeInsets.fromLTRB(20, 10, 17, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Workspace',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: scheme.onSurface.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                      child: Icon(
+                        Icons.chevron_right_rounded,
+                        size: 13,
+                        color: scheme.onSurface.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    Text(
+                      _activeItem.label,
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                        color: scheme.primary.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  _activeItem.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.displayFont,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.5,
+                    color: scheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!isTablet) ...[
+            _HeaderSearchButton(
+              onTap: () => UniversalSearchOverlay.show(context),
+            ),
+            const SizedBox(width: 8),
+          ],
+          _CircleAction(
+            tooltip: 'Search',
+            icon: Icons.search_rounded,
+            onTap: () => UniversalSearchOverlay.show(context),
+            compactOnly: !isTablet,
+          ),
+          const SizedBox(width: 6),
+          _CircleAction(
+            tooltip: themeController.isDark
+                ? 'Switch to light mode'
+                : 'Switch to dark mode',
+            icon: themeController.isDark
+                ? Icons.light_mode_rounded
+                : Icons.dark_mode_rounded,
+            iconColor: themeController.isDark
+                ? AppColors.brandAmber
+                : scheme.onSurface.withValues(alpha: 0.7),
+            onTap: themeController.toggle,
+          ),
+          const SizedBox(width: 6),
+          _NotificationBell(onTap: _openNotifications),
+          const SizedBox(width: 6),
+          _CircleAction(
+            tooltip: 'Settings',
+            icon: Icons.tune_rounded,
+            onTap: _openSettings,
+          ),
+          const SizedBox(width: 10),
+          if (!isTablet)
+            _QuickPosButton(onTap: _openPos)
+          else
+            _CircleAction(
+              tooltip: 'Open POS',
+              icon: Icons.bolt_rounded,
+              iconColor: Colors.white,
+              background: AppDecor.indigoGradient,
+              onTap: _openPos,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Shell building blocks
+// ─────────────────────────────────────────────
+
+class _SidebarLabel extends StatelessWidget {
+  final String text;
+  const _SidebarLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 7),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.26),
+          fontSize: 8.5,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.6,
+        ),
+      ),
+    );
+  }
+}
+
+class _SidebarNavItem extends StatefulWidget {
+  final _NavItem item;
+  final bool selected;
+  final bool collapsed;
+  final VoidCallback onTap;
+
+  const _SidebarNavItem({
+    required this.item,
+    required this.selected,
+    required this.collapsed,
+    required this.onTap,
+  });
+
+  @override
+  State<_SidebarNavItem> createState() => _SidebarNavItemState();
+}
+
+class _SidebarNavItemState extends State<_SidebarNavItem> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    final selected = widget.selected;
+
+    final content = AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOutCubic,
+      margin: const EdgeInsets.symmetric(vertical: 2.5),
+      padding: EdgeInsets.symmetric(
+        horizontal: widget.collapsed ? 0 : 12,
+        vertical: 10.5,
+      ),
+      decoration: BoxDecoration(
+        gradient: selected ? AppDecor.indigoGradient : null,
+        color: !selected && _hovered
+            ? Colors.white.withValues(alpha: 0.055)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(13),
+        border: selected
+            ? Border.all(color: Colors.white.withValues(alpha: 0.16))
+            : null,
+        boxShadow: selected
+            ? [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 7),
+                  spreadRadius: -4,
+                ),
+              ]
+            : null,
+      ),
+      child: widget.collapsed
+          ? Center(
+              child: Icon(
+                selected ? item.filledIcon : item.outlinedIcon,
+                size: 20,
+                color: selected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: _hovered ? 0.85 : 0.48),
+              ),
+            )
+          : Row(
+              children: [
+                Icon(
+                  selected ? item.filledIcon : item.outlinedIcon,
+                  size: 19,
+                  color: selected
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: _hovered ? 0.88 : 0.48),
+                ),
+                const SizedBox(width: 11),
                 Expanded(
                   child: Text(
                     item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
-                      color: sel && item.isProminent
+                      fontSize: 12.5,
+                      fontWeight:
+                          selected ? FontWeight.w700 : FontWeight.w500,
+                      letterSpacing: 0.05,
+                      color: selected
                           ? Colors.white
-                          : sel
-                          ? scheme.primary
-                          : scheme.onSurface.withValues(alpha: 0.85),
+                          : Colors.white.withValues(alpha: 0.74),
                     ),
                   ),
                 ),
-                if (sel)
+                if (selected)
                   Container(
-                    width: 6,
-                    height: 6,
+                    width: 5,
+                    height: 5,
                     decoration: BoxDecoration(
+                      color: Colors.white,
                       shape: BoxShape.circle,
-                      color: item.isProminent ? Colors.white : scheme.primary,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.white.withValues(alpha: 0.8),
+                          blurRadius: 6,
+                        ),
+                      ],
                     ),
+                  )
+                else if (item.isProminent)
+                  Icon(
+                    Icons.arrow_outward_rounded,
+                    size: 13,
+                    color: Colors.white.withValues(alpha: 0.30),
                   ),
               ],
+            ),
+    );
+
+    final tappable = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: widget.onTap,
+        onHover: (value) => setState(() => _hovered = value),
+        borderRadius: BorderRadius.circular(13),
+        hoverColor: Colors.transparent,
+        splashColor: Colors.white.withValues(alpha: 0.06),
+        child: content,
+      ),
+    );
+
+    if (!widget.collapsed) return tappable;
+    return Tooltip(
+      message: item.label,
+      preferBelow: false,
+      waitDuration: const Duration(milliseconds: 250),
+      child: tappable,
+    );
+  }
+}
+
+class _CollapseButton extends StatelessWidget {
+  final bool collapsed;
+  final VoidCallback onTap;
+
+  const _CollapseButton({required this.collapsed, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: collapsed ? 'Expand sidebar' : 'Collapse sidebar',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(9),
+          child: Padding(
+            padding: const EdgeInsets.all(6),
+            child: Icon(
+              collapsed
+                  ? Icons.keyboard_double_arrow_right_rounded
+                  : Icons.keyboard_double_arrow_left_rounded,
+              size: 17,
+              color: Colors.white.withValues(alpha: 0.35),
             ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildSidebarFooter(bool isDark) {
-    if (_sidebarCollapsed) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: Tooltip(
-          message: 'Offline Capable & Local Database Active',
-          child: Container(
+class _Avatar extends StatelessWidget {
+  final String name;
+  final double size;
+  const _Avatar({required this.name, this.size = 32});
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = name.trim().split(RegExp(r'\s+'));
+    final initials = parts.length >= 2
+        ? '${parts.first[0]}${parts.last[0]}'.toUpperCase()
+        : name.substring(0, name.length.clamp(1, 2)).toUpperCase();
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C5CFF), Color(0xFF4F46E5)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+      ),
+      child: Center(
+        child: Text(
+          initials,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: size * 0.32,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderSearchButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _HeaderSearchButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 224,
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.045)
+                : Colors.white.withValues(alpha: 0.75),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.07)
+                  : AppColors.lightBorder,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.search_rounded,
+                size: 17,
+                color: scheme.onSurface.withValues(alpha: 0.42),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Search anything…',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: scheme.onSurface.withValues(alpha: 0.42),
+                  ),
+                ),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                decoration: BoxDecoration(
+                  color: scheme.onSurface.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(5),
+                  border: Border.all(
+                    color: scheme.onSurface.withValues(alpha: 0.07),
+                  ),
+                ),
+                child: Text(
+                  '⌘K',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface.withValues(alpha: 0.38),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CircleAction extends StatelessWidget {
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onTap;
+  final Color? iconColor;
+  final Gradient? background;
+  final bool compactOnly;
+
+  const _CircleAction({
+    required this.tooltip,
+    required this.icon,
+    required this.onTap,
+    this.iconColor,
+    this.background,
+    this.compactOnly = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (compactOnly) return const SizedBox.shrink();
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(11),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: AppColors.secondary.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
+              color: background != null
+                  ? null
+                  : (isDark
+                      ? Colors.white.withValues(alpha: 0.045)
+                      : Colors.white.withValues(alpha: 0.75)),
+              gradient: background,
+              borderRadius: BorderRadius.circular(11),
+              border: background == null
+                  ? Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.07)
+                          : AppColors.lightBorder,
+                    )
+                  : null,
+              boxShadow: background != null
+                  ? AppDecor.glow(AppColors.primary, alpha: 0.30)
+                  : null,
             ),
-            child: const Icon(
-              Icons.check_circle_outline_rounded,
-              color: AppColors.secondary,
-              size: 20,
+            child: Icon(
+              icon,
+              size: 18,
+              color: iconColor ?? scheme.onSurface.withValues(alpha: 0.68),
             ),
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
+}
 
-    return Padding(
-      padding: const EdgeInsets.all(14),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.04)
-              : AppColors.lightSurfaceVariant,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.06)
-                : AppColors.lightBorder,
+class _QuickPosButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _QuickPosButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          decoration: BoxDecoration(
+            gradient: AppDecor.indigoGradient,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: AppDecor.glow(AppColors.primary, alpha: 0.35),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.bolt_rounded, color: Colors.white, size: 17),
+              SizedBox(width: 6),
+              Text(
+                'New sale',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Mobile top bar & dock
+// ─────────────────────────────────────────────
+
+class _MobileTopBar extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final VoidCallback onSearch;
+  final VoidCallback onNotifications;
+  final VoidCallback onSettings;
+
+  const _MobileTopBar({
+    required this.title,
+    required this.subtitle,
+    required this.onSearch,
+    required this.onNotifications,
+    required this.onSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 12, 4),
         child: Row(
           children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
-                color: AppColors.secondary,
-                shape: BoxShape.circle,
-              ),
-            ),
+            const BrandMark(size: 34),
             const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Offline Database',
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontFamily: AppTextStyles.displayFont,
+                      fontSize: 16,
                       fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
+                      color: scheme.onSurface,
                     ),
                   ),
                   Text(
-                    'Sync ready & safe',
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 10.5,
-                      color: isDark ? Colors.white54 : Colors.black45,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                      color: scheme.onSurface.withValues(alpha: 0.45),
                     ),
                   ),
                 ],
               ),
+            ),
+            _CircleAction(
+              tooltip: 'Search',
+              icon: Icons.search_rounded,
+              onTap: onSearch,
+            ),
+            const SizedBox(width: 6),
+            _NotificationBell(onTap: onNotifications),
+            const SizedBox(width: 6),
+            _CircleAction(
+              tooltip: 'Settings',
+              icon: Icons.tune_rounded,
+              onTap: onSettings,
             ),
           ],
         ),
@@ -1105,6 +1385,169 @@ class _AppShellState extends State<AppShell> with WidgetsBindingObserver {
     );
   }
 }
+
+class _MobileDock extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onSelected;
+
+  const _MobileDock({required this.currentIndex, required this.onSelected});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+        child: Container(
+          height: 70,
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(
+            color: (isDark ? const Color(0xFF0E1322) : Colors.white)
+                .withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : AppColors.lightBorder,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.08),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+                spreadRadius: -6,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _MobileDockItem(
+                label: 'Home',
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home_rounded,
+                selected: currentIndex == 0,
+                onTap: () => onSelected(0),
+              ),
+              _MobileDockItem(
+                label: 'Products',
+                icon: Icons.inventory_2_outlined,
+                activeIcon: Icons.inventory_2_rounded,
+                selected: currentIndex == 1,
+                onTap: () => onSelected(1),
+              ),
+              GestureDetector(
+                onTap: () => onSelected(2),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    gradient: AppDecor.indigoGradient,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: scheme.surface,
+                      width: 3,
+                    ),
+                    boxShadow: AppDecor.glow(AppColors.primary, alpha: 0.45),
+                  ),
+                  child: const Icon(
+                    Icons.bolt_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+              _MobileDockItem(
+                label: 'Sales',
+                icon: Icons.receipt_long_outlined,
+                activeIcon: Icons.receipt_long_rounded,
+                selected: currentIndex == 3,
+                onTap: () => onSelected(3),
+              ),
+              _MobileDockItem(
+                label: 'More',
+                icon: Icons.grid_view_outlined,
+                activeIcon: Icons.grid_view_rounded,
+                selected: currentIndex == 8,
+                onTap: () => onSelected(8),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileDockItem extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final IconData activeIcon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _MobileDockItem({
+    required this.label,
+    required this.icon,
+    required this.activeIcon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: selected
+                ? scheme.primary.withValues(alpha: 0.10)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? activeIcon : icon,
+                size: 21,
+                color: selected
+                    ? scheme.primary
+                    : scheme.onSurface.withValues(alpha: 0.45),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+                  color: selected
+                      ? scheme.primary
+                      : scheme.onSurface.withValues(alpha: 0.45),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Header actions
+// ─────────────────────────────────────────────
 
 class _NavItem {
   final String label;
@@ -1122,10 +1565,8 @@ class _NavItem {
   });
 }
 
-/// A bell icon button with a live unread badge, driven by [notificationStore].
 class _NotificationBell extends StatelessWidget {
   final VoidCallback onTap;
-
   const _NotificationBell({required this.onTap});
 
   @override
@@ -1138,64 +1579,48 @@ class _NotificationBell extends StatelessWidget {
       builder: (context, _) {
         final unread = notificationStore.unreadCount;
 
-        return Container(
-          margin: const EdgeInsets.only(right: 8),
-          decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: 0.05)
-                : AppColors.lightSurfaceVariant,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : AppColors.lightBorder,
-            ),
-          ),
+        return Tooltip(
+          message: 'Notifications',
           child: Material(
             color: Colors.transparent,
             child: InkWell(
               onTap: onTap,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.all(9),
+              borderRadius: BorderRadius.circular(11),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.045)
+                      : Colors.white.withValues(alpha: 0.75),
+                  borderRadius: BorderRadius.circular(11),
+                  border: Border.all(
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.07)
+                        : AppColors.lightBorder,
+                  ),
+                ),
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Icon(
-                      Icons.notifications_none_rounded,
-                      color: scheme.onSurface.withValues(alpha: 0.75),
-                      size: 20,
+                    Center(
+                      child: Icon(
+                        Icons.notifications_none_rounded,
+                        size: 18,
+                        color: scheme.onSurface.withValues(alpha: 0.68),
+                      ),
                     ),
                     if (unread > 0)
                       Positioned(
-                        right: -4,
-                        top: -4,
+                        right: 6,
+                        top: 6,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 1.5,
-                          ),
-                          constraints: const BoxConstraints(minWidth: 16),
+                          width: 8,
+                          height: 8,
                           decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppColors.rose, AppColors.error],
-                            ),
-                            borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: scheme.surface,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              unread > 9 ? '9+' : '$unread',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
-                                height: 1.1,
-                              ),
-                            ),
+                            color: AppColors.brandCoral,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: scheme.surface, width: 1.5),
                           ),
                         ),
                       ),
@@ -1210,87 +1635,17 @@ class _NotificationBell extends StatelessWidget {
   }
 }
 
-/// Floating notification button used on mobile layouts.
-class _MobileNotificationsButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _MobileNotificationsButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: notificationStore,
-      builder: (context, _) {
-        final unread = notificationStore.unreadCount;
-
-        return Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(999),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: AppDecor.indigoGradient,
-                shape: BoxShape.circle,
-                boxShadow: AppDecor.glow(AppColors.primary, alpha: 0.4),
-              ),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Icon(
-                    Icons.notifications_none_rounded,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                  if (unread > 0)
-                    Positioned(
-                      right: -6,
-                      top: -6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1,
-                        ),
-                        constraints: const BoxConstraints(minWidth: 16),
-                        decoration: BoxDecoration(
-                          color: AppColors.rose,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: Colors.white, width: 1.5),
-                        ),
-                        child: Center(
-                          child: Text(
-                            unread > 9 ? '9+' : '$unread',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w800,
-                              height: 1.1,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// Phase F: session controls menu (lock now, staff accounts, sign out).
 class _SessionMenuButton extends StatelessWidget {
   final VoidCallback onLockNow;
   final VoidCallback onSignOut;
   final VoidCallback onOpenStaff;
+  final bool compact;
 
   const _SessionMenuButton({
     required this.onLockNow,
     required this.onSignOut,
     required this.onOpenStaff,
+    this.compact = false,
   });
 
   @override
@@ -1299,82 +1654,88 @@ class _SessionMenuButton extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final current = sessionController.current;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.05)
-            : AppColors.lightSurfaceVariant,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : AppColors.lightBorder,
+    return PopupMenuButton<String>(
+      tooltip: 'Session',
+      offset: const Offset(0, 34),
+      color: isDark ? AppColors.darkSurface : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark ? Colors.white.withValues(alpha: 0.08) : AppColors.lightBorder,
         ),
       ),
-      child: PopupMenuButton<String>(
-        tooltip: 'Session',
-        icon: Icon(
-          Icons.account_circle_outlined,
-          size: 20,
-          color: scheme.onSurface.withValues(alpha: 0.75),
+      icon: compact
+          ? Icon(
+              Icons.more_horiz_rounded,
+              size: 18,
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.45)
+                  : scheme.onSurface.withValues(alpha: 0.55),
+            )
+          : Icon(
+              Icons.account_circle_outlined,
+              size: 20,
+              color: scheme.onSurface.withValues(alpha: 0.7),
+            ),
+      onSelected: (value) {
+        switch (value) {
+          case 'lock':
+            onLockNow();
+          case 'staff':
+            onOpenStaff();
+          case 'signout':
+            onSignOut();
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          enabled: false,
+          child: Text(
+            current == null
+                ? 'Local workspace'
+                : '${current.displayName.isEmpty ? current.username : current.displayName}'
+                    ' · ${current.role.name}',
+            style: TextStyle(
+              fontSize: 12,
+              color: scheme.onSurface.withValues(alpha: 0.65),
+            ),
+          ),
         ),
-        onSelected: (value) {
-          switch (value) {
-            case 'lock':
-              onLockNow();
-            case 'staff':
-              onOpenStaff();
-            case 'signout':
-              onSignOut();
-          }
-        },
-        itemBuilder: (context) => [
-          PopupMenuItem<String>(
-            enabled: false,
-            child: Text(
-              current == null
-                  ? 'Signed out'
-                  : '${current.displayName.isEmpty ? current.username : current.displayName}'
-                        ' (${current.role.name})',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'lock',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.lock_outline_rounded, size: 18),
+            title: Text('Lock now'),
           ),
-          const PopupMenuDivider(),
-          const PopupMenuItem<String>(
-            value: 'lock',
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.lock_outline_rounded, size: 18),
-              title: Text('Lock now'),
-            ),
+        ),
+        const PopupMenuItem<String>(
+          value: 'staff',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.group_outlined, size: 18),
+            title: Text('Staff & access'),
           ),
-          const PopupMenuItem<String>(
-            value: 'staff',
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.group_outlined, size: 18),
-              title: Text('Staff & access'),
-            ),
+        ),
+        const PopupMenuDivider(),
+        const PopupMenuItem<String>(
+          value: 'signout',
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: Icon(Icons.logout_rounded, size: 18),
+            title: Text('Sign out'),
           ),
-          const PopupMenuDivider(),
-          const PopupMenuItem<String>(
-            value: 'signout',
-            child: ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(Icons.logout_rounded, size: 18),
-              title: Text('Sign out'),
-            ),
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-/// Phase F: modal dialog shown when the session is locked by inactivity or
-/// an explicit lock. Requires PIN re-entry to unlock, or offers sign-out.
+// ─────────────────────────────────────────────
+// Lock dialog
+// ─────────────────────────────────────────────
+
 class _LockScreenDialog extends StatefulWidget {
   final VoidCallback onUnlock;
   final VoidCallback onSignOut;
@@ -1394,8 +1755,6 @@ class _LockScreenDialogState extends State<_LockScreenDialog> {
   @override
   void initState() {
     super.initState();
-    // The PIN field is the only way out of the lock, so it takes focus as
-    // soon as the dialog appears.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _pinFocus.requestFocus();
     });
@@ -1408,7 +1767,6 @@ class _LockScreenDialogState extends State<_LockScreenDialog> {
     super.dispose();
   }
 
-  /// Signs the user out of the locked session and closes the dialog.
   void _signOut() {
     Navigator.of(context).pop();
     widget.onSignOut();
@@ -1441,8 +1799,6 @@ class _LockScreenDialogState extends State<_LockScreenDialog> {
       switch (result.status) {
         case StaffAuthStatus.success:
           _pinController.clear();
-          // Close the dialog first so the shell is not left with a dialog
-          // over an already-unlocked session.
           Navigator.of(context).pop();
           widget.onUnlock();
         case StaffAuthStatus.invalidPin:
@@ -1454,7 +1810,8 @@ class _LockScreenDialogState extends State<_LockScreenDialog> {
         case StaffAuthStatus.locked:
           setState(() {
             _isVerifying = false;
-            _error = 'Account is temporarily locked. Please sign out and contact the owner.';
+            _error =
+                'Account is temporarily locked. Please sign out and contact the owner.';
             _pinController.clear();
           });
         case StaffAuthStatus.accountNotFound:
@@ -1480,73 +1837,80 @@ class _LockScreenDialogState extends State<_LockScreenDialog> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scheme = Theme.of(context).colorScheme;
 
-    // The lock screen must not be dismissible: not by the barrier, not by
-    // the system back button, and not by the predictive-back gesture. The
-    // only ways out are a successful PIN re-entry or an explicit sign-out.
     return PopScope(
       canPop: false,
       child: Dialog(
         backgroundColor: Colors.transparent,
         child: Container(
-          width: 340,
-          padding: const EdgeInsets.all(28),
+          width: 360,
+          padding: const EdgeInsets.all(26),
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkSurface : Colors.white,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusLg),
+            borderRadius: BorderRadius.circular(26),
             border: Border.all(
               color: isDark
-                  ? Colors.white.withValues(alpha: 0.12)
+                  ? Colors.white.withValues(alpha: 0.10)
                   : AppColors.lightBorder,
             ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.5 : 0.15),
+                blurRadius: 48,
+                offset: const Offset(0, 24),
+                spreadRadius: -10,
+              ),
+            ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.lock_outline_rounded,
-                size: 48,
-                color: AppColors.primaryDark,
-              ),
-              const SizedBox(height: AppDimensions.spacingMd),
+              const BrandMark(size: 50),
+              const SizedBox(height: 16),
               Text(
-                'Session Locked',
-                style: AppTextStyles.titleLarge.copyWith(
+                'Session locked',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.5,
                   color: scheme.onSurface,
-                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(height: AppDimensions.spacingXs),
+              const SizedBox(height: 5),
               Text(
-                'Please enter your PIN to resume your session.',
+                'Enter your PIN to jump back into BizFlow.',
                 textAlign: TextAlign.center,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  color: scheme.onSurfaceVariant,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: scheme.onSurface.withValues(alpha: 0.55),
                 ),
               ),
               if (_error != null) ...[
-                const SizedBox(height: AppDimensions.spacingXs),
+                const SizedBox(height: 12),
                 Container(
-                  padding: const EdgeInsets.all(AppDimensions.spacingXs),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+                    color: scheme.error.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: AppColors.error.withValues(alpha: 0.3),
+                      color: scheme.error.withValues(alpha: 0.25),
                     ),
                   ),
                   child: Row(
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.error_outline_rounded,
-                        size: 18,
-                        color: AppColors.error,
+                        size: 16,
+                        color: scheme.error,
                       ),
-                      const SizedBox(width: AppDimensions.spacingXs),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _error!,
-                          style: AppTextStyles.bodySmall.copyWith(
-                            color: AppColors.error,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: scheme.error,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
@@ -1554,7 +1918,7 @@ class _LockScreenDialogState extends State<_LockScreenDialog> {
                   ),
                 ),
               ],
-              const SizedBox(height: AppDimensions.spacingXl),
+              const SizedBox(height: 18),
               TextField(
                 controller: _pinController,
                 focusNode: _pinFocus,
@@ -1567,53 +1931,33 @@ class _LockScreenDialogState extends State<_LockScreenDialog> {
                   hintText:
                       '${StaffAccountRepository.minPinLength}-${StaffAccountRepository.maxPinLength} digits',
                   counterText: '',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded),
-                  filled: true,
-                  fillColor: isDark
-                      ? Colors.white.withValues(alpha: 0.05)
-                      : Colors.white.withValues(alpha: 0.7),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-                    borderSide: BorderSide(
-                      color: AppColors.primaryDark.withValues(alpha: 0.15),
-                    ),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-                    borderSide: const BorderSide(
-                      color: AppColors.primaryDark,
-                      width: 1.5,
-                    ),
-                  ),
+                  prefixIcon: const Icon(Icons.lock_outline_rounded, size: 19),
                 ),
                 onSubmitted: (_) => _verifyPin(),
               ),
-              const SizedBox(height: AppDimensions.spacingXl),
+              const SizedBox(height: 18),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: _isVerifying ? null : _signOut,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: scheme.onSurfaceVariant,
-                      ),
-                      child: const Text('Sign Out'),
+                      child: const Text('Sign out'),
                     ),
                   ),
-                  const SizedBox(width: AppDimensions.spacingMd),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: _isVerifying ? null : _verifyPin,
                       icon: _isVerifying
                           ? const SizedBox(
-                              width: 18,
-                              height: 18,
+                              width: 16,
+                              height: 16,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 color: Colors.white,
                               ),
                             )
-                          : const Icon(Icons.lock_open_rounded, size: 20),
+                          : const Icon(Icons.lock_open_rounded, size: 18),
                       label: Text(_isVerifying ? 'Verifying…' : 'Unlock'),
                     ),
                   ),

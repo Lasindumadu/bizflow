@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/app_database.dart' hide Sale, SaleItem;
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
@@ -153,14 +156,12 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoadingSettings) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Sale Details')),
-        body: const Center(child: CircularProgressIndicator()),
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Sale Details')),
       body: FutureBuilder<Sale?>(
         future: _saleFuture,
         builder: (context, saleSnapshot) {
@@ -225,21 +226,46 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
     required List<SaleItem> items,
   }) {
     return ListView(
-      padding: const EdgeInsets.all(AppDimensions.screenPadding),
+      padding: EdgeInsets.zero,
       children: [
-        _buildSaleHeader(sale),
-        const SizedBox(height: AppDimensions.spacingLg),
-        _buildCustomerCard(sale: sale, customer: customer),
-        const SizedBox(height: AppDimensions.spacingLg),
-        _buildItemsCard(items),
-        const SizedBox(height: AppDimensions.spacingLg),
-        _buildSummaryCard(sale),
-        const SizedBox(height: AppDimensions.spacingLg),
-        _buildReceiptButton(),
-        if (sale.isCompleted) ...[
-          const SizedBox(height: AppDimensions.spacingLg),
-          _buildCancelButton(sale),
-        ],
+        BrandPageHeader(
+          eyebrow: 'Sales history',
+          title: 'Sale details',
+          subtitle: 'Payment, customer and line items for this order.',
+          icon: Icons.receipt_long_rounded,
+          actions: [
+            BrandHeaderAction(
+              icon: Icons.picture_as_pdf_outlined,
+              tooltip: 'Open receipt',
+              onTap: _openReceipt,
+            ),
+          ],
+        ),
+        Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 860),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              child: Column(
+                children: [
+                  _buildSaleHeader(sale),
+                  const SizedBox(height: 14),
+                  _buildCustomerCard(sale: sale, customer: customer),
+                  const SizedBox(height: 14),
+                  _buildItemsCard(items),
+                  const SizedBox(height: 14),
+                  _buildSummaryCard(sale),
+                  const SizedBox(height: 18),
+                  _buildReceiptButton(),
+                  if (sale.isCompleted) ...[
+                    const SizedBox(height: 10),
+                    _buildCancelButton(sale),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -249,47 +275,117 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
       width: double.infinity,
       child: FilledButton.icon(
         onPressed: _openReceipt,
-        icon: const Icon(Icons.receipt_long_outlined),
-        label: const Text('View Receipt'),
-        style: FilledButton.styleFrom(
-          padding: const EdgeInsets.symmetric(
-            vertical: AppDimensions.spacingMd,
-          ),
-        ),
+        icon: const Icon(Icons.receipt_long_outlined, size: 18),
+        label: const Text('View receipt'),
       ),
     );
   }
 
   Widget _buildSaleHeader(Sale sale) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Sale Information',
-                    style: AppTextStyles.heading2,
-                  ),
-                ),
-                _StatusBadge(status: sale.status),
-              ],
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            _InfoRow(label: 'Sale ID', value: sale.id),
-            const SizedBox(height: AppDimensions.spacingMd),
-            _InfoRow(label: 'Date', value: _formatDateTime(sale.createdAt)),
-            const SizedBox(height: AppDimensions.spacingMd),
-            _InfoRow(
-              label: 'Payment',
-              value: _formatPaymentMethod(sale.paymentMethod),
-            ),
-          ],
+    final cancelled = sale.status.toLowerCase() == 'cancelled';
+    final gradient = cancelled
+        ? const [Color(0xFF3B1220), Color(0xFF5B1B2A), Color(0xFF1C1018)]
+        : const [Color(0xFF141033), Color(0xFF2C2266), Color(0xFF14405B)];
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: gradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: AppDecor.glow(
+          cancelled ? AppColors.error : AppColors.primary,
+          alpha: 0.22,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SALE ${sale.id}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF9FE9DE),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _formatDateTime(sale.createdAt),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.68),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              BrandPill(
+                label: sale.status.toUpperCase(),
+                color: cancelled ? AppColors.brandCoral : AppColors.brandMint,
+                icon: cancelled
+                    ? Icons.cancel_rounded
+                    : Icons.check_circle_rounded,
+                filled: true,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'TOTAL',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.55),
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+            ),
+          ),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              '$_currency ${sale.total.toStringAsFixed(2)}',
+              style: const TextStyle(
+                fontFamily: AppTextStyles.displayFont,
+                color: Colors.white,
+                fontSize: 34,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -1.2,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _HeaderMetric(
+                label: 'Payment',
+                value: _formatPaymentMethod(sale.paymentMethod),
+                icon: Icons.credit_card_rounded,
+              ),
+              const SizedBox(width: 10),
+              _HeaderMetric(
+                label: 'Paid',
+                value: '$_currency ${sale.paidAmount.toStringAsFixed(2)}',
+                icon: Icons.account_balance_wallet_rounded,
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -301,42 +397,43 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
         customer != null;
 
     if (!hasCustomer) {
-      return Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(AppDimensions.spacingLg),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(
-                    AppDimensions.buttonRadius,
-                  ),
-                ),
-                child: Icon(
-                  Icons.person_outline,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(width: AppDimensions.spacingMd),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Customer', style: AppTextStyles.heading2),
-                    SizedBox(height: AppDimensions.spacingXs),
-                    Text(
-                      'Walk-in Customer',
-                      style: AppTextStyles.bodySecondary,
+      return BrandCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            const BrandIconBadge(
+              icon: Icons.person_outline_rounded,
+              color: AppColors.primary,
+              size: 42,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Walk-in customer',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.bodyFont,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.onSurface,
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'No customer was attached to this sale.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
@@ -345,108 +442,110 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
     final email = customer.email.trim();
     final address = customer.address.trim();
 
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Customer', style: AppTextStyles.heading2),
-            const SizedBox(height: AppDimensions.spacingLg),
-            Row(
+    final initials = customer.name.trim().isEmpty
+        ? '?'
+        : customer.name.trim().substring(0, 1).toUpperCase();
+
+    return BrandCard(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: AppDecor.primaryGradient,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Text(
+              initials,
+              style: const TextStyle(
+                fontFamily: AppTextStyles.displayFont,
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary
-                        .withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(
-                      AppDimensions.buttonRadius,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.person_outline,
-                    color: Theme.of(context).colorScheme.primary,
+                Text(
+                  customer.name,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.bodyFont,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onSurface,
                   ),
                 ),
-                const SizedBox(width: AppDimensions.spacingMd),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        customer.name,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (phone.isNotEmpty) ...[
-                        const SizedBox(height: AppDimensions.spacingXs),
-                        Text(phone, style: AppTextStyles.bodySecondary),
-                      ],
-                      if (email.isNotEmpty) ...[
-                        const SizedBox(height: AppDimensions.spacingXs),
-                        Text(email, style: AppTextStyles.bodySecondary),
-                      ],
-                      if (address.isNotEmpty) ...[
-                        const SizedBox(height: AppDimensions.spacingXs),
-                        Text(address, style: AppTextStyles.bodySecondary),
-                      ],
-                    ],
-                  ),
+                const SizedBox(height: 3),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 4,
+                  children: [
+                    if (phone.isNotEmpty) _ContactChip(label: phone),
+                    if (email.isNotEmpty) _ContactChip(label: email),
+                    if (address.isNotEmpty) _ContactChip(label: address),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildItemsCard(List<SaleItem> items) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Items', style: AppTextStyles.heading2),
-            const SizedBox(height: AppDimensions.spacingMd),
-            if (items.isEmpty)
-              const Text(
-                'No items found for this sale.',
-                style: AppTextStyles.bodySecondary,
-              )
-            else
-              ...items.map(
-                (item) => Padding(
-                  padding: const EdgeInsets.only(
-                    bottom: AppDimensions.spacingMd,
-                  ),
-                  child: _SaleItemRow(item: item, currency: _currency),
-                ),
+    return BrandCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SectionHeading(
+            title: 'Items',
+            subtitle: '${items.length} line${items.length == 1 ? '' : 's'}',
+            icon: Icons.shopping_bag_outlined,
+          ),
+          const SizedBox(height: 14),
+          if (items.isEmpty)
+            Text(
+              'No items found for this sale.',
+              style: TextStyle(
+                fontSize: 12.5,
+                color: Theme.of(
+                  context,
+                ).colorScheme.onSurface.withValues(alpha: 0.55),
               ),
-          ],
-        ),
+            )
+          else
+            ...items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _SaleItemRow(item: item, currency: _currency),
+              ),
+            ),
+        ],
       ),
     );
   }
 
   Widget _buildSummaryCard(Sale sale) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Summary', style: AppTextStyles.heading2),
-            const SizedBox(height: AppDimensions.spacingLg),
+    return BrandCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeading(
+            title: 'Payment summary',
+            icon: Icons.calculate_outlined,
+          ),
+          const SizedBox(height: 14),
             _SummaryRow(
               label: 'Subtotal',
               value: sale.subtotal,
@@ -468,9 +567,9 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
               currency: _currency,
               isTotal: true,
             ),
-            const SizedBox(height: AppDimensions.spacingSm),
+            const SizedBox(height: 6),
             _SummaryRow(
-              label: 'Amount Paid',
+              label: 'Amount paid',
               value: sale.paidAmount,
               currency: _currency,
             ),
@@ -482,28 +581,29 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 
   Widget _buildCancelButton(Sale sale) {
     return SizedBox(
       width: double.infinity,
+      height: 48,
       child: OutlinedButton.icon(
         onPressed: _isCancelling ? null : () => _cancelSale(sale),
         icon: _isCancelling
             ? const SizedBox(
-                width: 18,
-                height: 18,
+                width: 16,
+                height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
-            : const Icon(Icons.cancel_outlined),
-        label: Text(_isCancelling ? 'Cancelling...' : 'Cancel Sale'),
+            : const Icon(Icons.cancel_outlined, size: 18),
+        label: Text(_isCancelling ? 'Cancelling…' : 'Cancel sale'),
         style: OutlinedButton.styleFrom(
           foregroundColor: Theme.of(context).colorScheme.error,
-          side: BorderSide(color: Theme.of(context).colorScheme.error),
-          padding: const EdgeInsets.symmetric(
-            vertical: AppDimensions.spacingMd,
+          side: BorderSide(
+            color: Theme.of(
+              context,
+            ).colorScheme.error.withValues(alpha: 0.45),
           ),
         ),
       ),
@@ -576,6 +676,96 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
   }
 }
 
+/// Small frosted metric used inside the sale hero.
+class _HeaderMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _HeaderMetric({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: const Color(0xFF8FE9DB)),
+            const SizedBox(width: 7),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.55),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.4,
+                    ),
+                  ),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContactChip extends StatelessWidget {
+  final String label;
+
+  const _ContactChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(
+          Icons.circle,
+          size: 4,
+          color: scheme.onSurface.withValues(alpha: 0.35),
+        ),
+        const SizedBox(width: 5),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11.5,
+            fontWeight: FontWeight.w500,
+            color: scheme.onSurface.withValues(alpha: 0.62),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _SaleItemRow extends StatelessWidget {
   final SaleItem item;
   final String currency;
@@ -584,55 +774,63 @@ class _SaleItemRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: scheme.primary.withValues(alpha: 0.09),
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Text(
+            '${item.quantity}×',
+            style: TextStyle(
+              fontFamily: AppTextStyles.displayFont,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: scheme.primary,
+            ),
+          ),
+        ),
+        const SizedBox(width: 11),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 item.productName,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: scheme.onSurface,
+                ),
               ),
-              const SizedBox(height: AppDimensions.spacingXs),
+              const SizedBox(height: 2),
               Text(
-                '${item.quantity} × $currency ${item.unitPrice.toStringAsFixed(2)}',
-                style: AppTextStyles.caption,
+                '$currency ${item.unitPrice.toStringAsFixed(2)} each',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: scheme.onSurface.withValues(alpha: 0.5),
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: AppDimensions.spacingMd),
+        const SizedBox(width: 10),
         Text(
           '$currency ${item.total.toStringAsFixed(2)}',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(label, style: AppTextStyles.bodySecondary),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            textAlign: TextAlign.end,
-            style: const TextStyle(fontWeight: FontWeight.w600),
+          style: TextStyle(
+            fontFamily: AppTextStyles.bodyFont,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: scheme.onSurface,
           ),
         ),
       ],
@@ -670,44 +868,22 @@ class _SummaryRow extends StatelessWidget {
         Text(
           '${isDiscount ? '-' : ''}$currency ${value.toStringAsFixed(2)}',
           style: isTotal
-              ? const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)
-              : const TextStyle(fontWeight: FontWeight.w600),
+              ? TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 20,
+                  letterSpacing: -0.6,
+                  color: Theme.of(context).colorScheme.primary,
+                )
+              : TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDiscount
+                      ? AppColors.brandMint
+                      : Theme.of(context).colorScheme.onSurface,
+                ),
         ),
       ],
-    );
-  }
-}
-
-class _StatusBadge extends StatelessWidget {
-  final String status;
-
-  const _StatusBadge({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final isCancelled = status == 'cancelled';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimensions.spacingSm,
-        vertical: AppDimensions.spacingXs,
-      ),
-      decoration: BoxDecoration(
-        color: isCancelled
-            ? Theme.of(context).colorScheme.error.withValues(alpha: 0.1)
-            : Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
-      ),
-      child: Text(
-        status.toUpperCase(),
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          color: isCancelled
-              ? Theme.of(context).colorScheme.error
-              : Theme.of(context).colorScheme.primary,
-        ),
-      ),
     );
   }
 }

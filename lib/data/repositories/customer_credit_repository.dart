@@ -1,10 +1,8 @@
-import 'package:bizflow/core/session/session_controller.dart';
 import 'package:drift/drift.dart';
 
+import '../../core/session/session_authorization.dart';
 import '../database/app_database.dart';
-import '../database/database_provider.dart';
 import 'audit_repository.dart';
-import 'package:bizflow/data/repositories/business_settings_repository.dart';
 
 class CustomerCreditRecord {
   final int id;
@@ -59,9 +57,9 @@ class CustomerCreditTransactionRecord {
 
 class CustomerCreditRepository {
   final AppDatabase db;
-  final AuditRepository _audit = AuditRepository(appDatabase);
+  final AuditRepository _audit;
 
-  CustomerCreditRepository(this.db);
+  CustomerCreditRepository(this.db) : _audit = AuditRepository(db);
 
   /// Get all credit accounts with customer names
   Future<List<CustomerCreditRecord>> getCreditAccounts({
@@ -131,6 +129,7 @@ class CustomerCreditRepository {
 
   /// Create or get credit account for a customer
   Future<CustomerCreditRecord> ensureCreditAccount(String customerId, {double creditLimit = 0.0}) async {
+    await _authorizeCreditOperation();
     final existing = await getCreditAccountByCustomer(customerId);
     if (existing != null) return existing;
 
@@ -166,6 +165,7 @@ class CustomerCreditRepository {
     String? paymentTerms,
     bool? isActive,
   }) async {
+    await _authorizeCreditOperation();
     final account = await (db.select(db.customerCreditAccounts)
           ..where((t) => t.id.equals(accountId)))
         .getSingleOrNull();
@@ -200,35 +200,14 @@ class CustomerCreditRepository {
     );
   }
 
-/// Ensure the session is authorized for credit operations.
-  /// Throws [StateError] if the session is locked or login is required but no session exists.
-  Future<void> _requireCreditOperationAuthorizaton() async {
-    // If session is locked, block all operations (Phase F)
-    if (sessionController.isLocked) {
-      throw StateError('Cannot perform credit operations on a locked session. Unlock first.');
-    }
-    // If no session exists, check if login is required
-    if (sessionController.current == null) {
-      // Check business settings for login requirement
-      final settings = await BusinessSettingsRepository(db).getSettings();
-      if (settings.loginRequired) {
-        throw StateError('Login required to perform credit operations.');
-      }
-      // If login is not required, allow backward compatibility (createdBy = null)
-    }
+  /// Resolves the acting staff and enforces authorization for credit
+  /// operations. Mirrors the Phase E/F pattern used by the other
+  /// repositories: a locked or missing (when login is required) session is
+  /// rejected at this choke point.
+  Future<ResolvedActor> _authorizeCreditOperation() async {
+    return resolveActor(db);
   }
 
-  /// Resolve the acting staff member from the current session.
-  /// Returns the staff ID to use as [createdBy], or [null] if no session and login is not required.
-  int? _resolveCreatedBy() {
-    // If we have a session, resolve the actor from it (use the staff member's ID)
-    if (sessionController.current != null) {
-      return int.tryParse(sessionController.current!.id);
-    }
-    // If login is not required and no session, allow backward compatibility with null
-    // (This should only be reached if requireAuthorization already passed)
-    return null;
-  }
   /// Add a transaction (invoice, payment, adjustment, credit_note)
   Future<void> addTransaction({
     required int accountId,
@@ -238,14 +217,14 @@ class CustomerCreditRepository {
     String? description,
     int? createdBy,
   }) async {
-    // Ensure the session is authorized for credit operations
-    await _requireCreditOperationAuthorizaton();
+    // Ensure the session is authorized for credit operations.
+    final actor = await _authorizeCreditOperation();
 
-    // Resolve the acting staff member from the current session
-    final resolvedCreatedBy = _resolveCreatedBy();
-
-    // Use resolved createdBy if provided, otherwise fall back to the method parameter
-    final effectiveCreatedBy = createdBy ?? resolvedCreatedBy;
+    // The acting staff is resolved from the verified session only; a caller
+    // cannot spoof `createdBy`.
+    final resolvedCreatedBy = (actor.staff != null)
+        ? int.tryParse(actor.staff!.id)
+        : null;
 
     // Get current balance
     final account = await (db.select(db.customerCreditAccounts)
@@ -265,7 +244,7 @@ class CustomerCreditRepository {
         amount: Value(amount),
         balanceAfter: Value(newBalance),
         description: Value(description),
-        createdBy: effectiveCreatedBy != null ? Value(effectiveCreatedBy) : const Value.absent(),
+        createdBy: resolvedCreatedBy != null ? Value(resolvedCreatedBy) : const Value.absent(),
       ),
     );
 
@@ -299,6 +278,7 @@ class CustomerCreditRepository {
     String? description,
     int? createdBy,
   }) async {
+    await _authorizeCreditOperation();
     final account = await ensureCreditAccount(customerId);
     await addTransaction(
       accountId: account.id,
@@ -318,6 +298,7 @@ class CustomerCreditRepository {
     String? description,
     int? createdBy,
   }) async {
+    await _authorizeCreditOperation();
     final account = await getCreditAccountByCustomer(customerId);
     if (account == null) throw Exception('Customer has no credit account');
 
@@ -338,6 +319,7 @@ class CustomerCreditRepository {
     required String reason,
     int? createdBy,
   }) async {
+    await _authorizeCreditOperation();
     final account = await getCreditAccountByCustomer(customerId);
     if (account == null) throw Exception('Customer has no credit account');
 
@@ -359,6 +341,7 @@ class CustomerCreditRepository {
     String? description,
     int? createdBy,
   }) async {
+    await _authorizeCreditOperation();
     final account = await getCreditAccountByCustomer(customerId);
     if (account == null) throw Exception('Customer has no credit account');
 

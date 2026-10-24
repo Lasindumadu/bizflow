@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/session/session_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../core/widgets/modern_widgets.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/staff_account_repository.dart';
@@ -190,25 +192,41 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Staff & Access')),
-      body: _isLoading
-          ? const AppLoadingState(message: 'Loading staff accounts…')
-          : _error != null
-          ? AppEmptyState(
-              icon: Icons.error_outline_rounded,
-              title: 'Could not load staff',
-              message: _error!,
-            )
-          : ListView(
-              padding: const EdgeInsets.all(AppDimensions.screenPadding),
-              children: [
-                _readinessCard(context),
-                const SizedBox(height: AppDimensions.spacingLg),
-                _staffCard(context),
-                const SizedBox(height: AppDimensions.spacingLg),
-                _recoveryCard(context),
-              ],
-            ),
+      body: BrandBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              BrandPageHeader(
+                eyebrow: 'Team',
+                title: 'Staff & access',
+                subtitle: 'Manage PIN accounts, roles and recovery.',
+                icon: Icons.badge_rounded,
+              ),
+              Expanded(
+                child: _isLoading
+                    ? const AppLoadingState(message: 'Loading staff accounts…')
+                    : _error != null
+                    ? AppEmptyState(
+                        icon: Icons.error_outline_rounded,
+                        title: 'Could not load staff',
+                        message: _error!,
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                        children: [
+                          _readinessCard(context),
+                          const SizedBox(height: 14),
+                          _staffCard(context),
+                          const SizedBox(height: 14),
+                          _recoveryCard(context),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -218,45 +236,68 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
     final readiness = _readiness;
     final ready = readiness?.ready ?? false;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  ready ? Icons.verified_user_rounded : Icons.gpp_maybe_rounded,
-                  size: 20,
+    return BrandCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: (ready ? AppColors.success : AppColors.warning)
+                      .withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  ready
+                      ? Icons.verified_user_rounded
+                      : Icons.gpp_maybe_rounded,
+                  size: 17,
                   color: ready ? AppColors.success : AppColors.warning,
                 ),
-                const SizedBox(width: AppDimensions.spacingXs),
-                Text(
-                  'Login Readiness',
-                  style: AppTextStyles.labelMedium.copyWith(
-                    color: scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Login readiness',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.bodyFont,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: AppDimensions.spacingSm),
-            Text(
-              readiness?.message ?? 'Readiness has not been checked yet.',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: scheme.onSurfaceVariant,
               ),
-            ),
-            const SizedBox(height: AppDimensions.spacingXs),
-            Text(
-              'Required before startup PIN login can be enabled: an active '
-              'owner account with a PIN and a recorded recovery code.',
-              style: AppTextStyles.bodySmall.copyWith(
-                color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
+              BrandPill(
+                label: ready ? 'READY' : 'CHECK',
+                color: ready ? AppColors.brandMint : AppColors.brandAmber,
               ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            readiness?.message ?? 'Readiness has not been checked yet.',
+            style: TextStyle(
+              fontSize: 12.5,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+              color: scheme.onSurface.withValues(alpha: 0.7),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Required before startup PIN login can be enabled: an active '
+            'owner account with a PIN and a recorded recovery code.',
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.4,
+              color: scheme.onSurface.withValues(alpha: 0.45),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -264,19 +305,21 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
   Widget _staffCard(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        child: Column(
+    return BrandCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    'Staff Accounts',
-                    style: AppTextStyles.labelMedium.copyWith(
-                      color: scheme.onSurfaceVariant,
+                    'Staff accounts',
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.displayFont,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
                     ),
                   ),
                 ),
@@ -312,7 +355,6 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
               ),
           ],
         ),
-      ),
     );
   }
 
@@ -321,14 +363,13 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
   Widget _recoveryCard(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        child: Column(
+    return BrandCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Owner Recovery',
+              'Owner recovery',
               style: AppTextStyles.labelMedium.copyWith(
                 color: scheme.onSurfaceVariant,
               ),
@@ -350,7 +391,6 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
             ),
           ],
         ),
-      ),
     );
   }
 }
@@ -384,15 +424,22 @@ class _StaffRow extends StatelessWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.primarySoft,
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              gradient: AppDecor.primaryGradient,
+              borderRadius: BorderRadius.circular(11),
+            ),
             child: Text(
               account.username.isEmpty
                   ? '?'
                   : account.username.substring(0, 1).toUpperCase(),
               style: const TextStyle(
-                color: AppColors.primaryDark,
+                fontFamily: AppTextStyles.displayFont,
+                color: Colors.white,
+                fontSize: 13,
                 fontWeight: FontWeight.w700,
               ),
             ),

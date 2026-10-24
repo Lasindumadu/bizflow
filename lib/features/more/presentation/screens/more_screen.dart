@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../audit/presentation/screens/audit_log_screen.dart';
 import '../../../customer_credit/presentation/screens/customer_credit_screen.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
@@ -22,7 +23,8 @@ import '../../../shifts/presentation/screens/cash_shift_screen.dart';
 import '../../../suppliers/presentation/screens/suppliers_screen.dart';
 
 class MoreScreen extends StatelessWidget {
-  const MoreScreen({super.key});
+  final bool showAppBar;
+  const MoreScreen({super.key, this.showAppBar = true});
 
   void _open(BuildContext context, Widget screen) {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
@@ -33,14 +35,25 @@ class MoreScreen extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('More'),
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-      ),
+      appBar: showAppBar
+          ? AppBar(
+              title: const Text('More'),
+              backgroundColor: colorScheme.surface,
+              elevation: 0,
+            )
+          : null,
       body: ListView(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
+        padding: const EdgeInsets.all(16),
         children: [
+          PageHero(
+            eyebrow: 'Toolbox',
+            title: 'More tools',
+            subtitle:
+                'Everything else your business needs — suppliers, staff, '
+                'refunds, shifts and settings.',
+            showIllustration: false,
+          ),
+          const SizedBox(height: 18),
           AnimatedBuilder(
             animation: notificationStore,
             builder: (context, _) {
@@ -57,13 +70,13 @@ class MoreScreen extends StatelessWidget {
               );
             },
           ),
-          Text(
-            'Management',
-            style: AppTextStyles.titleMedium.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
+          const SizedBox(height: 6),
+          const SectionHeading(
+            title: 'Management',
+            subtitle: 'The controls behind the counter',
+            icon: Icons.tune_rounded,
           ),
-          const SizedBox(height: AppDimensions.spacingMd),
+          const SizedBox(height: 12),
           _MoreTile(
             title: 'Customers',
             subtitle: 'Customer records & balances',
@@ -202,112 +215,73 @@ class _MoreTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppDimensions.spacingMd),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : AppColors.lightBorder,
-          width: 1.1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimensions.spacingLg),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    gradient: gradient,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: gradient.colors.first.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 9),
+      child: BrandCard(
+        padding: const EdgeInsets.all(13),
+        radius: 16,
+        onTap: onTap,
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                gradient: gradient,
+                borderRadius: BorderRadius.circular(13),
+                boxShadow: [
+                  BoxShadow(
+                    color: gradient.colors.first.withValues(alpha: 0.24),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                    spreadRadius: -4,
                   ),
-                  child: Icon(icon, color: Colors.white, size: 22),
-                ),
-                const SizedBox(width: AppDimensions.spacingLg),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: AppTextStyles.titleMedium.copyWith(
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (trailingCount > 0)
-                  Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.rose,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      trailingCount > 9 ? '9+' : '$trailingCount',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(
-                      alpha: 0.7,
-                    ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.chevron_right_rounded,
-                    size: 20,
-                    color: colorScheme.onSurface.withValues(alpha: 0.5),
-                  ),
-                ),
-              ],
+                ],
+              ),
+              child: Icon(icon, color: Colors.white, size: 20),
             ),
-          ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.displayFont,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.1,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                      color: colorScheme.onSurface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (trailingCount > 0)
+              BrandPill(
+                label: trailingCount > 9 ? '9+' : '$trailingCount',
+                color: AppColors.brandCoral,
+              ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: colorScheme.onSurface.withValues(alpha: 0.30),
+            ),
+          ],
         ),
       ),
     );

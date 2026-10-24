@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 
+import '../../core/session/session_authorization.dart';
 import '../database/app_database.dart';
 
 /// Loyalty tier definition derived purely from lifetime points.
@@ -97,6 +98,29 @@ class LoyaltyRepository {
 
   LoyaltyRepository(this.database);
 
+  /// Resolves the acting staff and enforces session validity for loyalty
+  /// earning/redemption triggered through checkout. No role restriction —
+  /// these are called within an already-authorized sale flow. The session
+  /// choke point rejects locked sessions, deactivated accounts, and missing
+  /// sessions when `loginRequired=true`. In login-disabled mode the
+  /// null-staff actor from [resolveActor] is accepted.
+  Future<ResolvedActor> _authorizeLoyaltySession() async {
+    return resolveActor(database);
+  }
+
+  /// Resolves the acting staff and enforces owner-only authorization for
+  /// manual loyalty point adjustments (admin corrections that bypass normal
+  /// sale/redemption flows).
+  Future<ResolvedActor> _authorizeLoyaltyAdjustment() async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner},
+      'loyalty adjustment',
+    );
+    return actor;
+  }
+
   /// Total spendable points currently held across all customers.
   Future<int> totalPointsIssued() async {
     final rows = await database.select(database.customers).get();
@@ -115,6 +139,7 @@ class LoyaltyRepository {
   /// the spendable balance, then refreshes the cached tier from lifetime
   /// points only.
   Future<void> earnPoints(String customerId, int points) async {
+    await _authorizeLoyaltySession();
     if (points <= 0) return;
 
     final customer = await (database.select(
@@ -142,6 +167,7 @@ class LoyaltyRepository {
   /// are intentionally left untouched. Throws when the request is invalid
   /// or exceeds the available balance.
   Future<void> redeemPoints(String customerId, int points) async {
+    await _authorizeLoyaltySession();
     if (points <= 0) {
       throw ArgumentError('Points to redeem must be greater than zero.');
     }
@@ -171,6 +197,7 @@ class LoyaltyRepository {
   /// the lifetime total; a negative [delta] only lowers the spendable balance
   /// so tiers are never affected.
   Future<void> adjustPoints(String customerId, int delta) async {
+    await _authorizeLoyaltyAdjustment();
     if (delta >= 0) {
       await earnPoints(customerId, delta);
     } else {

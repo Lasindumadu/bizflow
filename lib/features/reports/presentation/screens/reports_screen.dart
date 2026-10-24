@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../core/widgets/modern_widgets.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../data/repositories/report_repository.dart';
 
 class ReportsScreen extends StatefulWidget {
-  const ReportsScreen({super.key});
+  final bool showAppBar;
+  const ReportsScreen({super.key, this.showAppBar = true});
   @override
   State<ReportsScreen> createState() => ReportsScreenState();
 }
@@ -143,16 +146,18 @@ class ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reports'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            onPressed: _refresh,
-            icon: const Icon(Icons.refresh_rounded),
-          ),
-        ],
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('Reports'),
+              actions: [
+                IconButton(
+                  tooltip: 'Refresh',
+                  onPressed: _refresh,
+                  icon: const Icon(Icons.refresh_rounded),
+                ),
+              ],
+            )
+          : null,
       body: _isLoadingSettings
           ? const Center(
               child: Column(
@@ -187,8 +192,33 @@ class ReportsScreenState extends State<ReportsScreen> {
                 return RefreshIndicator(
                   onRefresh: _refresh,
                   child: ListView(
-                    padding: const EdgeInsets.all(AppDimensions.screenPadding),
+                    padding: const EdgeInsets.all(16),
                     children: [
+                      PageHero(
+                        eyebrow: 'Insight',
+                        title: 'Business analytics',
+                        subtitle:
+                            'Revenue, profit, stock value and customer trends — '
+                            'all in one clear report.',
+                        showIllustration: false,
+                        action: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: _refresh,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.28),
+                                ),
+                              ),
+                              icon: const Icon(Icons.refresh_rounded, size: 16),
+                              label: const Text('Refresh'),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
                       _buildRangeSelector(),
                       const SizedBox(height: AppDimensions.spacingLg),
                       _buildComparisonSection(),
@@ -250,7 +280,7 @@ class ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildSectionTitle(String title) {
-    return Text(title, style: AppTextStyles.heading2);
+    return SectionHeading(title: title);
   }
 
   Widget _buildSalesPeriodCard({
@@ -258,54 +288,55 @@ class ReportsScreenState extends State<ReportsScreen> {
     required SalesReport report,
     required IconData icon,
   }) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(
-                      AppDimensions.buttonRadius,
-                    ),
-                  ),
-                  child: Icon(icon, color: AppColors.primaryDark),
+    return BrandCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              BrandIconBadge(icon: icon, color: AppColors.primary, size: 38),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
                 ),
-                const SizedBox(width: AppDimensions.spacingMd),
-                Text(title, style: AppTextStyles.heading2),
-              ],
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildMetric(
-                    label: 'Sales',
-                    value: _money(report.revenue),
-                  ),
+              ),
+              const Spacer(),
+              BrandPill(
+                label: '${report.transactionCount} SALES',
+                color: AppColors.brandMintDeep,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMetric(
+                  label: 'Revenue',
+                  value: _money(report.revenue),
                 ),
-                Expanded(
-                  child: _buildMetric(
-                    label: 'Transactions',
-                    value: report.transactionCount.toString(),
-                  ),
+              ),
+              Expanded(
+                child: _buildMetric(
+                  label: 'Transactions',
+                  value: report.transactionCount.toString(),
                 ),
-                Expanded(
-                  child: _buildMetric(
-                    label: 'Gross Profit',
-                    value: _money(report.grossProfit),
-                  ),
+              ),
+              Expanded(
+                child: _buildMetric(
+                  label: 'Gross profit',
+                  value: _money(report.grossProfit),
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -382,65 +413,12 @@ class ReportsScreenState extends State<ReportsScreen> {
     required String title,
     required String value,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : AppColors.lightBorder,
-          width: 1.1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: AppColors.primaryLight),
-            ),
-            const SizedBox(width: AppDimensions.spacingMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.caption,
-                  ),
-                  const SizedBox(height: AppDimensions.spacingXs),
-                  Text(
-                    value,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.statValue,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+    return MetricCard(
+      compact: true,
+      label: title,
+      value: value,
+      icon: icon,
+      gradient: AppDecor.indigoGradient.colors,
     );
   }
 

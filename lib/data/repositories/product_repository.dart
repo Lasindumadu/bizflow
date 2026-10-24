@@ -80,7 +80,32 @@ class ProductRepository {
     return _toModel(row);
   }
 
+  /// Resolves the acting staff and enforces owner-or-manager authorization
+  /// for product management (pricing and inventory affect financial records).
+  Future<ResolvedActor> _authorizeProductManagement() async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner, StaffRole.manager},
+      'product management',
+    );
+    return actor;
+  }
+
+  /// Resolves the acting staff and enforces owner-only authorization for
+  /// product deletion (destructive: removes sales history and stock records).
+  Future<ResolvedActor> _authorizeProductDeletion() async {
+    final actor = await resolveActor(database);
+    requireRole(
+      actor.staff,
+      {StaffRole.owner},
+      'product deletion',
+    );
+    return actor;
+  }
+
   Future<void> addProduct(Product product) async {
+    await _authorizeProductManagement();
     await _ensureBarcodeAvailable(product.barcode);
     await database
         .into(database.products)
@@ -100,6 +125,7 @@ class ProductRepository {
   }
 
   Future<void> updateProduct(Product product) async {
+    await _authorizeProductManagement();
     await _ensureBarcodeAvailable(
       product.barcode,
       excludingProductId: product.id,
@@ -203,6 +229,7 @@ class ProductRepository {
   }
 
   Future<void> deleteProduct(String id) async {
+    await _authorizeProductDeletion();
     await (database.delete(
       database.products,
     )..where((table) => table.id.equals(id))).go();

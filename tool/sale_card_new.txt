@@ -1,0 +1,178 @@
+class _SaleCard extends StatelessWidget {
+  final Sale sale;
+  final Customer? customer;
+  final String currency;
+  final VoidCallback onTap;
+
+  const _SaleCard({
+    required this.sale,
+    required this.customer,
+    required this.currency,
+    required this.onTap,
+  });
+
+  String _formatDateTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour == 0
+        ? 12
+        : local.hour > 12
+            ? local.hour - 12
+            : local.hour;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '$day/$month · $hour:$minute $period';
+  }
+
+  String _paymentLabel(String method) {
+    switch (method) {
+      case 'bank_transfer':
+        return 'BANK';
+      case 'cash':
+        return 'CASH';
+      case 'card':
+        return 'CARD';
+      default:
+        return method.toUpperCase();
+    }
+  }
+
+  String _statusLabel(String status) {
+    switch (status.toUpperCase()) {
+      case 'CANCELLED':
+        return 'CANCELLED';
+      case 'REFUNDED':
+        return 'REFUNDED';
+      case 'COMPLETED':
+      default:
+        return 'PAID';
+    }
+  }
+
+  Color _statusColor(String status) {
+    switch (status.toUpperCase()) {
+      case 'CANCELLED':
+        return AppColors.error;
+      case 'REFUNDED':
+        return AppColors.brandAmber;
+      default:
+        return AppColors.brandMintDeep;
+    }
+  }
+
+  IconData _paymentIcon(String method) {
+    switch (method) {
+      case 'cash':
+        return Icons.payments_rounded;
+      case 'card':
+        return Icons.credit_card_rounded;
+      case 'bank_transfer':
+        return Icons.account_balance_rounded;
+      default:
+        return Icons.phone_android_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final customerName = customer?.name ?? 'Walk-in customer';
+    final statusColor = _statusColor(sale.status);
+
+    return BrandCard(
+      padding: const EdgeInsets.all(14),
+      radius: 16,
+      onTap: onTap,
+      child: Row(
+        children: [
+          BrandIconBadge(
+            icon: _paymentIcon(sale.paymentMethod),
+            color: sale.status.toUpperCase() == 'COMPLETED'
+                ? AppColors.primary
+                : statusColor,
+            size: 42,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        SaleReference.format(sale),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.1,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    BrandPill(
+                      label: _statusLabel(sale.status),
+                      color: statusColor,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$customerName · ${_formatDateTime(sale.createdAt)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: scheme.onSurface.withValues(alpha: 0.46),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$currency ${sale.total.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                  color: scheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _paymentLabel(sale.paymentMethod),
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                      color: scheme.onSurface.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 15,
+                    color: scheme.onSurface.withValues(alpha: 0.28),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

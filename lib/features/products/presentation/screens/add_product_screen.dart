@@ -2,8 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/app_database.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
@@ -90,6 +93,12 @@ class _AddProductScreenState extends State<AddProductScreen>
 
     _loadBusinessSettings();
 
+    // Live preview card follows the name, category and price fields.
+    _nameController.addListener(_refreshPreview);
+    _purchasePriceController.addListener(_refreshPreview);
+    _sellingPriceController.addListener(_refreshPreview);
+    _stockController.addListener(_refreshPreview);
+
     _categoriesSubscription = _categoryRepository.watchCategories().listen((
       categories,
     ) {
@@ -128,9 +137,20 @@ class _AddProductScreenState extends State<AddProductScreen>
     }
   }
 
+  void _refreshPreview() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
   void dispose() {
     _categoriesSubscription?.cancel();
+
+    _nameController.removeListener(_refreshPreview);
+    _purchasePriceController.removeListener(_refreshPreview);
+    _sellingPriceController.removeListener(_refreshPreview);
+    _stockController.removeListener(_refreshPreview);
 
     _pageAnimationController.dispose();
 
@@ -354,57 +374,172 @@ class _AddProductScreenState extends State<AddProductScreen>
     required String subtitle,
     required IconData icon,
     required Widget child,
+    Color accent = AppColors.primary,
   }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    return BrandFormSection(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      accent: accent,
+      child: child,
+    );
+  }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(
-                      AppDimensions.buttonRadius,
+  Widget _buildProductPreview(BuildContext context, bool isEditing) {
+    final name = _nameController.text.trim();
+    final purchase = double.tryParse(_purchasePriceController.text.trim()) ?? 0;
+    final selling = double.tryParse(_sellingPriceController.text.trim()) ?? 0;
+    final stock = int.tryParse(_stockController.text.trim()) ?? 0;
+    final profit = selling - purchase;
+    final margin = selling > 0 ? (profit / selling) * 100 : 0.0;
+    final healthy = profit > 0;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: AppDecor.heroGradient(
+          Theme.of(context).brightness == Brightness.dark,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: AppDecor.glow(AppColors.primary, alpha: 0.22),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.inventory_2_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name.isEmpty ? 'Untitled product' : name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontFamily: AppTextStyles.displayFont,
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _selectedCategory == null || _selectedCategory!.isEmpty
+                          ? 'No category selected'
+                          : _selectedCategory!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.68),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.13),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Text(
+                  isEditing ? 'EDITING' : 'NEW ITEM',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'SELLING PRICE',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '$_currency ${selling.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -1,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  BrandPill(
+                    label:
+                        '${margin.toStringAsFixed(0)}% margin',
+                    color: healthy ? AppColors.brandMint : AppColors.brandCoral,
+                    icon: healthy
+                        ? Icons.trending_up_rounded
+                        : Icons.trending_down_rounded,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${stock < 0 ? 0 : stock} in stock',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.66),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  child: Icon(icon, color: colorScheme.primary, size: 21),
-                ),
-                const SizedBox(width: AppDimensions.spacingMd),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: AppTextStyles.heading2.copyWith(
-                          color: colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(height: AppDimensions.spacingXs),
-                      Text(
-                        subtitle,
-                        style: AppTextStyles.caption.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            child,
-          ],
-        ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -433,9 +568,6 @@ class _AddProductScreenState extends State<AddProductScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     final categoryNames = _categories
         .map<String>((category) => category.name)
         .toList();
@@ -455,32 +587,37 @@ class _AddProductScreenState extends State<AddProductScreen>
     final isEditing = widget.product != null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isEditing ? 'Edit Product' : 'Add Product')),
-      body: SafeArea(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: SlideTransition(
-            position: _slideAnimation,
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(AppDimensions.screenPadding),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 760),
-                  child: Form(
-                    key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isEditing
-                              ? 'Update your product details'
-                              : 'Add a new product to your inventory',
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+      body: BrandBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              BrandPageHeader(
+                eyebrow: 'Inventory',
+                title: isEditing ? 'Edit product' : 'Add product',
+                subtitle: isEditing
+                    ? 'Update pricing, stock and identification details.'
+                    : 'Create a catalogue item with pricing and stock levels.',
+                icon: Icons.inventory_2_rounded,
+              ),
+              Expanded(
+                child: FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SlideTransition(
+                    position: _slideAnimation,
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 760),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildProductPreview(context, isEditing),
 
-                        const SizedBox(height: AppDimensions.spacingXl),
+                                const SizedBox(height: 16),
 
                         _buildSectionCard(
                           context: context,
@@ -731,33 +868,32 @@ class _AddProductScreenState extends State<AddProductScreen>
                           ),
                         ),
 
-                        const SizedBox(height: AppDimensions.spacingXl),
-
-                        SizedBox(
-                          width: double.infinity,
-                          height: AppDimensions.buttonHeight,
-                          child: FilledButton.icon(
-                            onPressed: _isLoadingSettings || _isSaving
-                                ? null
-                                : _saveProduct,
-                            icon: Icon(
-                              isEditing
-                                  ? Icons.save_outlined
-                                  : Icons.add_circle_outline,
-                            ),
-                            label: Text(
-                              isEditing ? 'Save Changes' : 'Save Product',
+                              ],
                             ),
                           ),
                         ),
-
-                        const SizedBox(height: AppDimensions.spacingXl),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
+              BrandStickyBar(
+                child: FilledButton.icon(
+                  onPressed: _isLoadingSettings || _isSaving
+                      ? null
+                      : _saveProduct,
+                  icon: Icon(
+                    isEditing
+                        ? Icons.check_rounded
+                        : Icons.add_circle_outline_rounded,
+                    size: 19,
+                  ),
+                  label: Text(
+                    isEditing ? 'Save changes' : 'Save product',
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

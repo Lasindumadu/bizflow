@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../data/repositories/product_repository.dart';
@@ -17,7 +18,8 @@ import '../widgets/product_search_bar.dart';
 import 'add_product_screen.dart';
 
 class ProductsScreen extends StatefulWidget {
-  const ProductsScreen({super.key});
+  final bool showAppBar;
+  const ProductsScreen({super.key, this.showAppBar = true});
 
   @override
   ProductsScreenState createState() => ProductsScreenState();
@@ -348,75 +350,74 @@ class ProductsScreenState extends State<ProductsScreen>
   }
 
   Widget _buildPageHeader(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Products',
-          style: AppTextStyles.heading1.copyWith(color: colorScheme.onSurface),
-        ),
-        const SizedBox(height: AppDimensions.spacingXs),
-        Text(
-          'Manage your products and inventory.',
-          style: AppTextStyles.bodySecondary.copyWith(
-            color: colorScheme.onSurfaceVariant,
+    final lowStock = products.where((p) => p.isLowStock).length;
+    return PageHero(
+      eyebrow: 'Catalog',
+      title: 'Products & pricing',
+      subtitle:
+          '${products.length} product${products.length == 1 ? '' : 's'} · '
+          '$lowStock low on stock · prices in $currency',
+      action: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FilledButton.icon(
+            onPressed: _addProduct,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Add product'),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primaryDark,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(11),
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: AppDimensions.spacingMd),
-        Container(
-          height: 4,
-          width: 60,
-          decoration: BoxDecoration(
-            gradient: AppDecor.indigoGradient,
-            borderRadius: BorderRadius.circular(2),
+          const SizedBox(width: 10),
+          Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 15,
+                  color: AppColors.brandMint,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  '${products.fold<int>(0, (sum, p) => sum + p.stockQuantity)} units',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   Widget _buildProductSectionHeader(BuildContext context, int itemCount) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          'Products',
-          style: AppTextStyles.heading2.copyWith(color: colorScheme.onSurface),
-        ),
-        const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimensions.spacingSm,
-            vertical: AppDimensions.spacingXs,
-          ),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.primary.withValues(alpha: 0.12),
-                AppColors.accent.withValues(alpha: 0.12),
-              ],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-            borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
-            border: Border.all(
-              color: AppColors.primary.withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            '$itemCount ${itemCount == 1 ? 'item' : 'items'}',
-            style: AppTextStyles.caption.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
+    return SectionHeading(
+      title: selectedCategory == 'All Categories'
+          ? 'All products'
+          : selectedCategory,
+      subtitle:
+          '$itemCount item${itemCount == 1 ? '' : 's'} in this view',
+      icon: Icons.grid_view_rounded,
+      trailing: BrandPill(
+        label: '$itemCount',
+        color: AppColors.primary,
+      ),
     );
   }
 
@@ -550,7 +551,7 @@ class ProductsScreenState extends State<ProductsScreen>
     }).toList();
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: widget.showAppBar ? AppBar(
         title: Text(
           'Products',
           style: AppTextStyles.heading3.copyWith(
@@ -586,7 +587,7 @@ class ProductsScreenState extends State<ProductsScreen>
             ).animate().fadeIn(duration: 300.ms, delay: 100.ms).slideX(begin: 0.2, end: 0),
           ),
         ],
-      ),
+      ) : null,
       body: hasError
           ? _buildErrorState().animate().fadeIn(duration: 300.ms).shake()
           : SafeArea(
@@ -606,17 +607,38 @@ class ProductsScreenState extends State<ProductsScreen>
 
                             const SizedBox(height: AppDimensions.spacingXl),
 
-                            ProductSearchBar(
-                              onChanged: (value) {
-                                setState(() {
-                                  searchQuery = value;
-                                });
-                              },
+                            BrandCard(
+                              padding: const EdgeInsets.all(12),
+                              child: LayoutBuilder(
+                                builder: (context, constraints) {
+                                  final wide = constraints.maxWidth >= 620;
+                                  final search = ProductSearchBar(
+                                    onChanged: (value) {
+                                      setState(() {
+                                        searchQuery = value;
+                                      });
+                                    },
+                                  );
+                                  final category = _buildCategoryFilter(context);
+                                  if (!wide) {
+                                    return Column(
+                                      children: [
+                                        search,
+                                        const SizedBox(height: 10),
+                                        category,
+                                      ],
+                                    );
+                                  }
+                                  return Row(
+                                    children: [
+                                      Expanded(child: search),
+                                      const SizedBox(width: 12),
+                                      SizedBox(width: 240, child: category),
+                                    ],
+                                  );
+                                },
+                              ),
                             ).animate().fadeIn(duration: 300.ms, delay: 200.ms).slideY(begin: 0.1, end: 0),
-
-                            const SizedBox(height: AppDimensions.spacingMd),
-
-                            _buildCategoryFilter(context).animate().fadeIn(duration: 300.ms, delay: 300.ms).slideY(begin: 0.1, end: 0),
 
                             const SizedBox(height: AppDimensions.spacingXl),
 

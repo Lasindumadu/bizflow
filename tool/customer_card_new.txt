@@ -1,0 +1,178 @@
+class _CustomerCard extends StatelessWidget {
+  final Customer customer;
+  final String currency;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onCredit;
+
+  const _CustomerCard({
+    required this.customer,
+    required this.currency,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onCredit,
+  });
+
+  String get _initials {
+    final parts = customer.name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    final name = customer.name.trim();
+    return name.isEmpty ? '?' : name.substring(0, name.length.clamp(1, 2)).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasPhone = customer.phone.trim().isNotEmpty;
+    final hasEmail = customer.email.trim().isNotEmpty;
+    final owes = customer.outstandingBalance > 0;
+    final hasPoints = customer.pointsBalance > 0;
+
+    return BrandCard(
+      padding: const EdgeInsets.all(14),
+      radius: 16,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF8B6CFF), Color(0xFF5B5BF7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
+                  spreadRadius: -3,
+                ),
+              ],
+            ),
+            child: Center(
+              child: Text(
+                _initials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        customer.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    if (owes)
+                      BrandPill(
+                        label:
+                            '$currency ${customer.outstandingBalance.toStringAsFixed(2)}',
+                        color: AppColors.error,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  hasPhone
+                      ? customer.phone
+                      : hasEmail
+                          ? customer.email
+                          : 'No contact details yet',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: scheme.onSurface.withValues(alpha: 0.46),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 5,
+                  runSpacing: 4,
+                  children: [
+                    BrandPill(
+                      label: customer.loyaltyTier.toUpperCase(),
+                      color: AppColors.brandAmber,
+                      icon: Icons.workspace_premium_rounded,
+                    ),
+                    BrandPill(
+                      label: hasPoints
+                          ? '${customer.pointsBalance} PTS'
+                          : 'NO POINTS',
+                      color: AppColors.primary,
+                      icon: Icons.stars_rounded,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 2),
+          PopupMenuButton<String>(
+            tooltip: 'Customer actions',
+            offset: const Offset(0, 36),
+            icon: Icon(
+              Icons.more_horiz_rounded,
+              size: 19,
+              color: scheme.onSurface.withValues(alpha: 0.42),
+            ),
+            onSelected: (value) {
+              if (value == 'edit') onEdit();
+              if (value == 'delete') onDelete();
+              if (value == 'credit') onCredit();
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'edit',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.edit_outlined, size: 18),
+                  title: Text('Edit customer'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'credit',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.credit_card_outlined, size: 18),
+                  title: Text('Credit account'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.delete_outline_rounded, size: 18),
+                  title: Text('Delete'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}

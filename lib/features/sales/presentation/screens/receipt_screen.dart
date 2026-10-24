@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/app_database.dart' hide Sale, SaleItem;
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
@@ -88,44 +91,6 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        titleSpacing: AppDimensions.screenPadding,
-        title: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
-              ),
-              child: Icon(
-                Icons.receipt_long_rounded,
-                size: 19,
-                color: Theme.of(context).colorScheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(width: AppDimensions.spacingSm),
-            const Text('Receipt'),
-          ],
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppDimensions.spacingSm),
-            child: IconButton(
-              onPressed: _openPdfPreview,
-              tooltip: 'View PDF receipt',
-              style: IconButton.styleFrom(
-                backgroundColor: Theme.of(context)
-                    .colorScheme
-                    .surfaceContainerHighest,
-                foregroundColor: Theme.of(context).colorScheme.primary,
-              ),
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-            ),
-          ),
-        ],
-      ),
       body: FutureBuilder<Sale?>(
         future: _saleFuture,
         builder: (context, saleSnapshot) {
@@ -224,154 +189,184 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppDimensions.screenPadding),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: Card(
-            margin: EdgeInsets.zero,
-            clipBehavior: Clip.antiAlias,
-            child: Padding(
-              padding: const EdgeInsets.all(AppDimensions.spacingXl),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildBusinessHeader(businessSettings),
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          BrandPageHeader(
+            eyebrow: 'Sale ${sale.id}',
+            title: 'Digital receipt',
+            subtitle: 'A customer-ready copy you can print or export.',
+            icon: Icons.receipt_long_rounded,
+            actions: [
+              BrandHeaderAction(
+                icon: Icons.picture_as_pdf_outlined,
+                tooltip: 'Open PDF receipt',
+                onTap: _openPdfPreview,
+              ),
+            ],
+          ),
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                child: Container(
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.darkSurface : Colors.white,
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : AppColors.lightBorder,
+                    ),
+                    boxShadow: AppDecor.layeredShadow(context),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildBusinessHeader(businessSettings),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(22, 20, 22, 26),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildSaleInformation(sale),
 
-                  const SizedBox(height: AppDimensions.spacingLg),
+                            const SizedBox(height: AppDimensions.spacingLg),
 
-                  Divider(color: colorScheme.outlineVariant),
+                            _buildCustomerInformation(sale, customer),
 
-                  const SizedBox(height: AppDimensions.spacingLg),
+                            const SizedBox(height: AppDimensions.spacingLg),
 
-                  _buildSaleInformation(sale),
+                            Divider(color: colorScheme.outlineVariant),
 
-                  const SizedBox(height: AppDimensions.spacingLg),
+                            const SizedBox(height: AppDimensions.spacingLg),
 
-                  _buildCustomerInformation(sale, customer),
+                            _buildItems(items, businessSettings.currency),
 
-                  const SizedBox(height: AppDimensions.spacingLg),
+                            const SizedBox(height: AppDimensions.spacingLg),
 
-                  Divider(color: colorScheme.outlineVariant),
+                            Divider(color: colorScheme.outlineVariant),
 
-                  const SizedBox(height: AppDimensions.spacingLg),
+                            const SizedBox(height: AppDimensions.spacingLg),
 
-                  _buildItems(items, businessSettings.currency),
+                            _buildSummary(sale, businessSettings.currency),
 
-                  const SizedBox(height: AppDimensions.spacingLg),
+                            const SizedBox(height: AppDimensions.spacingXl),
 
-                  Divider(color: colorScheme.outlineVariant),
+                            Divider(color: colorScheme.outlineVariant),
 
-                  const SizedBox(height: AppDimensions.spacingLg),
+                            const SizedBox(height: AppDimensions.spacingLg),
 
-                  _buildSummary(sale, businessSettings.currency),
-
-                  const SizedBox(height: AppDimensions.spacingXl),
-
-                  Divider(color: colorScheme.outlineVariant),
-
-                  const SizedBox(height: AppDimensions.spacingXl),
-
-                  _buildFooter(),
-                ],
+                            _buildFooter(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
   Widget _buildBusinessHeader(BusinessSetting settings) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Column(
-      children: [
-        Container(
-          width: 52,
-          height: 52,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.storefront_rounded,
-            size: 26,
-            color: colorScheme.onPrimaryContainer,
-          ),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFF141033), Color(0xFF2C2266), Color(0xFF14405B)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+      ),
+      child: Column(
+        children: [
+          const BrandMark(size: 46, showShadow: false),
 
-        const SizedBox(height: AppDimensions.spacingMd),
+          const SizedBox(height: AppDimensions.spacingMd),
 
-        Text(
-          settings.businessName,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: theme.textTheme.headlineMedium?.copyWith(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-
-        if (settings.address.trim().isNotEmpty) ...[
-          const SizedBox(height: AppDimensions.spacingSm),
           Text(
-            settings.address.trim(),
+            settings.businessName,
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: AppTextStyles.displayFont,
+              color: Colors.white,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.5,
+              height: 1.2,
+            ),
+          ),
+
+          if (settings.address.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              settings.address.trim(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.68),
+                fontSize: 11.5,
+                height: 1.4,
+              ),
+            ),
+          ],
+
+          if (settings.phone.trim().isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              settings.phone.trim(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 11.5,
+              ),
+            ),
+          ],
+
+          if (settings.email.trim().isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              settings.email.trim(),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 11.5,
+              ),
+            ),
+          ],
+
+          const SizedBox(height: AppDimensions.spacingMd),
+
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            child: const Text(
+              'SALES RECEIPT',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF9FE9DE),
+                fontSize: 9.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
+              ),
             ),
           ),
         ],
-
-        if (settings.phone.trim().isNotEmpty) ...[
-          const SizedBox(height: AppDimensions.spacingXs),
-          Text(
-            settings.phone.trim(),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-
-        if (settings.email.trim().isNotEmpty) ...[
-          const SizedBox(height: AppDimensions.spacingXs),
-          Text(
-            settings.email.trim(),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-
-        const SizedBox(height: AppDimensions.spacingLg),
-
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimensions.spacingMd,
-            vertical: AppDimensions.spacingSm,
-          ),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-          ),
-          child: Text(
-            'SALES RECEIPT',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.4,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
@@ -613,9 +608,6 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
   }
 
   Widget _buildSummary(Sale sale, String currency) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -638,31 +630,33 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         const SizedBox(height: AppDimensions.spacingMd),
 
         Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppDimensions.spacingMd,
-            vertical: AppDimensions.spacingMd,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+            gradient: AppDecor.primaryGradient,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: AppDecor.glow(AppColors.primary, alpha: 0.25),
           ),
           child: Row(
             children: [
               Expanded(
                 child: Text(
                   'TOTAL',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: colorScheme.onPrimaryContainer,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    letterSpacing: 0.4,
+                    letterSpacing: 1.2,
                   ),
                 ),
               ),
               Text(
                 _money(sale.total, currency),
-                style: theme.textTheme.titleLarge?.copyWith(
-                  color: colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w800,
+                style: const TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.6,
                 ),
               ),
             ],
@@ -694,19 +688,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
 
     return Column(
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            Icons.storefront_rounded,
-            size: 20,
-            color: colorScheme.onPrimaryContainer,
-          ),
-        ),
+        const BrandMark(size: 34, showShadow: false),
 
         const SizedBox(height: AppDimensions.spacingMd),
 
@@ -734,19 +716,23 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         Container(
           padding: const EdgeInsets.symmetric(
             horizontal: AppDimensions.spacingMd,
-            vertical: AppDimensions.spacingXs,
+            vertical: 5,
           ),
           decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
+            color: colorScheme.primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: colorScheme.primary.withValues(alpha: 0.18),
+            ),
           ),
           child: Text(
-            'Powered by BizFlow',
+            'POWERED BY BIZFLOW',
             textAlign: TextAlign.center,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.3,
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.2,
+              color: colorScheme.primary,
             ),
           ),
         ),

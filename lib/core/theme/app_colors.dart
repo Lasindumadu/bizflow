@@ -8,21 +8,31 @@ class AppColors {
   // Brand — Modern gradient primary (Indigo/Violet)
   // ─────────────────────────────────────────────
 
-  static const primary = Color(0xFF4F46E5);
-  static const primaryDark = Color(0xFF4338CA);
-  static const primaryLight = Color(0xFF6366F1);
-  static const primarySoft = Color(0xFFEEF2FF);
-  static const primaryContainer = Color(0xFFEEF2FF);
+  static const primary = Color(0xFF5B5BF7);
+  static const primaryDark = Color(0xFF4141D6);
+  static const primaryLight = Color(0xFF7C7CFF);
+  static const primarySoft = Color(0xFFEEF0FF);
+  static const primaryContainer = Color(0xFFEEF0FF);
   static const onPrimary = Color(0xFFFFFFFF);
-  static const onPrimaryContainer = Color(0xFF312E81);
-  static const gradientStart = Color(0xFF6366F1); // Indigo
-  static const gradientEnd = Color(0xFF8B5CF6);   // Violet
-  static const gradientDeep = Color(0xFF4338CA);
-  static const gradientVibrant = Color(0xFF4F46E5);
-  static const gradientAccent = Color(0xFFA855F7);
-  static const gradientCyan = Color(0xFF06B6D4);
-  static const gradientEmerald = Color(0xFF10B981);
-  static const gradientSunset = Color(0xFFF43F5E);
+  static const onPrimaryContainer = Color(0xFF211A78);
+  static const gradientStart = Color(0xFF7C5CFF); // Iris
+  static const gradientEnd = Color(0xFF4F46E5);   // Indigo
+  static const gradientDeep = Color(0xFF2E1C86);
+  static const gradientVibrant = Color(0xFF5B5BF7);
+  static const gradientAccent = Color(0xFFB388FF);
+  static const gradientCyan = Color(0xFF22D3EE);
+  static const gradientEmerald = Color(0xFF2DD4BF);
+  static const gradientSunset = Color(0xFFFF6B8A);
+
+  // ─────────────────────────────────────────────
+  // BizFlow brand signature
+  // ─────────────────────────────────────────────
+  static const brandMint = Color(0xFF2DD4BF);
+  static const brandMintDeep = Color(0xFF0E9F8C);
+  static const brandAmber = Color(0xFFFFB547);
+  static const brandCoral = Color(0xFFFF6B8A);
+  static const brandInk = Color(0xFF070A14);
+  static const brandInkSoft = Color(0xFF0D1222);
 
   // Modern UI Glass & Aura Accents
   static const auraPurple = Color(0x338B5CF6);
@@ -30,9 +40,9 @@ class AppColors {
   static const auraCyan = Color(0x3306B6D4);
   static const auraEmerald = Color(0x3310B981);
 
-  static const accent = Color(0xFF7C3AED);
-  static const accentLight = Color(0xFFA78BFA);
-  static const accentSoft = Color(0xFFF5F3FF);
+  static const accent = Color(0xFF8B5CF6);
+  static const accentLight = Color(0xFFB69CFF);
+  static const accentSoft = Color(0xFFF3F0FF);
 
   // Secondary — Emerald for success/money
   static const secondary = Color(0xFF059669);
@@ -93,43 +103,43 @@ class AppColors {
   // Light theme — Clean, airy, professional
   // ─────────────────────────────────────────────
 
-  static const lightBackground = Color(0xFFF8FAFC);
+  static const lightBackground = Color(0xFFF6F7FC);
   static const lightSurface = Color(0xFFFFFFFF);
-  static const lightSurfaceVariant = Color(0xFFF1F5F9);
-  static const lightSurfaceContainer = Color(0xFFE2E8F0);
-  static const lightSurfaceContainerHigh = Color(0xFFCBD5E1);
-  static const lightSurfaceContainerHighest = Color(0xFF94A3B8);
+  static const lightSurfaceVariant = Color(0xFFF1F3FA);
+  static const lightSurfaceContainer = Color(0xFFE7EAF3);
+  static const lightSurfaceContainerHigh = Color(0xFFD6DBE9);
+  static const lightSurfaceContainerHighest = Color(0xFFA6AFC4);
 
-  static const lightTextPrimary = Color(0xFF0F172A);
-  static const lightTextSecondary = Color(0xFF334155);
-  static const lightTextTertiary = Color(0xFF64748B);
-  static const lightTextDisabled = Color(0xFF94A3B8);
-  static const lightTextOnSurface = Color(0xFF0F172A);
+  static const lightTextPrimary = Color(0xFF0B1020);
+  static const lightTextSecondary = Color(0xFF49536B);
+  static const lightTextTertiary = Color(0xFF6E7891);
+  static const lightTextDisabled = Color(0xFFA2AABD);
+  static const lightTextOnSurface = Color(0xFF0B1020);
 
-  static const lightBorder = Color(0xFFE2E8F0);
-  static const lightBorderStrong = Color(0xFFCBD5E1);
-  static const lightDivider = Color(0xFFF1F5F9);
+  static const lightBorder = Color(0xFFE6E9F2);
+  static const lightBorderStrong = Color(0xFFD2D8E6);
+  static const lightDivider = Color(0xFFEFF1F7);
 
   // ─────────────────────────────────────────────
   // Dark theme — Rich modern dark with depth
   // ─────────────────────────────────────────────
 
-  static const darkBackground = Color(0xFF080C1A);
-  static const darkSurface = Color(0xFF0F172A);
-  static const darkSurfaceVariant = Color(0xFF1E293B);
-  static const darkSurfaceContainer = Color(0xFF334155);
-  static const darkSurfaceContainerHigh = Color(0xFF475569);
-  static const darkSurfaceContainerHighest = Color(0xFF64748B);
+  static const darkBackground = Color(0xFF070A14);
+  static const darkSurface = Color(0xFF0E1322);
+  static const darkSurfaceVariant = Color(0xFF151C30);
+  static const darkSurfaceContainer = Color(0xFF2A3450);
+  static const darkSurfaceContainerHigh = Color(0xFF3B4766);
+  static const darkSurfaceContainerHighest = Color(0xFF56607C);
 
-  static const darkTextPrimary = Color(0xFFF8FAFC);
-  static const darkTextSecondary = Color(0xFFE2E8F0);
-  static const darkTextTertiary = Color(0xFF94A3B8);
-  static const darkTextDisabled = Color(0xFF64748B);
-  static const darkTextOnSurface = Color(0xFFF8FAFC);
+  static const darkTextPrimary = Color(0xFFF4F6FF);
+  static const darkTextSecondary = Color(0xFFCBD2E4);
+  static const darkTextTertiary = Color(0xFF8E99B5);
+  static const darkTextDisabled = Color(0xFF5A6480);
+  static const darkTextOnSurface = Color(0xFFF4F6FF);
 
-  static const darkBorder = Color(0xFF334155);
-  static const darkBorderStrong = Color(0xFF475569);
-  static const darkDivider = Color(0xFF1E2937);
+  static const darkBorder = Color(0xFF232C44);
+  static const darkBorderStrong = Color(0xFF35405C);
+  static const darkDivider = Color(0xFF1A2237);
 
   // ─────────────────────────────────────────────
   // Semantic colors

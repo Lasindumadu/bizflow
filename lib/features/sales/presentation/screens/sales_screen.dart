@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/app_database.dart' hide Sale;
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
@@ -13,7 +14,8 @@ import 'sale_details_screen.dart';
 import '../../../../core/utils/sale_reference.dart';
 
 class SalesScreen extends StatefulWidget {
-  const SalesScreen({super.key});
+  final bool showAppBar;
+  const SalesScreen({super.key, this.showAppBar = true});
 
   @override
   SalesScreenState createState() => SalesScreenState();
@@ -174,67 +176,81 @@ class SalesScreenState extends State<SalesScreen> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextField(
-          controller: _searchController,
-          onChanged: (value) {
-            setState(() {
-              _searchQuery = value;
-            });
-          },
-          decoration: InputDecoration(
-            hintText: 'Search sales, customer, or payment method',
-            prefixIcon: const Icon(Icons.search_rounded),
-            suffixIcon: _searchQuery.isEmpty
-                ? null
-                : IconButton(
-                    onPressed: () {
-                      _searchController.clear();
-
-                      setState(() {
-                        _searchQuery = '';
-                      });
-                    },
-                    tooltip: 'Clear search',
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-            filled: true,
-            fillColor: colorScheme.surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
+    return BrandCard(
+      padding: const EdgeInsets.all(12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 760;
+          final search = TextField(
+            controller: _searchController,
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
+            decoration: InputDecoration(
+              hintText: 'Search reference, customer or payment',
+              prefixIcon: const Icon(Icons.search_rounded, size: 19),
+              suffixIcon: _searchQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                      },
+                      tooltip: 'Clear search',
+                      icon: const Icon(Icons.close_rounded, size: 17),
+                    ),
+              isDense: true,
+              filled: true,
+              fillColor: colorScheme.onSurface.withValues(alpha: 0.025),
             ),
-          ),
-        ),
-        const SizedBox(height: AppDimensions.spacingMd),
-        Wrap(
-          spacing: AppDimensions.spacingSm,
-          runSpacing: AppDimensions.spacingSm,
-          children: [
-            for (final filter in const [
-              'All Sales',
-              'Today',
-              'This Week',
-              'This Month',
-            ])
-              ChoiceChip(
-                label: Text(filter),
-                selected: _selectedDateFilter == filter,
-                showCheckmark: false,
-                onSelected: (selected) {
-                  if (!selected) {
-                    return;
-                  }
-
-                  setState(() {
-                    _selectedDateFilter = filter;
-                  });
-                },
-              ),
-          ],
-        ),
-      ],
+          );
+          final filters = Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final filter in const [
+                'All Sales',
+                'Today',
+                'This Week',
+                'This Month',
+              ])
+                ChoiceChip(
+                  label: Text(filter, style: const TextStyle(fontSize: 11)),
+                  selected: _selectedDateFilter == filter,
+                  showCheckmark: false,
+                  visualDensity: VisualDensity.compact,
+                  onSelected: (selected) {
+                    if (!selected) return;
+                    setState(() {
+                      _selectedDateFilter = filter;
+                    });
+                  },
+                ),
+            ],
+          );
+          if (!wide) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                search,
+                const SizedBox(height: 9),
+                filters,
+              ],
+            );
+          }
+          return Row(
+            children: [
+              Expanded(flex: 5, child: search),
+              const SizedBox(width: 12),
+              Expanded(flex: 6, child: filters),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -253,7 +269,7 @@ class SalesScreenState extends State<SalesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Sales')),
+      appBar: widget.showAppBar ? AppBar(title: const Text('Sales')) : null,
       body: _isLoadingSettings
           ? const Center(child: CircularProgressIndicator())
           : StreamBuilder<List<Sale>>(
@@ -296,12 +312,17 @@ class SalesScreenState extends State<SalesScreen> {
                     return Column(
                       children: [
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppDimensions.screenPadding,
-                            AppDimensions.screenPadding,
-                            AppDimensions.screenPadding,
-                            0,
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                          child: PageHero(
+                            eyebrow: 'Transactions',
+                            title: 'Sales & receipts',
+                            subtitle:
+                                'Every sale, payment and refund in one clear timeline.',
+                            showIllustration: false,
                           ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
                           child: _buildSalesFilters(),
                         ),
                         Padding(
@@ -365,45 +386,80 @@ class SalesScreenState extends State<SalesScreen> {
     );
 
     return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppDimensions.spacingLg,
-        vertical: AppDimensions.spacingMd,
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-         color: AppColors.lightSurfaceVariant,
-        borderRadius: BorderRadius.circular(AppDimensions.cardRadius),
+        gradient: LinearGradient(
+          colors: [
+            AppColors.primary.withValues(alpha: 0.08),
+            AppColors.brandMint.withValues(alpha: 0.06),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withValues(alpha: 0.14),
+        ),
       ),
       child: Row(
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Text('Sales', style: AppTextStyles.caption),
-                const SizedBox(height: 2),
-                Text(
-                  '${filteredSales.length}',
-                  style: AppTextStyles.heading2.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+                const Icon(
+                  Icons.receipt_long_rounded,
+                  size: 17,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${filteredSales.length} transactions',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      'in this view',
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Revenue', style: AppTextStyles.caption),
-                const SizedBox(height: 2),
-                Text(
-                  '$_currency ${total.toStringAsFixed(2)}',
-                  style: AppTextStyles.heading2.copyWith(
-                    color: AppColors.primary,
-                  ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'REVENUE',
+                style: TextStyle(
+                  fontSize: 8.5,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.40),
                 ),
-              ],
-            ),
+              ),
+              Text(
+                '$_currency ${total.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -508,28 +564,23 @@ class _SaleCard extends StatelessWidget {
   });
 
   String _formatDateTime(DateTime dateTime) {
-    final localDateTime = dateTime.toLocal();
-
-    final day = localDateTime.day.toString().padLeft(2, '0');
-    final month = localDateTime.month.toString().padLeft(2, '0');
-    final year = localDateTime.year.toString();
-
-    final hour = localDateTime.hour == 0
+    final local = dateTime.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour == 0
         ? 12
-        : localDateTime.hour > 12
-        ? localDateTime.hour - 12
-        : localDateTime.hour;
-
-    final minute = localDateTime.minute.toString().padLeft(2, '0');
-    final period = localDateTime.hour >= 12 ? 'PM' : 'AM';
-
-    return '$day/$month/$year • $hour:$minute $period';
+        : local.hour > 12
+            ? local.hour - 12
+            : local.hour;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '$day/$month · $hour:$minute $period';
   }
 
-  String _formatPaymentMethod(String method) {
+  String _paymentLabel(String method) {
     switch (method) {
       case 'bank_transfer':
-        return 'BANK TRANSFER';
+        return 'BANK';
       case 'cash':
         return 'CASH';
       case 'card':
@@ -539,175 +590,141 @@ class _SaleCard extends StatelessWidget {
     }
   }
 
-  String _formatStatus(String status) {
+  String _statusLabel(String status) {
     switch (status.toUpperCase()) {
       case 'CANCELLED':
-        return 'Cancelled';
+        return 'CANCELLED';
       case 'REFUNDED':
-        return 'Refunded';
+        return 'REFUNDED';
       case 'COMPLETED':
       default:
-        return 'Completed';
+        return 'PAID';
     }
   }
 
-  Color _getStatusColor(BuildContext context, String status) {
-    final colorScheme = Theme.of(context).colorScheme;
-
+  Color _statusColor(String status) {
     switch (status.toUpperCase()) {
       case 'CANCELLED':
-        return colorScheme.error;
+        return AppColors.error;
       case 'REFUNDED':
-        return colorScheme.tertiary;
-      case 'COMPLETED':
+        return AppColors.brandAmber;
       default:
-        return colorScheme.primary;
+        return AppColors.brandMintDeep;
+    }
+  }
+
+  IconData _paymentIcon(String method) {
+    switch (method) {
+      case 'cash':
+        return Icons.payments_rounded;
+      case 'card':
+        return Icons.credit_card_rounded;
+      case 'bank_transfer':
+        return Icons.account_balance_rounded;
+      default:
+        return Icons.phone_android_rounded;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final customerName = customer == null ? 'Walk-in Customer' : customer!.name;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final customerName = customer?.name ?? 'Walk-in customer';
+    final statusColor = _statusColor(sale.status);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : AppColors.lightBorder,
-          width: 1.1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+    return BrandCard(
+      padding: const EdgeInsets.all(14),
+      radius: 16,
+      onTap: onTap,
+      child: Row(
+        children: [
+          BrandIconBadge(
+            icon: _paymentIcon(sale.paymentMethod),
+            color: sale.status.toUpperCase() == 'COMPLETED'
+                ? AppColors.primary
+                : statusColor,
+            size: 42,
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimensions.spacingLg),
-            child: Row(
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary
-                        .withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                child: Icon(
-                  Icons.receipt_long_outlined,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: AppDimensions.spacingMd),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            SaleReference.format(sale),
-                            style: AppTextStyles.titleMedium.copyWith(fontSize: 14),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                    Expanded(
+                      child: Text(
+                        SaleReference.format(sale),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.1,
+                          color: scheme.onSurface,
                         ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(
-                              context,
-                              sale.status,
-                            ).withValues(alpha: 0.10),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            _formatStatus(sale.status),
-                            style: TextStyle(
-                              color: _getStatusColor(context, sale.status),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: AppDimensions.spacingXs),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person_outline,
-                          size: 15,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: AppDimensions.spacingXs),
-                        Expanded(
-                          child: Text(
-                            customerName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.caption,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppDimensions.spacingXs),
-                    Text(
-                      _formatDateTime(sale.createdAt),
-                      style: AppTextStyles.caption,
-                    ),
-                    const SizedBox(height: AppDimensions.spacingXs),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.payments_outlined,
-                          size: 15,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: AppDimensions.spacingXs),
-                        Text(
-                          _formatPaymentMethod(sale.paymentMethod),
-                          style: AppTextStyles.caption,
-                        ),
-                      ],
+                    BrandPill(
+                      label: _statusLabel(sale.status),
+                      color: statusColor,
                     ),
                   ],
                 ),
+                const SizedBox(height: 3),
+                Text(
+                  '$customerName · ${_formatDateTime(sale.createdAt)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: scheme.onSurface.withValues(alpha: 0.46),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '$currency ${sale.total.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.2,
+                  color: scheme.onSurface,
+                ),
               ),
-              const SizedBox(width: AppDimensions.spacingSm),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+              const SizedBox(height: 3),
+              Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    '$currency ${sale.total.toStringAsFixed(2)}',
-                    style: AppTextStyles.titleMedium.copyWith(fontSize: 16),
+                    _paymentLabel(sale.paymentMethod),
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                      color: scheme.onSurface.withValues(alpha: 0.35),
+                    ),
                   ),
-                  const SizedBox(height: AppDimensions.spacingXs),
-                  const Icon(Icons.chevron_right, size: 20),
+                  const SizedBox(width: 2),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 15,
+                    color: scheme.onSurface.withValues(alpha: 0.28),
+                  ),
                 ],
               ),
             ],
           ),
-        ),
+        ],
       ),
-    ));
+    );
   }
 }

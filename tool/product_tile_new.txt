@@ -1,0 +1,281 @@
+class _ProductTile extends StatefulWidget {
+  final Product product;
+  final String currency;
+  final int quantity;
+
+  final VoidCallback onAdd;
+  final VoidCallback onIncrease;
+  final VoidCallback onDecrease;
+
+  const _ProductTile({
+    required this.product,
+    required this.currency,
+    required this.quantity,
+    required this.onAdd,
+    required this.onIncrease,
+    required this.onDecrease,
+  });
+
+  @override
+  State<_ProductTile> createState() => _ProductTileState();
+}
+
+class _ProductTileState extends State<_ProductTile> {
+  bool _hovered = false;
+
+  List<Color> get _colors {
+    final k = widget.product.category.toLowerCase();
+    if (k.contains('elect')) {
+      return const [Color(0xFF6366F1), Color(0xFF8B5CF6)];
+    }
+    if (k.contains('groc') || k.contains('food')) {
+      return const [Color(0xFF10B981), Color(0xFF2DD4BF)];
+    }
+    if (k.contains('bev')) {
+      return const [Color(0xFF0EA5E9), Color(0xFF22D3EE)];
+    }
+    if (k.contains('house')) {
+      return const [Color(0xFFF59E0B), Color(0xFFFB923C)];
+    }
+    if (k.contains('care') || k.contains('beaut')) {
+      return const [Color(0xFFEC4899), Color(0xFFFB7185)];
+    }
+    if (k.contains('stat')) {
+      return const [Color(0xFF8B5CF6), Color(0xFF6D5DFB)];
+    }
+    return const [Color(0xFF5B5BF7), Color(0xFF8B5CF6)];
+  }
+
+  IconData get _icon {
+    final k = widget.product.category.toLowerCase();
+    if (k.contains('elect')) return Icons.devices_rounded;
+    if (k.contains('groc') || k.contains('food')) {
+      return Icons.shopping_basket_rounded;
+    }
+    if (k.contains('bev')) return Icons.local_cafe_rounded;
+    if (k.contains('house')) return Icons.chair_rounded;
+    if (k.contains('care') || k.contains('beaut')) return Icons.spa_rounded;
+    if (k.contains('stat')) return Icons.note_alt_rounded;
+    return Icons.inventory_2_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final out = widget.product.stockQuantity <= 0;
+    final low = widget.product.isLowStock;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: out ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        transform: Matrix4.translationValues(0, _hovered && !out ? -2 : 0, 0),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: _hovered && !out
+                ? scheme.primary.withValues(alpha: 0.40)
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.07)
+                    : AppColors.lightBorder),
+          ),
+          boxShadow: _hovered && !out
+              ? [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: 0.10),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                    spreadRadius: -6,
+                  ),
+                ]
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: out ? null : widget.onAdd,
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: out
+                            ? [
+                                Colors.grey.withValues(alpha: 0.35),
+                                Colors.grey.withValues(alpha: 0.18),
+                              ]
+                            : _colors,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      _icon,
+                      size: 22,
+                      color: out
+                          ? Colors.white.withValues(alpha: 0.5)
+                          : Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 11),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          widget.product.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.displayFont,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.2,
+                            color: out
+                                ? scheme.onSurface.withValues(alpha: 0.45)
+                                : scheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${widget.product.sku} · ${widget.product.category}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            color: scheme.onSurface.withValues(alpha: 0.42),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Text(
+                              '${widget.currency} '
+                              '${widget.product.sellingPrice.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.bodyFont,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(width: 7),
+                            BrandPill(
+                              label: out
+                                  ? 'OUT'
+                                  : low
+                                      ? 'LOW ${widget.product.stockQuantity}'
+                                      : '${widget.product.stockQuantity}',
+                              color: out
+                                  ? AppColors.error
+                                  : low
+                                      ? AppColors.brandAmber
+                                      : AppColors.brandMintDeep,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (widget.quantity == 0)
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        gradient: out ? null : AppDecor.indigoGradient,
+                        color: out
+                            ? scheme.onSurface.withValues(alpha: 0.06)
+                            : null,
+                        borderRadius: BorderRadius.circular(11),
+                        boxShadow: out
+                            ? null
+                            : AppDecor.glow(AppColors.primary, alpha: 0.24),
+                      ),
+                      child: Icon(
+                        Icons.add_rounded,
+                        size: 19,
+                        color: out
+                            ? scheme.onSurface.withValues(alpha: 0.3)
+                            : Colors.white,
+                      ),
+                    )
+                  else
+                    Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(11),
+                        border: Border.all(
+                          color: scheme.primary.withValues(alpha: 0.24),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _TileStep(
+                            icon: Icons.remove_rounded,
+                            onTap: widget.onDecrease,
+                          ),
+                          SizedBox(
+                            width: 20,
+                            child: Center(
+                              child: Text(
+                                '${widget.quantity}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                  color: scheme.primary,
+                                ),
+                              ),
+                            ),
+                          ),
+                          _TileStep(
+                            icon: Icons.add_rounded,
+                            onTap: widget.onIncrease,
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TileStep extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TileStep({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(9),
+      child: SizedBox(
+        width: 26,
+        height: 34,
+        child: Icon(icon, size: 15, color: scheme.primary),
+      ),
+    );
+  }
+}

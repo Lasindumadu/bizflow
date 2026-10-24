@@ -3,41 +3,49 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
-import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/utils/sale_reference.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../core/widgets/mini_charts.dart';
-import '../../../../core/widgets/premium_ui.dart';
-import '../../../../core/widgets/responsive_grid.dart';
+import '../../../../core/widgets/modern_widgets.dart';
 import '../../../../data/database/app_database.dart' hide Sale;
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../data/repositories/dashboard_repository.dart';
 import '../../../../models/sale.dart';
 import '../../../customers/presentation/screens/customers_screen.dart';
+import '../../../inventory/presentation/screens/inventory_screen.dart';
 import '../../../products/presentation/screens/products_screen.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../sales/presentation/screens/sale_details_screen.dart';
-import '../widgets/dashboard_stat_card.dart';
-import '../widgets/empty_sales_card.dart';
-import '../widgets/quick_action_card.dart';
-import '../../../../core/utils/sale_reference.dart';
+import '../../../sales/presentation/screens/sales_screen.dart';
 
+/// The BizFlow command centre.
+///
+/// The dashboard is intentionally calm: one clear greeting, six honest
+/// numbers, a revenue pulse and the latest transactions. Every block is
+/// tappable so the screen doubles as a launchpad.
 class DashboardScreen extends StatefulWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenPos;
+  final ValueChanged<int>? onNavigate;
+
+  /// Hidden while hosted inside [AppShell], which provides the global chrome.
+  final bool showAppBar;
 
   const DashboardScreen({
     super.key,
     required this.onOpenSettings,
     required this.onOpenPos,
+    this.onNavigate,
+    this.showAppBar = true,
   });
 
   @override
   DashboardScreenState createState() => DashboardScreenState();
 }
 
-class DashboardScreenState extends State<DashboardScreen>
-    with SingleTickerProviderStateMixin {
+class DashboardScreenState extends State<DashboardScreen> {
   final DashboardRepository _dashboardRepository = DashboardRepository(
     appDatabase,
   );
@@ -49,64 +57,24 @@ class DashboardScreenState extends State<DashboardScreen>
   String _businessName = 'My Business';
   bool _isLoadingSettings = true;
 
-  late final AnimationController _pageAnimationController;
-  late final Animation<double> _pageFadeAnimation;
-  late final Animation<Offset> _pageSlideAnimation;
-
   @override
   void initState() {
     super.initState();
-
-    _pageAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 350),
-    );
-
-    _pageFadeAnimation = CurvedAnimation(
-      parent: _pageAnimationController,
-      curve: Curves.easeOut,
-    );
-
-    _pageSlideAnimation =
-        Tween<Offset>(begin: const Offset(0, 0.015), end: Offset.zero).animate(
-          CurvedAnimation(
-            parent: _pageAnimationController,
-            curve: Curves.easeOutCubic,
-          ),
-        );
-
-    _pageAnimationController.forward();
-
     _loadBusinessSettings();
-  }
-
-  @override
-  void dispose() {
-    _pageAnimationController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadBusinessSettings() async {
     try {
       final settings = await _businessSettingsRepository.getSettings();
-
-      if (!mounted) {
-        return;
-      }
-
+      if (!mounted) return;
       setState(() {
         _currency = settings.currency;
         _businessName = settings.businessName;
         _isLoadingSettings = false;
       });
     } catch (_) {
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _isLoadingSettings = false;
-      });
+      if (!mounted) return;
+      setState(() => _isLoadingSettings = false);
     }
   }
 
@@ -123,195 +91,134 @@ class DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('BizFlow').animate().fadeIn(duration: 300.ms).slideX(begin: -0.2, end: 0),
-        actions: [
-          IconButton(
-            onPressed: widget.onOpenSettings,
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: 'Settings',
-          ).animate().fadeIn(duration: 300.ms, delay: 100.ms).slideX(begin: 0.2, end: 0),
-        ],
-      ),
-      body: SafeArea(
-        child: _isLoadingSettings
-            ? const Center(child: CircularProgressIndicator())
-            : StreamBuilder<DashboardStats>(
-                stream: _dashboardRepository.watchStats(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      !snapshot.hasData) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  if (snapshot.hasError) {
-                    return _buildErrorState().animate().fadeIn(duration: 300.ms).shake();
-                  }
-
-                  final stats = snapshot.data;
-
-                  if (stats == null) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  return FadeTransition(
-                    opacity: _pageFadeAnimation,
-                    child: SlideTransition(
-                      position: _pageSlideAnimation,
-                      child: _buildContent(context, stats),
-                    ),
-                  ).animate().fadeIn(duration: 400.ms, curve: Curves.easeOutCubic);
-                },
-              ),
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(
+              title: const Text('BizFlow'),
+              actions: [
+                IconButton(
+                  onPressed: widget.onOpenSettings,
+                  icon: const Icon(Icons.settings_outlined),
+                  tooltip: 'Settings',
+                ),
+              ],
+            )
+          : null,
+      body: _isLoadingSettings
+          ? const _DashboardSkeleton()
+          : StreamBuilder<DashboardStats>(
+              stream: _dashboardRepository.watchStats(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
+                  return const _DashboardSkeleton();
+                }
+                if (snapshot.hasError) {
+                  return _buildErrorState();
+                }
+                final stats = snapshot.data;
+                if (stats == null) return const _DashboardSkeleton();
+                return _buildContent(context, stats);
+              },
+            ),
     );
   }
 
   Widget _buildContent(BuildContext context, DashboardStats stats) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(AppDimensions.screenPadding),
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+    final scheme = Theme.of(context).colorScheme;
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadBusinessSettings();
+        setState(() {});
+      },
+      color: scheme.primary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: PageBody(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildWelcomeHeader(context).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1, end: 0),
-
-              const SizedBox(height: AppDimensions.spacingXl),
-
-              ResponsiveGrid(
-                children: List.generate(6, (index) {
-                  final cards = [
-                    DashboardStatCard(
-                      title: "Today's Sales",
-                      value: '$_currency ${stats.todaySales.toStringAsFixed(2)}',
-                      icon: Icons.payments_rounded,
-                      gradient: AppDecor.indigoGradient.colors,
+              PageHero(
+                eyebrow: 'Live business overview',
+                title: '${_greeting()}, $_businessName',
+                subtitle:
+                    'Here is the pulse of your store today — sales, stock and '
+                    'customers in one glance.',
+                action: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _HeroAction(
+                      label: 'New sale',
+                      icon: Icons.bolt_rounded,
+                      primary: true,
                       onTap: widget.onOpenPos,
                     ),
-                    DashboardStatCard(
-                      title: "Today's Profit",
-                      value: '$_currency ${stats.todayProfit.toStringAsFixed(2)}',
-                      icon: Icons.trending_up_rounded,
-                      gradient: AppDecor.moneyGradient.colors,
-                      trend: stats.todayProfit >= 0 ? 'Profit' : 'Loss',
-                      trendUp: stats.todayProfit >= 0,
+                    const SizedBox(width: 10),
+                    _HeroAction(
+                      label: 'View reports',
+                      icon: Icons.insights_rounded,
+                      primary: false,
+                      onTap: () => _go(7),
                     ),
-                    DashboardStatCard(
-                      title: 'Transactions',
-                      value: stats.todayTransactions.toString(),
-                      icon: Icons.receipt_long_rounded,
-                      gradient: AppDecor.tealGradient.colors,
-                    ),
-                    DashboardStatCard(
-                      title: 'Products',
-                      value: stats.totalProducts.toString(),
-                      icon: Icons.inventory_2_rounded,
-                      gradient: AppDecor.skyGradient.colors,
-                    ),
-                    DashboardStatCard(
-                      title: 'Low Stock',
-                      value: stats.lowStockProducts.toString(),
-                      icon: Icons.warning_amber_rounded,
-                      gradient: AppDecor.amberGradient.colors,
-                    ),
-                    DashboardStatCard(
-                      title: 'Customers',
-                      value: stats.totalCustomers.toString(),
-                      icon: Icons.people_alt_rounded,
-                      gradient: AppDecor.violetGradient.colors,
-                    ),
-                  ];
-                  return cards[index]
-                      .animate(delay: Duration(milliseconds: 100 * (index + 1)))
-                      .fadeIn(duration: 300.ms, curve: Curves.easeOutCubic)
-                      .slideY(begin: 0.2, end: 0);
-                }),
-              ),
-
-              const SizedBox(height: AppDimensions.spacingXl),
-
-              QuickActionCard(
-                title: 'New Sale',
-                subtitle:
-                    '$_currency ${stats.todaySales.toStringAsFixed(2)} today • Tap to open POS',
-                icon: Icons.point_of_sale_rounded,
-                onTap: widget.onOpenPos,
-              ).animate().fadeIn(duration: 400.ms, delay: 500.ms).slideY(begin: 0.1, end: 0),
-
-              const SizedBox(height: AppDimensions.spacingMd),
-
-              _buildQuickActions(context).animate().fadeIn(duration: 400.ms, delay: 600.ms).slideY(begin: 0.1, end: 0),
-
-              const SizedBox(height: AppDimensions.spacingXl),
-
-              _revenueChartCard(context).animate().fadeIn(duration: 400.ms, delay: 700.ms).slideY(begin: 0.1, end: 0),
-
-              const SizedBox(height: AppDimensions.spacingXl),
-
-              _lowStockCard(context).animate().fadeIn(duration: 400.ms, delay: 800.ms).slideY(begin: 0.1, end: 0),
-
-              const SizedBox(height: AppDimensions.spacingXxl),
-
-              _buildSectionHeader(
-                context,
-                title: 'Recent Sales',
-                subtitle: 'Your latest transactions',
-              ).animate().fadeIn(duration: 300.ms, delay: 900.ms).slideX(begin: -0.1, end: 0),
-
-              const SizedBox(height: AppDimensions.spacingMd),
-
-              StreamBuilder<List<Sale>>(
-                stream: _dashboardRepository.watchRecentSales(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      !snapshot.hasData) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(AppDimensions.spacingXl),
-                        child: CircularProgressIndicator(),
+                  ],
+                ),
+              )
+                  .animate()
+                  .fadeIn(duration: 520.ms, curve: Curves.easeOutCubic)
+                  .slideY(begin: 0.04, end: 0, curve: Curves.easeOutCubic),
+              const SizedBox(height: 20),
+              _kpiGrid(stats),
+              const SizedBox(height: 24),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final wide = constraints.maxWidth >= 920;
+                  final main = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _revenueCard(context),
+                      const SizedBox(height: 20),
+                      SectionHeading(
+                        title: 'Recent transactions',
+                        subtitle: 'The latest activity across your till',
+                        icon: Icons.receipt_long_rounded,
+                        trailing: TextButton(
+                          onPressed: () => _go(3),
+                          child: const Text('View all'),
+                        ),
                       ),
+                      const SizedBox(height: 12),
+                      _recentSales(context),
+                    ],
+                  );
+                  final side = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _quickActions(context),
+                      const SizedBox(height: 20),
+                      _lowStockCard(context, stats),
+                    ],
+                  );
+
+                  if (!wide) {
+                    return Column(
+                      children: [
+                        main,
+                        const SizedBox(height: 24),
+                        side,
+                      ],
                     );
                   }
-
-                  if (snapshot.hasError) {
-                    return _buildRecentSalesError();
-                  }
-
-                  final sales = snapshot.data ?? [];
-
-                  if (sales.isEmpty) {
-                    return const EmptySalesCard().animate().fadeIn(duration: 400.ms);
-                  }
-
-                  return Column(
-                    children: sales.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final sale = entry.value;
-                      return Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: AppDimensions.spacingMd,
-                        ),
-                        child: _RecentSaleCard(
-                          sale: sale,
-                          currency: _currency,
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    SaleDetailsScreen(saleId: sale.id),
-                              ),
-                            );
-                          },
-                        ).animate(delay: Duration(milliseconds: 1000 + 80 * index))
-                          .fadeIn(duration: 300.ms, curve: Curves.easeOutCubic)
-                          .slideX(begin: 0.1, end: 0),
-                      );
-                    }).toList(),
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 7, child: main),
+                      const SizedBox(width: 20),
+                      Expanded(flex: 4, child: side),
+                    ],
                   );
                 },
               ),
+              const SizedBox(height: 12),
             ],
           ),
         ),
@@ -319,131 +226,322 @@ class DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  String _getGreeting() {
+  String _greeting() {
     final hour = DateTime.now().hour;
-
     if (hour < 12) return 'Good morning';
     if (hour < 17) return 'Good afternoon';
     return 'Good evening';
   }
 
-Widget _buildWelcomeHeader(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        gradient: AppDecor.heroGradient(isDark),
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(children: [
-            Container(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color:
-                    Colors.white.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.bolt_rounded,
-                      color: AppColors.successLight, size: 14),
-                  const SizedBox(width: 6),
-                  Text('LIVE • OPEN FOR SALE',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1)),
-                ],
-              ),
-            ),
-            const Spacer(),
-            IconButton(
-              onPressed: widget.onOpenSettings,
-              icon: const Icon(Icons.settings_outlined,
-                  color: Colors.white),
-              tooltip: 'Settings',
-            ),
-          ]),
-          const SizedBox(height: 12),
-          Text(_getGreeting(),
-              style: TextStyle(
-                  color:
-                      Colors.white.withValues(alpha: 0.8),
-                  fontSize: 14)),
-          Text(_businessName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text("Here's your business overview",
-              style: TextStyle(
-                  color:
-                      Colors.white.withValues(alpha: 0.75),
-                  fontSize: 13)),
-        ],
-      ),
+  void _go(int index) {
+    if (widget.onNavigate != null) {
+      widget.onNavigate!(index);
+      return;
+    }
+    final Widget? screen = switch (index) {
+      1 => const ProductsScreen(),
+      3 => const SalesScreen(),
+      4 => const CustomersScreen(),
+      5 => const InventoryScreen(),
+      7 => const ReportsScreen(),
+      _ => null,
+    };
+    if (screen == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => screen),
     );
   }
 
-  Widget _buildSectionHeader(
-    BuildContext context, {
-    required String title,
-    required String subtitle,
-  }) {
-    return SectionHeader(title: title, subtitle: subtitle);
-  }
+  Widget _kpiGrid(DashboardStats stats) {
+    final avgSale = stats.todayTransactions == 0
+        ? 0.0
+        : stats.todaySales / stats.todayTransactions;
+    final profitUp = stats.todayProfit >= 0;
 
-  /// A compact grid of quick navigation actions for common tasks.
-  Widget _buildQuickActions(BuildContext context) {
-    final actions = <_QuickAction>[
-      _QuickAction(
-        label: 'POS',
-        icon: Icons.point_of_sale_rounded,
+    final cards = [
+      MetricCard(
+        label: "Today's sales",
+        value: '$_currency ${_compact(stats.todaySales)}',
+        icon: Icons.payments_rounded,
         gradient: AppDecor.indigoGradient.colors,
+        helper: '${stats.todayTransactions} transactions',
+        badge: 'LIVE',
         onTap: widget.onOpenPos,
       ),
-      _QuickAction(
-        label: 'Products',
-        icon: Icons.inventory_2_rounded,
-        gradient: AppDecor.skyGradient.colors,
-        onTap: () => _push(const ProductsScreen()),
+      MetricCard(
+        label: "Today's profit",
+        value: '$_currency ${_compact(stats.todayProfit)}',
+        icon: Icons.trending_up_rounded,
+        gradient: AppDecor.moneyGradient.colors,
+        badge: profitUp ? 'UP' : 'DOWN',
+        badgeUp: profitUp,
+        helper: profitUp ? 'Healthy margin today' : 'Review your costs',
+        onTap: () => _go(7),
       ),
-      _QuickAction(
+      MetricCard(
+        label: 'Avg. basket',
+        value: '$_currency ${_compact(avgSale)}',
+        icon: Icons.shopping_bag_rounded,
+        gradient: AppDecor.tealGradient.colors,
+        helper: 'Per completed sale',
+        onTap: () => _go(3),
+      ),
+      MetricCard(
         label: 'Customers',
+        value: '${stats.totalCustomers}',
         icon: Icons.people_alt_rounded,
         gradient: AppDecor.violetGradient.colors,
-        onTap: () => _push(const CustomersScreen()),
+        helper: 'In your directory',
+        onTap: () => _go(4),
       ),
-      _QuickAction(
-        label: 'Reports',
-        icon: Icons.insights_rounded,
-        gradient: AppDecor.moneyGradient.colors,
-        onTap: () => _push(const ReportsScreen()),
+      MetricCard(
+        label: 'Products',
+        value: '${stats.totalProducts}',
+        icon: Icons.inventory_2_rounded,
+        gradient: AppDecor.skyGradient.colors,
+        helper: '${stats.lowStockProducts} need attention',
+        onTap: () => _go(1),
+      ),
+      MetricCard(
+        label: 'Low stock',
+        value: '${stats.lowStockProducts}',
+        icon: Icons.warning_amber_rounded,
+        gradient: AppDecor.amberGradient.colors,
+        helper: stats.lowStockProducts == 0
+            ? 'Everything is stocked'
+            : 'Reorder soon',
+        onTap: () => _go(5),
       ),
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth >= 560 ? 4 : 2;
-        final spacing = AppDimensions.spacingMd;
-        final width =
-            (constraints.maxWidth - spacing * (columns - 1)) / columns;
+        final width = constraints.maxWidth;
+        final columns = width >= 1080
+            ? 3
+            : width >= 680
+                ? 3
+                : width >= 430
+                    ? 2
+                    : 1;
+        const gap = 12.0;
+        final cardWidth = (width - gap * (columns - 1)) / columns;
         return Wrap(
-          spacing: spacing,
-          runSpacing: spacing,
-          children: actions.map((a) {
-            return SizedBox(
-              width: width,
-              child: _QuickActionTile(action: a),
+          spacing: gap,
+          runSpacing: gap,
+          children: cards
+              .asMap()
+              .entries
+              .map(
+                (entry) => SizedBox(
+                  width: cardWidth,
+                  child: entry.value
+                      .animate(
+                        delay: Duration(milliseconds: 70 * entry.key),
+                      )
+                      .fadeIn(duration: 420.ms, curve: Curves.easeOutCubic)
+                      .slideY(begin: 0.10, end: 0, curve: Curves.easeOutCubic)
+                      .scale(
+                        begin: const Offset(0.94, 0.94),
+                        end: const Offset(1, 1),
+                        duration: 420.ms,
+                        curve: Curves.easeOutBack,
+                      ),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+
+  Widget _revenueCard(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return FutureBuilder<List<double>>(
+      future: _dashboardRepository.getLast7DaysRevenue(),
+      builder: (context, snap) {
+        final values = snap.data ?? List<double>.filled(7, 0);
+        const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+        final total = values.fold<double>(0, (a, b) => a + b);
+        final peak = values.isEmpty ? 0.0 : values.reduce((a, b) => a > b ? a : b);
+
+        return BrandCard(
+          padding: const EdgeInsets.all(22),
+          gradientBorder: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Revenue pulse',
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.displayFont,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.3,
+                                color: scheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.brandMint
+                                    .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const Text(
+                                '7 DAYS',
+                                style: TextStyle(
+                                  fontSize: 8.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 0.5,
+                                  color: AppColors.brandMintDeep,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Total $_currency ${_compact(total)}',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                            color: scheme.onSurface.withValues(alpha: 0.52),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: scheme.primary.withValues(alpha: 0.09),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.show_chart_rounded,
+                      size: 20,
+                      color: scheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              MiniBarChart(
+                values: values,
+                labels: labels,
+                barColor: AppColors.primary,
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: scheme.onSurface.withValues(alpha: 0.035),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 15,
+                      color: AppColors.brandAmber,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        peak > 0
+                            ? 'Your best day this week brought in '
+                                '$_currency ${_compact(peak)}.'
+                            : 'Sales will appear here as soon as your first '
+                                'sale is completed.',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          height: 1.4,
+                          color: scheme.onSurface.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _recentSales(BuildContext context) {
+    return StreamBuilder<List<Sale>>(
+      stream: _dashboardRepository.watchRecentSales(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const SkeletonList(count: 3, itemHeight: 76);
+        }
+        if (snapshot.hasError) {
+          return BrandCard(
+            child: Text(
+              'Unable to load recent sales.',
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.error,
+                fontSize: 12.5,
+              ),
+            ),
+          );
+        }
+        final sales = snapshot.data ?? const <Sale>[];
+        if (sales.isEmpty) {
+          return BrandCard(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: BrandEmptyState(
+              compact: true,
+              icon: Icons.receipt_long_rounded,
+              title: 'No sales yet',
+              message:
+                  'Your first completed sale will appear here with its receipt.',
+              actionLabel: 'Open the till',
+              onAction: widget.onOpenPos,
+            ),
+          );
+        }
+
+        return Column(
+          children: sales.asMap().entries.map((entry) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 9),
+              child: _RecentSaleCard(
+                sale: entry.value,
+                currency: _currency,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          SaleDetailsScreen(saleId: entry.value.id),
+                    ),
+                  );
+                },
+              )
+                  .animate(delay: Duration(milliseconds: 60 * entry.key))
+                  .fadeIn(duration: 300.ms)
+                  .slideX(begin: 0.03, end: 0),
             );
           }).toList(),
         );
@@ -451,272 +549,348 @@ Widget _buildWelcomeHeader(BuildContext context) {
     );
   }
 
-  void _push(Widget screen) {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => screen));
-  }
+  Widget _quickActions(BuildContext context) {
+    final actions = <_QuickAction>[
+      _QuickAction(
+        label: 'New sale',
+        hint: 'Open the till',
+        icon: Icons.bolt_rounded,
+        gradient: AppDecor.indigoGradient.colors,
+        onTap: widget.onOpenPos,
+      ),
+      _QuickAction(
+        label: 'Products',
+        hint: 'Catalog & prices',
+        icon: Icons.inventory_2_rounded,
+        gradient: AppDecor.skyGradient.colors,
+        onTap: () => _go(1),
+      ),
+      _QuickAction(
+        label: 'Customers',
+        hint: 'Loyalty & credit',
+        icon: Icons.people_alt_rounded,
+        gradient: AppDecor.violetGradient.colors,
+        onTap: () => _go(4),
+      ),
+      _QuickAction(
+        label: 'Reports',
+        hint: 'Know your numbers',
+        icon: Icons.insights_rounded,
+        gradient: AppDecor.moneyGradient.colors,
+        onTap: () => _go(7),
+      ),
+    ];
 
-  Widget _revenueChartCard(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return FutureBuilder<List<double>>(
-      future: _dashboardRepository.getLast7DaysRevenue(),
-      builder: (context, snap) {
-        final vals = snap.data ?? List<double>.filled(7, 0);
-        const labels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-        final total = vals.fold<double>(0, (a, b) => a + b);
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-                color: scheme.outline.withValues(alpha: 0.7)),
+    return BrandCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SectionHeading(
+            title: 'Quick actions',
+            subtitle: 'Jump straight into the work',
+            icon: Icons.flash_on_rounded,
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
-                    children: [
-                      Text('Revenue - last 7 days',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: scheme.onSurface)),
-                      Text(
-                          'Total $_currency ${total.toStringAsFixed(2)}',
-                          style: TextStyle(
-                              fontSize: 13,
-                              color: scheme.onSurface
-                                  .withValues(alpha: 0.6))),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius:
-                        BorderRadius.circular(999),
-                  ),
-                  child: Text('LIVE',
-                      style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary)),
-                ),
-              ]),
-              const SizedBox(height: 16),
-              MiniBarChart(
-                values: vals,
-                labels: labels,
-                barColor: AppColors.primary,
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-
-
-  Widget _lowStockCard(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return FutureBuilder<List<ProductRow>>(
-      future: _dashboardRepository.getLowStockProducts(),
-      builder: (context, snap) {
-        final rows = snap.data ?? const <ProductRow>[];
-
-        if (rows.isEmpty && snap.connectionState != ConnectionState.done) {
-          return const SizedBox.shrink();
-        }
-
-        if (rows.isEmpty) {
-          return Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: const Color(0xFF059669).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: const Color(0xFF059669).withValues(alpha: 0.25),
-              ),
-            ),
-            child: const Row(children: [
-              Icon(Icons.check_circle_rounded, color: Color(0xFF059669)),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text('All products are well stocked',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF059669))),
-              ),
-            ]),
-          );
-        }
-
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(Icons.warning_amber_rounded,
-                      color: Color(0xFFF59E0B), size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text('Low stock alerts',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: scheme.onSurface)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text('${rows.length} items',
-                      style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFFF59E0B))),
-                ),
-              ]),
-              const SizedBox(height: 14),
-              for (final p in rows)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Row(children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(p.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 13.5,
-                                  color: scheme.onSurface)),
-                          Text('SKU ${p.sku}',
-                              style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: scheme.onSurface
-                                      .withValues(alpha: 0.55))),
-                        ],
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const gap = 9.0;
+              final width = (constraints.maxWidth - gap) / 2;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: actions
+                    .map(
+                      (action) => SizedBox(
+                        width: width,
+                        child: _QuickActionTile(action: action),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: (p.stockQuantity == 0
-                                ? const Color(0xFFDC2626)
-                                : const Color(0xFFF59E0B))
-                            .withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Text(
-                        p.stockQuantity == 0
-                            ? 'OUT'
-                            : '${p.stockQuantity} left',
-                        style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w800,
-                            color: p.stockQuantity == 0
-                                ? const Color(0xFFDC2626)
-                                : const Color(0xFFF59E0B)),
-                      ),
-                    ),
-                  ]),
-                ),
-            ],
+                    )
+                    .toList(),
+              );
+            },
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildRecentSalesError() {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Text(
-          'Unable to load recent sales.',
-          style: AppTextStyles.bodySecondary.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildErrorState() {
-    final colorScheme = Theme.of(context).colorScheme;
+  Widget _lowStockCard(BuildContext context, DashboardStats stats) {
+    final scheme = Theme.of(context).colorScheme;
 
+    return FutureBuilder<List<ProductRow>>(
+      future: _dashboardRepository.getLowStockProducts(),
+      builder: (context, snap) {
+        final rows = snap.data ?? const <ProductRow>[];
+        final isLoading =
+            snap.connectionState != ConnectionState.done && rows.isEmpty;
+
+        return BrandCard(
+          padding: const EdgeInsets.all(18),
+          accent: AppColors.brandAmber,
+          gradientBorder: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeading(
+                title: 'Stock watch',
+                subtitle: isLoading
+                    ? 'Checking your shelves…'
+                    : rows.isEmpty
+                        ? 'All shelves are healthy'
+                        : '${rows.length} item${rows.length == 1 ? '' : 's'} '
+                            'need attention',
+                icon: Icons.inventory_rounded,
+                trailing: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppColors.brandAmber,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (isLoading)
+                const SkeletonList(count: 2, itemHeight: 54)
+              else if (rows.isEmpty)
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.brandMint.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check_rounded,
+                        color: AppColors.brandMintDeep,
+                        size: 19,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Nothing is running low. Nice work.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.onSurface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              else ...[
+                ...rows.take(4).map(
+                      (p) => Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
+                                color: (p.stockQuantity == 0
+                                        ? AppColors.error
+                                        : AppColors.brandAmber)
+                                    .withValues(alpha: 0.11),
+                                borderRadius: BorderRadius.circular(9),
+                              ),
+                              child: Icon(
+                                p.stockQuantity == 0
+                                    ? Icons.remove_shopping_cart_rounded
+                                    : Icons.inventory_2_outlined,
+                                size: 15,
+                                color: p.stockQuantity == 0
+                                    ? AppColors.error
+                                    : const Color(0xFF9A6400),
+                              ),
+                            ),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                p.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: scheme.onSurface,
+                                ),
+                              ),
+                            ),
+                            BrandPill(
+                              label: p.stockQuantity == 0
+                                  ? 'OUT'
+                                  : '${p.stockQuantity}',
+                              color: p.stockQuantity == 0
+                                  ? AppColors.error
+                                  : AppColors.brandAmber,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () => _go(5),
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 15),
+                    label: const Text('Open inventory'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  String _compact(double value) {
+    if (value.abs() >= 1000000) {
+      return '${(value / 1000000).toStringAsFixed(1)}M';
+    }
+    if (value.abs() >= 10000) {
+      return '${(value / 1000).toStringAsFixed(1)}k';
+    }
+    return value.toStringAsFixed(2);
+  }
+
+  Widget _buildErrorState() {
+    final scheme = Theme.of(context).colorScheme;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: colorScheme.error),
-
-            const SizedBox(height: AppDimensions.spacingMd),
-
-            Text(
-              'Unable to load dashboard data.',
-              style: AppTextStyles.heading2.copyWith(
-                color: colorScheme.onSurface,
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: scheme.error.withValues(alpha: 0.10),
+                shape: BoxShape.circle,
               ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: AppDimensions.spacingSm),
-
-            Text(
-              'Something went wrong while loading your dashboard. '
-              'Please try again.',
-              style: AppTextStyles.bodySecondary.copyWith(
-                color: colorScheme.onSurfaceVariant,
+              child: Icon(
+                Icons.cloud_off_rounded,
+                color: scheme.error,
+                size: 28,
               ),
-              textAlign: TextAlign.center,
             ),
-
-            const SizedBox(height: AppDimensions.spacingLg),
-
+            const SizedBox(height: 14),
+            Text(
+              'Unable to load your dashboard',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: AppTextStyles.displayFont,
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: scheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Your data is safe. Try refreshing the view.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12.5,
+                color: scheme.onSurface.withValues(alpha: 0.55),
+              ),
+            ),
+            const SizedBox(height: 16),
             FilledButton.icon(
-              onPressed: () {
-                setState(() {});
-              },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Try Again'),
+              onPressed: () => setState(() {}),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try again'),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// Dashboard building blocks
+// ─────────────────────────────────────────────
+
+class _HeroAction extends StatefulWidget {
+  final String label;
+  final IconData icon;
+  final bool primary;
+  final VoidCallback onTap;
+
+  const _HeroAction({
+    required this.label,
+    required this.icon,
+    required this.primary,
+    required this.onTap,
+  });
+
+  @override
+  State<_HeroAction> createState() => _HeroActionState();
+}
+
+class _HeroActionState extends State<_HeroAction> {
+  bool _hovered = false;
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) {
+          setState(() => _pressed = false);
+          widget.onTap();
+        },
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.94 : 1,
+          duration: const Duration(milliseconds: 120),
+          curve: Curves.easeOut,
+          child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            gradient: widget.primary ? AppDecor.indigoGradient : null,
+            color: widget.primary
+                ? null
+                : Colors.white.withValues(alpha: _hovered ? 0.16 : 0.10),
+            borderRadius: BorderRadius.circular(11),
+            border: Border.all(
+              color: Colors.white.withValues(
+                alpha: widget.primary ? 0.18 : 0.22,
+              ),
+            ),
+            boxShadow: widget.primary
+                ? AppDecor.glow(AppColors.primary, alpha: 0.30)
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(widget.icon, size: 16, color: Colors.white),
+              const SizedBox(width: 7),
+              Text(
+                widget.label,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
         ),
       ),
     );
@@ -735,73 +909,62 @@ class _RecentSaleCard extends StatelessWidget {
   });
 
   String _formatDateTime(DateTime dateTime) {
-    final localDateTime = dateTime.toLocal();
-
-    final day = localDateTime.day.toString().padLeft(2, '0');
-    final month = localDateTime.month.toString().padLeft(2, '0');
-    final year = localDateTime.year.toString();
-
-    final hour = localDateTime.hour == 0
+    final local = dateTime.toLocal();
+    final day = local.day.toString().padLeft(2, '0');
+    final month = local.month.toString().padLeft(2, '0');
+    final hour = local.hour == 0
         ? 12
-        : localDateTime.hour > 12
-        ? localDateTime.hour - 12
-        : localDateTime.hour;
+        : local.hour > 12
+            ? local.hour - 12
+            : local.hour;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    return '$day/$month · $hour:$minute $period';
+  }
 
-    final minute = localDateTime.minute.toString().padLeft(2, '0');
-    final period = localDateTime.hour >= 12 ? 'PM' : 'AM';
+  IconData get _paymentIcon {
+    final method = sale.paymentMethod.toLowerCase();
+    if (method.contains('cash')) return Icons.payments_rounded;
+    if (method.contains('card')) return Icons.credit_card_rounded;
+    return Icons.phone_android_rounded;
+  }
 
-    return '$day/$month/$year • $hour:$minute $period';
+  Color get _paymentColor {
+    final method = sale.paymentMethod.toLowerCase();
+    if (method.contains('cash')) return AppColors.brandMintDeep;
+    if (method.contains('card')) return AppColors.primary;
+    return AppColors.brandAmber;
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.07)
-              : AppColors.lightBorder,
-          width: 1.1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: scheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: scheme.brightness == Brightness.dark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : AppColors.lightBorder,
+            ),
           ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: const Icon(
-                    Icons.receipt_long_rounded,
-                    color: AppColors.primaryLight,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
+          child: Row(
+            children: [
+              BrandIconBadge(
+                icon: _paymentIcon,
+                color: _paymentColor,
+                size: 38,
+              ),
+              const SizedBox(width: 11),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -810,64 +973,55 @@ class _RecentSaleCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
                         color: scheme.onSurface,
-                        fontWeight: FontWeight.w600,
                       ),
                     ),
-
-                    const SizedBox(height: AppDimensions.spacingXs),
-
+                    const SizedBox(height: 2),
                     Text(
-                      _formatDateTime(sale.createdAt),
-                      style: AppTextStyles.caption.copyWith(
-                        color: scheme.onSurfaceVariant,
+                      '${_formatDateTime(sale.createdAt)} · '
+                      '${sale.paymentMethod.toUpperCase()}',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w500,
+                        color: scheme.onSurface.withValues(alpha: 0.48),
                       ),
-                    ),
-
-                    const SizedBox(height: AppDimensions.spacingXs),
-
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.payments_outlined,
-                          size: 15,
-                          color: scheme.onSurfaceVariant,
-                        ),
-
-                        const SizedBox(width: AppDimensions.spacingXs),
-
-                        Text(
-                          sale.paymentMethod.toUpperCase(),
-                          style: AppTextStyles.caption.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(width: AppDimensions.spacingSm),
-
+              const SizedBox(width: 10),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
                     '$currency ${sale.total.toStringAsFixed(2)}',
                     style: TextStyle(
+                      fontFamily: AppTextStyles.displayFont,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
                       color: scheme.onSurface,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
                     ),
                   ),
-
-                  const SizedBox(height: AppDimensions.spacingXs),
-
-                  Icon(
-                    Icons.chevron_right,
-                    size: 20,
-                    color: scheme.onSurfaceVariant,
+                  const SizedBox(height: 3),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      BrandPill(
+                        label: sale.status.toUpperCase(),
+                        color: sale.status == 'completed'
+                            ? AppColors.brandMintDeep
+                            : AppColors.brandAmber,
+                      ),
+                      const SizedBox(width: 4),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 15,
+                        color: scheme.onSurface.withValues(alpha: 0.32),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -875,26 +1029,26 @@ class _RecentSaleCard extends StatelessWidget {
           ),
         ),
       ),
-    ));
+    );
   }
 }
 
-/// Data for a single quick-action tile on the dashboard.
 class _QuickAction {
   final String label;
+  final String hint;
   final IconData icon;
   final List<Color> gradient;
   final VoidCallback onTap;
 
   const _QuickAction({
     required this.label,
+    required this.hint,
     required this.icon,
     required this.gradient,
     required this.onTap,
   });
 }
 
-/// A compact gradient action tile used in the dashboard quick-actions grid.
 class _QuickActionTile extends StatefulWidget {
   final _QuickAction action;
 
@@ -910,61 +1064,99 @@ class _QuickActionTileState extends State<_QuickActionTile> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.action.onTap();
+      },
       onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.action.onTap,
       child: AnimatedScale(
         scale: _pressed ? 0.96 : 1,
         duration: const Duration(milliseconds: 110),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: BorderRadius.circular(20),
+            color: scheme.onSurface.withValues(alpha: 0.028),
+            borderRadius: BorderRadius.circular(15),
             border: Border.all(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : scheme.outline.withValues(alpha: 0.7),
+              color: scheme.onSurface.withValues(alpha: 0.055),
             ),
-            boxShadow: AppDecor.subtleShadow(context),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: 32,
+                height: 32,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: widget.action.gradient,
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: AppDecor.glow(
-                    widget.action.gradient.first,
-                    alpha: 0.24,
-                  ),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(
                   widget.action.icon,
                   color: Colors.white,
-                  size: 22,
+                  size: 17,
                 ),
               ),
               const SizedBox(height: 10),
               Text(
                 widget.action.label,
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: scheme.onSurface,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11.5,
                   fontWeight: FontWeight.w700,
+                  color: scheme.onSurface,
+                ),
+              ),
+              Text(
+                widget.action.hint,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 9.5,
+                  fontWeight: FontWeight.w500,
+                  color: scheme.onSurface.withValues(alpha: 0.42),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashboardSkeleton extends StatelessWidget {
+  const _DashboardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: PageBody(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            ShimmerBox(height: 190, radius: 28),
+            SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(child: ShimmerBox(height: 116, radius: 22)),
+                SizedBox(width: 12),
+                Expanded(child: ShimmerBox(height: 116, radius: 22)),
+                SizedBox(width: 12),
+                Expanded(child: ShimmerBox(height: 116, radius: 22)),
+              ],
+            ),
+            SizedBox(height: 20),
+            ShimmerBox(height: 260, radius: 22),
+          ],
         ),
       ),
     );

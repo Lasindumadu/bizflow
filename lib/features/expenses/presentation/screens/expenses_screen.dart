@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/app_database.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
@@ -11,7 +12,8 @@ import '../../../../data/repositories/expense_repository.dart';
 import 'add_expense_screen.dart';
 
 class ExpensesScreen extends StatefulWidget {
-  const ExpensesScreen({super.key});
+  final bool showAppBar;
+  const ExpensesScreen({super.key, this.showAppBar = true});
 
   @override
   State<ExpensesScreen> createState() => ExpensesScreenState();
@@ -183,7 +185,8 @@ class ExpensesScreenState extends State<ExpensesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Expenses')),
+      appBar:
+          widget.showAppBar ? AppBar(title: const Text('Expenses')) : null,
       body: _isLoadingSettings
           ? const Center(child: CircularProgressIndicator())
           : StreamBuilder<List<Expense>>(
@@ -216,16 +219,27 @@ class ExpensesScreenState extends State<ExpensesScreen> {
                 }
 
                 return ListView(
-                  padding: const EdgeInsets.all(AppDimensions.screenPadding),
+                  padding: const EdgeInsets.all(16),
                   children: [
-                    _buildSummaryCard(expenses),
-                    const SizedBox(height: AppDimensions.spacingXl),
-                    const Text(
-                      'Expense History',
-                      style: AppTextStyles.heading2,
+                    PageHero(
+                      eyebrow: 'Costs',
+                      title: 'Expenses',
+                      subtitle:
+                          'Know where the money goes, keep margins healthy and '
+                          'stay on top of every cost.',
+                      showIllustration: false,
                     ),
-                    const SizedBox(height: AppDimensions.spacingMd),
+                    const SizedBox(height: 18),
+                    _buildSummaryCard(expenses),
+                    const SizedBox(height: 22),
+                    SectionHeading(
+                      title: 'Expense history',
+                      subtitle: '${expenses.length} recorded entries',
+                      icon: Icons.receipt_long_rounded,
+                    ),
+                    const SizedBox(height: 12),
                     ...expenses.map((expense) => _buildExpenseCard(expense)),
+                    const SizedBox(height: 70),
                   ],
                 );
               },
@@ -363,155 +377,107 @@ class ExpensesScreenState extends State<ExpensesScreen> {
 
   Widget _buildExpenseCard(Expense expense) {
     final (icon, color) = _expenseStyle(expense.category);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: AppDimensions.spacingMd),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : AppColors.lightBorder,
-          width: 1.1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppDimensions.spacingLg,
-          vertical: AppDimensions.spacingSm,
-        ),
-        leading: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        title: Text(
-          expense.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: AppTextStyles.titleMedium,
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: AppDimensions.spacingXs),
-          child: Text(
-            '${expense.category} • ${_formatDate(expense.date)}',
-            style: AppTextStyles.caption,
-          ),
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                '-$_currency ${expense.amount.toStringAsFixed(2)}',
-                style: AppTextStyles.labelMedium.copyWith(
-                  color: AppColors.error,
-                ),
-              ),
-            ),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _openEditExpense(expense);
-                } else if (value == 'delete') {
-                  _confirmDeleteExpense(expense);
-                }
-              },
-              itemBuilder: (context) => const [
-                PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit_outlined),
-                    title: Text('Edit'),
-                    contentPadding: EdgeInsets.zero,
+    return BrandCard(
+      padding: const EdgeInsets.all(13),
+      radius: 16,
+      onTap: () => _openEditExpense(expense),
+      child: Row(
+        children: [
+          BrandIconBadge(icon: icon, color: color, size: 42),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  expense.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.displayFont,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(Icons.delete_outline),
-                    title: Text('Delete'),
-                    contentPadding: EdgeInsets.zero,
+                const SizedBox(height: 2),
+                Text(
+                  '${expense.category} · ${_formatDate(expense.date)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: scheme.onSurface.withValues(alpha: 0.45),
                   ),
                 ),
               ],
             ),
-          ],
-        ),
-        onTap: () {
-          _openEditExpense(expense);
-        },
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '-$_currency ${expense.amount.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontFamily: AppTextStyles.displayFont,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: AppColors.error,
+            ),
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Expense actions',
+            offset: const Offset(0, 34),
+            icon: Icon(
+              Icons.more_horiz_rounded,
+              size: 18,
+              color: scheme.onSurface.withValues(alpha: 0.38),
+            ),
+            onSelected: (value) {
+              if (value == 'edit') _openEditExpense(expense);
+              if (value == 'delete') _confirmDeleteExpense(expense);
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'edit',
+                child: ListTile(
+                  leading: Icon(Icons.edit_outlined, size: 18),
+                  title: Text('Edit'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline_rounded, size: 18),
+                  title: Text('Delete'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildEmptyState(BuildContext context) {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary
-                    .withValues(alpha: 0.10),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.receipt_long_outlined,
-                size: 36,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+      child: BrandEmptyState(
+        title: 'No expenses yet',
+        message:
+            'Record your first expense to start tracking business costs and '
+            'protecting your margins.',
+        actionLabel: 'Add expense',
+        onAction: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => const AddExpenseScreen(),
             ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            const Text(
-              'No expenses yet',
-              style: AppTextStyles.heading2,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppDimensions.spacingXs),
-            const Text(
-              'Record your first expense to start tracking business costs.',
-              textAlign: TextAlign.center,
-              style: AppTextStyles.bodySecondary,
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            FilledButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const AddExpenseScreen(),
-                  ),
-                );
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add Expense'),
-            ),
-          ],
-        ),
+          );
+        },
+        icon: Icons.receipt_long_outlined,
       ),
     );
   }

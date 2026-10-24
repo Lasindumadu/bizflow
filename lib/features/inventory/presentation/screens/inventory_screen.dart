@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/product_repository.dart';
 import '../../../../data/repositories/stock_movement_repository.dart';
@@ -14,7 +15,8 @@ import '../widgets/inventory_product_card.dart';
 import '../widgets/stock_action_dialog.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+  final bool showAppBar;
+  const InventoryScreen({super.key, this.showAppBar = true});
 
   @override
   State<InventoryScreen> createState() => InventoryScreenState();
@@ -277,9 +279,9 @@ class InventoryScreenState extends State<InventoryScreen> {
     final products = _filteredProducts;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inventory').animate().fadeIn(duration: 300.ms).slideX(begin: -0.2, end: 0),
-      ),
+      appBar: widget.showAppBar
+          ? AppBar(title: const Text('Inventory'))
+          : null,
       body: _hasError
           ? _buildErrorState().animate().fadeIn(duration: 300.ms).shake()
           : SingleChildScrollView(
@@ -287,10 +289,14 @@ class InventoryScreenState extends State<InventoryScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Manage stock levels and inventory movements.',
-                    style: AppTextStyles.bodySecondary,
-                  ).animate().fadeIn(duration: 300.ms).slideY(begin: -0.1, end: 0),
+                  PageHero(
+                    eyebrow: 'Stock control',
+                    title: 'Inventory',
+                    subtitle:
+                        '${_products.length} products · $_totalUnits units on hand · '
+                        '$_lowStockCount low on stock.',
+                    showIllustration: false,
+                  ).animate().fadeIn(duration: 350.ms).slideY(begin: -0.05, end: 0),
                   const SizedBox(height: AppDimensions.spacingLg),
                   Wrap(
                     spacing: AppDimensions.spacingMd,
@@ -323,48 +329,34 @@ class InventoryScreenState extends State<InventoryScreen> {
                     ],
                   ),
                   const SizedBox(height: AppDimensions.spacingXl),
-                  TextField(
-                    onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search by name, SKU, category...',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      filled: true,
-                      fillColor: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest
-                          .withValues(alpha: 0.5),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppDimensions.buttonRadius,
-                        ),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(
-                          AppDimensions.buttonRadius,
-                        ),
-                        borderSide: BorderSide(
-                          color: Theme.of(context).colorScheme.outlineVariant,
-                        ),
+                  BrandCard(
+                    padding: const EdgeInsets.all(10),
+                    child: TextField(
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                      decoration: const InputDecoration(
+                        hintText: 'Search by name, SKU, category or barcode…',
+                        prefixIcon: Icon(Icons.search_rounded, size: 19),
+                        isDense: true,
+                        filled: false,
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
                       ),
                     ),
                   ).animate().fadeIn(duration: 300.ms, delay: 500.ms).slideY(begin: 0.1, end: 0),
                   const SizedBox(height: AppDimensions.spacingXl),
-                  Row(
-                    children: [
-                      const Text('Inventory', style: AppTextStyles.heading2),
-                      const Spacer(),
-                      Text(
-                        '${products.length} items',
-                        style: AppTextStyles.caption,
-                      ),
-                    ],
+                  SectionHeading(
+                    title: 'Stock on hand',
+                    subtitle: '${products.length} items in this view',
+                    icon: Icons.warehouse_rounded,
+                    trailing: BrandPill(
+                      label: '$_totalUnits UNITS',
+                      color: AppColors.primary,
+                    ),
                   ).animate().fadeIn(duration: 300.ms, delay: 600.ms).slideX(begin: -0.1, end: 0),
                   const SizedBox(height: AppDimensions.spacingMd),
                   if (_isLoading)
@@ -385,11 +377,11 @@ class InventoryScreenState extends State<InventoryScreen> {
                       ),
                     ).animate().fadeIn(duration: 300.ms)
                   else if (products.isEmpty)
-                    const Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(AppDimensions.spacingXl),
-                        child: Center(child: Text('No products found.')),
-                      ),
+                    const BrandEmptyState(
+                      compact: true,
+                      icon: Icons.inventory_2_outlined,
+                      title: 'No products found',
+                      message: 'Try another search or add products first.',
                     ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.9, 0.9), end: const Offset(1.0, 1.0))
                   else
                     ...products.asMap().entries.map(
@@ -444,35 +436,13 @@ class _InventorySummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 180,
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: const EdgeInsets.all(AppDimensions.spacingLg),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: color, size: 22),
-              ),
-              const SizedBox(width: AppDimensions.spacingSm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: AppTextStyles.caption),
-                    const SizedBox(height: AppDimensions.spacingXs),
-                    Text(value, style: AppTextStyles.statValue),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
+      width: 196,
+      child: MetricCard(
+        compact: true,
+        label: title,
+        value: value,
+        icon: icon,
+        gradient: [color, color.withValues(alpha: 0.72)],
       ),
     );
   }

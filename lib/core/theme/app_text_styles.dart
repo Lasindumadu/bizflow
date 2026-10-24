@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 
 class AppTextStyles {
+  /// Brand display face — used for headlines and hero numbers.
+  static const displayFont = 'Sora';
+
+  /// Brand text face — used for every other style.
+  static const bodyFont = 'Manrope';
+
   // ─────────────────────────────────────────────
   // Display styles (largest)
   // ─────────────────────────────────────────────
 
   static const displayLarge = TextStyle(
+    fontFamily: displayFont,
     fontSize: 57,
     fontWeight: FontWeight.w600,
     height: 1.12,
@@ -13,6 +20,7 @@ class AppTextStyles {
   );
 
   static const displayMedium = TextStyle(
+    fontFamily: displayFont,
     fontSize: 45,
     fontWeight: FontWeight.w600,
     height: 1.16,
@@ -20,6 +28,7 @@ class AppTextStyles {
   );
 
   static const displaySmall = TextStyle(
+    fontFamily: displayFont,
     fontSize: 36,
     fontWeight: FontWeight.w600,
     height: 1.22,
@@ -31,6 +40,7 @@ class AppTextStyles {
   // ─────────────────────────────────────────────
 
   static const headlineLarge = TextStyle(
+    fontFamily: displayFont,
     fontSize: 32,
     fontWeight: FontWeight.w700,
     height: 1.25,
@@ -38,6 +48,7 @@ class AppTextStyles {
   );
 
   static const headlineMedium = TextStyle(
+    fontFamily: displayFont,
     fontSize: 28,
     fontWeight: FontWeight.w700,
     height: 1.29,
@@ -45,6 +56,7 @@ class AppTextStyles {
   );
 
   static const headlineSmall = TextStyle(
+    fontFamily: displayFont,
     fontSize: 24,
     fontWeight: FontWeight.w700,
     height: 1.33,
@@ -56,6 +68,7 @@ class AppTextStyles {
   // ─────────────────────────────────────────────
 
   static const titleLarge = TextStyle(
+    fontFamily: displayFont,
     fontSize: 22,
     fontWeight: FontWeight.w600,
     height: 1.27,
@@ -63,6 +76,7 @@ class AppTextStyles {
   );
 
   static const titleMedium = TextStyle(
+    fontFamily: displayFont,
     fontSize: 16,
     fontWeight: FontWeight.w600,
     height: 1.5,
@@ -70,6 +84,7 @@ class AppTextStyles {
   );
 
   static const titleSmall = TextStyle(
+    fontFamily: displayFont,
     fontSize: 14,
     fontWeight: FontWeight.w600,
     height: 1.43,
@@ -81,6 +96,7 @@ class AppTextStyles {
   // ─────────────────────────────────────────────
 
   static const bodyLarge = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 16,
     fontWeight: FontWeight.w400,
     height: 1.5,
@@ -88,6 +104,7 @@ class AppTextStyles {
   );
 
   static const bodyMedium = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 14,
     fontWeight: FontWeight.w400,
     height: 1.43,
@@ -95,6 +112,7 @@ class AppTextStyles {
   );
 
   static const bodySmall = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 12,
     fontWeight: FontWeight.w400,
     height: 1.33,
@@ -106,6 +124,7 @@ class AppTextStyles {
   // ─────────────────────────────────────────────
 
   static const labelLarge = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 14,
     fontWeight: FontWeight.w600,
     height: 1.43,
@@ -113,6 +132,7 @@ class AppTextStyles {
   );
 
   static const labelMedium = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 12,
     fontWeight: FontWeight.w600,
     height: 1.33,
@@ -120,6 +140,7 @@ class AppTextStyles {
   );
 
   static const labelSmall = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 11,
     fontWeight: FontWeight.w600,
     height: 1.45,
@@ -146,6 +167,7 @@ class AppTextStyles {
   // ─────────────────────────────────────────────
 
   static const statValue = TextStyle(
+    fontFamily: displayFont,
     fontSize: 32,
     fontWeight: FontWeight.w700,
     height: 1.1,
@@ -153,6 +175,7 @@ class AppTextStyles {
   );
 
   static const statTitle = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 12,
     fontWeight: FontWeight.w600,
     height: 1.3,
@@ -160,6 +183,7 @@ class AppTextStyles {
   );
 
   static const priceLarge = TextStyle(
+    fontFamily: displayFont,
     fontSize: 36,
     fontWeight: FontWeight.w700,
     height: 1.1,
@@ -167,6 +191,7 @@ class AppTextStyles {
   );
 
   static const priceMedium = TextStyle(
+    fontFamily: displayFont,
     fontSize: 28,
     fontWeight: FontWeight.w700,
     height: 1.2,
@@ -174,6 +199,7 @@ class AppTextStyles {
   );
 
   static const priceSmall = TextStyle(
+    fontFamily: displayFont,
     fontSize: 20,
     fontWeight: FontWeight.w600,
     height: 1.3,
@@ -181,7 +207,7 @@ class AppTextStyles {
   );
 
   static const monetary = TextStyle(
-    fontFamily: 'Roboto Mono',
+    fontFamily: bodyFont,
     fontSize: 16,
     fontWeight: FontWeight.w600,
     height: 1.5,
@@ -190,7 +216,7 @@ class AppTextStyles {
   );
 
   static const code = TextStyle(
-    fontFamily: 'Roboto Mono',
+    fontFamily: bodyFont,
     fontSize: 13,
     fontWeight: FontWeight.w500,
     height: 1.4,
@@ -209,6 +235,7 @@ class AppTextStyles {
   // ─────────────────────────────────────────────
 
   static const numericLarge = TextStyle(
+    fontFamily: displayFont,
     fontSize: 32,
     fontWeight: FontWeight.w800,
     height: 1.1,
@@ -217,6 +244,7 @@ class AppTextStyles {
   );
 
   static const numericMedium = TextStyle(
+    fontFamily: displayFont,
     fontSize: 20,
     fontWeight: FontWeight.w700,
     height: 1.2,
@@ -225,6 +253,7 @@ class AppTextStyles {
   );
 
   static const numericSmall = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 14,
     fontWeight: FontWeight.w700,
     height: 1.3,
@@ -234,6 +263,7 @@ class AppTextStyles {
 
   /// Big hero price used on POS totals and checkout.
   static const priceHero = TextStyle(
+    fontFamily: displayFont,
     fontSize: 40,
     fontWeight: FontWeight.w800,
     height: 1.05,
@@ -243,6 +273,7 @@ class AppTextStyles {
 
   /// Softer variant of [statTitle] for dense KPI rows.
   static const kpiLabel = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 11,
     fontWeight: FontWeight.w700,
     height: 1.3,
@@ -251,6 +282,7 @@ class AppTextStyles {
 
   /// Uppercase micro label used on badges and pills.
   static const badge = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 10,
     fontWeight: FontWeight.w800,
     height: 1.2,
@@ -259,6 +291,7 @@ class AppTextStyles {
 
   /// Muted helper line under section headers.
   static const helper = TextStyle(
+    fontFamily: bodyFont,
     fontSize: 12.5,
     fontWeight: FontWeight.w500,
     height: 1.4,

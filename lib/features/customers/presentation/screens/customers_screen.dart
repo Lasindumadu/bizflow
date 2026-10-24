@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/app_database.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
@@ -13,7 +14,8 @@ import '../../../customer_credit/presentation/screens/customer_credit_detail_scr
 import 'add_customer_screen.dart';
 
 class CustomersScreen extends StatefulWidget {
-  const CustomersScreen({super.key});
+  final bool showAppBar;
+  const CustomersScreen({super.key, this.showAppBar = true});
   @override
   State<CustomersScreen> createState() => CustomersScreenState();
 }
@@ -200,7 +202,7 @@ class CustomersScreenState extends State<CustomersScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: widget.showAppBar ? AppBar(
         title: Text(
           'Customers',
           style: AppTextStyles.heading3.copyWith(
@@ -238,7 +240,7 @@ class CustomersScreenState extends State<CustomersScreen> {
             ),
           ),
         ],
-      ),
+      ) : null,
       body: _isLoadingSettings
           ? _buildLoadingState()
           : StreamBuilder<List<Customer>>(
@@ -268,6 +270,29 @@ class CustomersScreenState extends State<CustomersScreen> {
                     );
                 return Column(
                   children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: PageHero(
+                        eyebrow: 'Relationships',
+                        title: 'Customers & loyalty',
+                        subtitle:
+                            '${customers.length} people in your directory · '
+                            'balances, credit and points in one place.',
+                        showIllustration: false,
+                        action: FilledButton.icon(
+                          onPressed: _openAddCustomer,
+                          icon: const Icon(
+                            Icons.person_add_alt_1_rounded,
+                            size: 18,
+                          ),
+                          label: const Text('Add customer'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
                     _buildSearchField(),
                     Expanded(
                       child: filteredCustomers.isEmpty
@@ -311,42 +336,31 @@ class CustomersScreenState extends State<CustomersScreen> {
 
   Widget _buildSearchField() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppDimensions.screenPadding,
-        AppDimensions.screenPadding,
-        AppDimensions.screenPadding,
-        0,
-      ),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (_) {
-          setState(() {});
-        },
-        decoration: InputDecoration(
-          hintText: 'Search customers...',
-          hintStyle: AppTextStyles.bodyMedium.copyWith(
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          prefixIcon: Icon(Icons.search_rounded, color: AppColors.primary),
-          suffixIcon: _searchController.text.isEmpty
-              ? null
-              : IconButton(
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {});
-                  },
-                  icon: Icon(Icons.clear_rounded, color: AppColors.primary),
-                ),
-          filled: true,
-          fillColor: Theme.of(context).colorScheme.surfaceContainerHighest
-              .withValues(alpha: 0.5),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
-            borderSide: BorderSide(color: AppColors.primary, width: 2),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: BrandCard(
+        padding: const EdgeInsets.all(10),
+        child: TextField(
+          controller: _searchController,
+          onChanged: (_) {
+            setState(() {});
+          },
+          decoration: InputDecoration(
+            hintText: 'Search by name, phone or email…',
+            prefixIcon: const Icon(Icons.search_rounded, size: 19),
+            suffixIcon: _searchController.text.isEmpty
+                ? null
+                : IconButton(
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() {});
+                    },
+                    icon: const Icon(Icons.clear_rounded, size: 17),
+                  ),
+            isDense: true,
+            filled: false,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
           ),
         ),
       ),
@@ -410,106 +424,26 @@ class CustomersScreenState extends State<CustomersScreen> {
   }
 
   Widget _buildEmptyState() {
-    final colorScheme = Theme.of(context).colorScheme;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 88,
-              height: 88,
-              decoration: BoxDecoration(
-                gradient: AppDecor.indigoGradient,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryDark.withValues(alpha: 0.3),
-                    blurRadius: 24,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.people_outline_rounded,
-                size: 44,
-                color: AppColors.onPrimary,
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            Text(
-              'No customers yet',
-              style: AppTextStyles.heading2.copyWith(
-                color: colorScheme.onSurface,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppDimensions.spacingXs),
-            Text(
-              'Add your first customer to start tracking customer details and outstanding balances.',
-              style: AppTextStyles.bodySecondary.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            FilledButton.icon(
-              onPressed: _openAddCustomer,
-              icon: const Icon(Icons.person_add_alt_1_rounded),
-              label: const Text('Add Customer'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppDimensions.spacingXl,
-                  vertical: AppDimensions.spacingMd,
-                ),
-              ),
-            ),
-          ],
-        ),
+      child: BrandEmptyState(
+        title: 'No customers yet',
+        message:
+            'Add your first customer to track purchases, loyalty points and '
+            'outstanding balances.',
+        actionLabel: 'Add customer',
+        onAction: _openAddCustomer,
+        icon: Icons.people_outline_rounded,
       ),
     );
   }
 
   Widget _buildNoResultsState() {
-    final colorScheme = Theme.of(context).colorScheme;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(
-                  alpha: 0.5,
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.search_off_outlined,
-                size: 36,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingMd),
-            Text(
-              'No customers found',
-              style: AppTextStyles.heading2.copyWith(
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingXs),
-            Text(
-              'Try a different search term.',
-              style: AppTextStyles.bodySecondary.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+      child: BrandEmptyState(
+        compact: true,
+        title: 'No customers found',
+        message: 'Try a different name, phone number or email.',
+        icon: Icons.search_off_outlined,
       ),
     );
   }
@@ -572,6 +506,7 @@ class _CustomerCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onCredit;
+
   const _CustomerCard({
     required this.customer,
     required this.currency,
@@ -579,199 +514,166 @@ class _CustomerCard extends StatelessWidget {
     required this.onDelete,
     required this.onCredit,
   });
+
+  String get _initials {
+    final parts = customer.name.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    final name = customer.name.trim();
+    return name.isEmpty ? '?' : name.substring(0, name.length.clamp(1, 2)).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final hasPhone = customer.phone.trim().isNotEmpty;
     final hasEmail = customer.email.trim().isNotEmpty;
-    final hasOutstandingBalance = customer.outstandingBalance > 0;
-    final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final owes = customer.outstandingBalance > 0;
+    final hasPoints = customer.pointsBalance > 0;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : AppColors.lightBorder,
-          width: 1.1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: isDark
-                ? Colors.black.withValues(alpha: 0.3)
-                : Colors.black.withValues(alpha: 0.03),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingLg),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: AppDecor.indigoGradient,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryDark.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+    return BrandCard(
+      padding: const EdgeInsets.all(14),
+      radius: 16,
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF8B6CFF), Color(0xFF5B5BF7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              alignment: Alignment.center,
-              child: Text(
-                customer.name.trim().isEmpty
-                    ? '?'
-                    : customer.name.trim()[0].toUpperCase(),
-                style: AppTextStyles.titleMedium.copyWith(
-                  color: AppColors.onPrimary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
-              ),
-            ),
-            const SizedBox(width: AppDimensions.spacingMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    customer.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTextStyles.titleMedium.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  if (hasPhone) ...[
-                    const SizedBox(height: AppDimensions.spacingXs),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.phone_rounded,
-                          size: 14,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          customer.phone,
-                          style: AppTextStyles.caption.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (hasEmail) ...[
-                    const SizedBox(height: AppDimensions.spacingXs),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.email_rounded,
-                          size: 14,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            customer.email,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTextStyles.caption.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (hasOutstandingBalance) ...[
-              const SizedBox(width: AppDimensions.spacingSm),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.error.withValues(alpha: 0.15),
-                      AppColors.error.withValues(alpha: 0.08),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(
-                    color: AppColors.error.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  '$currency '
-                  '${customer.outstandingBalance.toStringAsFixed(2)}',
-                  style: AppTextStyles.labelSmall.copyWith(
-                    color: AppColors.error,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(width: AppDimensions.spacingSm),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  onEdit();
-                } else if (value == 'delete') {
-                  onDelete();
-                } else if (value == 'credit') {
-                  onCredit();
-                }
-              },
-              icon: Icon(
-                Icons.more_vert_rounded,
-                color: colorScheme.onSurfaceVariant,
-              ),
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: ListTile(
-                    leading: Icon(Icons.edit_outlined),
-                    title: Text('Edit'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'credit',
-                  child: ListTile(
-                    leading: Icon(Icons.credit_card_outlined),
-                    title: Text('Credit Account'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: ListTile(
-                    leading: Icon(Icons.delete_outline, color: Colors.red),
-                    title: Text('Delete', style: TextStyle(color: Colors.red)),
-                    contentPadding: EdgeInsets.zero,
-                  ),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                  blurRadius: 12,
+                  offset: const Offset(0, 5),
+                  spreadRadius: -3,
                 ),
               ],
             ),
-          ],
-        ),
+            child: Center(
+              child: Text(
+                _initials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        customer.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    if (owes)
+                      BrandPill(
+                        label:
+                            '$currency ${customer.outstandingBalance.toStringAsFixed(2)}',
+                        color: AppColors.error,
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  hasPhone
+                      ? customer.phone
+                      : hasEmail
+                          ? customer.email
+                          : 'No contact details yet',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: scheme.onSurface.withValues(alpha: 0.46),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 5,
+                  runSpacing: 4,
+                  children: [
+                    BrandPill(
+                      label: customer.loyaltyTier.toUpperCase(),
+                      color: AppColors.brandAmber,
+                      icon: Icons.workspace_premium_rounded,
+                    ),
+                    BrandPill(
+                      label: hasPoints
+                          ? '${customer.pointsBalance} PTS'
+                          : 'NO POINTS',
+                      color: AppColors.primary,
+                      icon: Icons.stars_rounded,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 2),
+          PopupMenuButton<String>(
+            tooltip: 'Customer actions',
+            offset: const Offset(0, 36),
+            icon: Icon(
+              Icons.more_horiz_rounded,
+              size: 19,
+              color: scheme.onSurface.withValues(alpha: 0.42),
+            ),
+            onSelected: (value) {
+              if (value == 'edit') onEdit();
+              if (value == 'delete') onDelete();
+              if (value == 'credit') onCredit();
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'edit',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.edit_outlined, size: 18),
+                  title: Text('Edit customer'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'credit',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.credit_card_outlined, size: 18),
+                  title: Text('Credit account'),
+                ),
+              ),
+              PopupMenuItem(
+                value: 'delete',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.delete_outline_rounded, size: 18),
+                  title: Text('Delete'),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
