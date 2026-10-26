@@ -6,6 +6,8 @@ import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/app_database.dart' hide Sale, SaleItem;
+import '../../../../core/session/session_authorization.dart';
+import '../../../../core/session/session_controller.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../data/repositories/customer_repository.dart';
@@ -38,6 +40,12 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
   String _currency = 'USD';
   bool _isLoadingSettings = true;
   bool _isCancelling = false;
+
+  /// Whether the acting session can cancel sales (owner or manager).
+  bool get _canCancelSales => canPerform(
+        sessionController.current,
+        {StaffRole.owner, StaffRole.manager},
+      );
 
   @override
   void initState() {
@@ -157,7 +165,7 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
   Widget build(BuildContext context) {
     if (_isLoadingSettings) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(child: AuroraLoader(size: 46)),
       );
     }
 
@@ -166,7 +174,7 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
         future: _saleFuture,
         builder: (context, saleSnapshot) {
           if (saleSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: AuroraLoader(size: 46));
           }
 
           if (saleSnapshot.hasError) {
@@ -183,7 +191,7 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
             future: _customerFuture,
             builder: (context, customerSnapshot) {
               if (customerSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(child: AuroraLoader(size: 46));
               }
 
               if (customerSnapshot.hasError) {
@@ -197,7 +205,7 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
                 builder: (context, itemsSnapshot) {
                   if (itemsSnapshot.connectionState ==
                       ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(child: AuroraLoader(size: 46));
                   }
 
                   if (itemsSnapshot.hasError) {
@@ -248,7 +256,7 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
               child: Column(
                 children: [
-                  _buildSaleHeader(sale),
+                  _buildSaleHeader(sale, items.length),
                   const SizedBox(height: 14),
                   _buildCustomerCard(sale: sale, customer: customer),
                   const SizedBox(height: 14),
@@ -257,7 +265,7 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
                   _buildSummaryCard(sale),
                   const SizedBox(height: 18),
                   _buildReceiptButton(),
-                  if (sale.isCompleted) ...[
+                  if (sale.isCompleted && _canCancelSales) ...[
                     const SizedBox(height: 10),
                     _buildCancelButton(sale),
                   ],
@@ -273,28 +281,50 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
   Widget _buildReceiptButton() {
     return SizedBox(
       width: double.infinity,
-      child: FilledButton.icon(
-        onPressed: _openReceipt,
-        icon: const Icon(Icons.receipt_long_outlined, size: 18),
-        label: const Text('View receipt'),
+      height: 46,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: AppDecor.royalGradient,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.30),
+        ),
+        child: FilledButton.icon(
+          onPressed: _openReceipt,
+          style: FilledButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          icon: const Icon(Icons.receipt_long_outlined, size: 18),
+          label: const Text(
+            'View receipt',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildSaleHeader(Sale sale) {
+  Widget _buildSaleHeader(Sale sale, int itemCount) {
     final cancelled = sale.status.toLowerCase() == 'cancelled';
-    final gradient = cancelled
-        ? const [Color(0xFF3B1220), Color(0xFF5B1B2A), Color(0xFF1C1018)]
-        : const [Color(0xFF141033), Color(0xFF2C2266), Color(0xFF14405B)];
+    final gradient = LinearGradient(
+      colors: cancelled
+          ? const [Color(0xFF3B1220), Color(0xFF5B1B2A), Color(0xFF1C1018)]
+          : const [
+              Color(0xFF0B0730),
+              Color(0xFF31246E),
+              Color(0xFF4338CA),
+            ],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: gradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: gradient,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
         boxShadow: AppDecor.glow(
@@ -302,90 +332,106 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
           alpha: 0.22,
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            Positioned.fill(child: GrainOverlay()),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      'SALE ${sale.id}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF9FE9DE),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SALE ${sale.id}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFF9FE9DE),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _formatDateTime(sale.createdAt),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.68),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _formatDateTime(sale.createdAt),
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.68),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                    BrandPill(
+                      label: sale.status.toUpperCase(),
+                      color: cancelled
+                          ? AppColors.brandCoral
+                          : AppColors.brandMint,
+                      icon: cancelled
+                          ? Icons.cancel_rounded
+                          : Icons.check_circle_rounded,
+                      filled: true,
                     ),
                   ],
                 ),
-              ),
-              BrandPill(
-                label: sale.status.toUpperCase(),
-                color: cancelled ? AppColors.brandCoral : AppColors.brandMint,
-                icon: cancelled
-                    ? Icons.cancel_rounded
-                    : Icons.check_circle_rounded,
-                filled: true,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'TOTAL',
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.55),
-              fontSize: 9.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.2,
+                const SizedBox(height: 18),
+                Text(
+                  'TOTAL',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$_currency ${sale.total.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                      fontFamily: AppTextStyles.displayFont,
+                      color: Colors.white,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -1.2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _HeaderMetric(
+                      label: 'Items',
+                      value: '$itemCount',
+                      icon: Icons.shopping_bag_rounded,
+                    ),
+                    const SizedBox(width: 10),
+                    _HeaderMetric(
+                      label: 'Payment',
+                      value: _formatPaymentMethod(sale.paymentMethod),
+                      icon: Icons.credit_card_rounded,
+                    ),
+                    const SizedBox(width: 10),
+                    _HeaderMetric(
+                      label: 'Paid',
+                      value: '$_currency ${sale.paidAmount.toStringAsFixed(2)}',
+                      icon: Icons.account_balance_wallet_rounded,
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 4),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '$_currency ${sale.total.toStringAsFixed(2)}',
-              style: const TextStyle(
-                fontFamily: AppTextStyles.displayFont,
-                color: Colors.white,
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -1.2,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              _HeaderMetric(
-                label: 'Payment',
-                value: _formatPaymentMethod(sale.paymentMethod),
-                icon: Icons.credit_card_rounded,
-              ),
-              const SizedBox(width: 10),
-              _HeaderMetric(
-                label: 'Paid',
-                value: '$_currency ${sale.paidAmount.toStringAsFixed(2)}',
-                icon: Icons.account_balance_wallet_rounded,
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -594,7 +640,7 @@ class _SaleDetailsScreenState extends State<SaleDetailsScreen> {
             ? const SizedBox(
                 width: 16,
                 height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: AuroraLoader(size: 16, strokeWidth: 2),
               )
             : const Icon(Icons.cancel_outlined, size: 18),
         label: Text(_isCancelling ? 'Cancelling…' : 'Cancel sale'),
@@ -775,65 +821,90 @@ class _SaleItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tint = isDark
+        ? AppColors.primaryLight.withValues(alpha: 0.18)
+        : AppColors.posTint.first;
+    final tintInk = isDark ? AppColors.primaryLight : AppColors.royalEnd;
 
-    return Row(
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: scheme.primary.withValues(alpha: 0.09),
-            borderRadius: BorderRadius.circular(11),
-          ),
-          child: Text(
-            '${item.quantity}×',
-            style: TextStyle(
-              fontFamily: AppTextStyles.displayFont,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
-              color: scheme.primary,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark
+            ? Colors.white.withValues(alpha: 0.035)
+            : AppColors.lightSurfaceVariant.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.06)
+              : AppColors.lightBorder,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: tint,
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(
+                color: tintInk.withValues(alpha: isDark ? 0.35 : 0.24),
+              ),
+            ),
+            child: Text(
+              '${item.quantity}×',
+              style: TextStyle(
+                fontFamily: AppTextStyles.displayFont,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: tintInk,
+              ),
             ),
           ),
-        ),
-        const SizedBox(width: 11),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.productName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface,
+          const SizedBox(width: 11),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.productName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.bodyFont,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '$currency ${item.unitPrice.toStringAsFixed(2)} each',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: scheme.onSurface.withValues(alpha: 0.5),
+                const SizedBox(height: 2),
+                Text(
+                  '$currency ${item.unitPrice.toStringAsFixed(2)} each',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: scheme.onSurface.withValues(alpha: 0.5),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 10),
-        Text(
-          '$currency ${item.total.toStringAsFixed(2)}',
-          style: TextStyle(
-            fontFamily: AppTextStyles.bodyFont,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: scheme.onSurface,
+          const SizedBox(width: 10),
+          Text(
+            '$currency ${item.total.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontFamily: AppTextStyles.bodyFont,
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              fontFeatures: const [FontFeature.tabularFigures()],
+              color: scheme.onSurface,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -878,6 +949,7 @@ class _SummaryRow extends StatelessWidget {
               : TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                   color: isDiscount
                       ? AppColors.brandMint
                       : Theme.of(context).colorScheme.onSurface,

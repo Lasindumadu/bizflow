@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
@@ -99,70 +100,127 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
           final sales = snapshot.data ?? const <Sale>[];
 
           if (sales.isEmpty) {
-            return const AppEmptyState(
-              icon: Icons.assignment_return_outlined,
-              title: 'No completed sales',
-              message:
-                  'Completed sales will appear here so you can process returns '
-                  'and refunds.',
+            return Column(
+              children: [
+                _ReturnsHeaderBand(),
+                Expanded(
+                  child: AppEmptyState(
+                    icon: Icons.assignment_return_outlined,
+                    title: 'No completed sales',
+                    message:
+                        'Completed sales will appear here so you can process '
+                        'returns and refunds.',
+                  ),
+                ),
+              ],
             );
           }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(AppDimensions.screenPadding),
-            itemCount: sales.length,
-            itemBuilder: (context, index) {
-              final sale = sales[index];
-              return Padding(
-                padding: const EdgeInsets.only(bottom: AppDimensions.spacingSm),
-                child: HoverLiftCard(
-                  padding: const EdgeInsets.all(AppDimensions.spacingMd),
-                  onTap: () => _openReturnFlow(sale),
-                  child: Row(
-                    children: [
-                      IconTile(
-                        icon: Icons.assignment_return_rounded,
-                        gradient: AppDecor.roseGradient.colors,
-                        size: 44,
-                        iconSize: 21,
-                      ),
-                      const SizedBox(width: AppDimensions.spacingMd),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+          return Column(
+            children: [
+              _ReturnsHeaderBand(),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(AppDimensions.screenPadding),
+                  itemCount: sales.length,
+                  itemBuilder: (context, index) {
+                    final sale = sales[index];
+                    final tile = Padding(
+                      padding:
+                          const EdgeInsets.only(bottom: AppDimensions.spacingSm),
+                      child: HoverLiftCard(
+                        padding: const EdgeInsets.all(AppDimensions.spacingMd),
+                        onTap: () => _openReturnFlow(sale),
+                        child: Row(
                           children: [
-                            Text(
-                              'Sale ${sale.id}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTextStyles.titleSmall,
+                            IconTile(
+                              icon: Icons.assignment_return_rounded,
+                              gradient: AppDecor.roseGradient.colors,
+                              size: 44,
+                              iconSize: 21,
                             ),
-                            Text(
-                              _formatDate(sale.createdAt),
-                              style: AppTextStyles.caption.copyWith(
-                                color: Theme.of(context).colorScheme.onSurface
-                                    .withValues(alpha: 0.55),
+                            const SizedBox(width: AppDimensions.spacingMd),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Sale ${sale.id}',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: AppTextStyles.titleSmall,
+                                  ),
+                                  Text(
+                                    _formatDate(sale.createdAt),
+                                    style: AppTextStyles.caption.copyWith(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.55),
+                                    ),
+                                  ),
+                                ],
                               ),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  _money(sale.total),
+                                  style: AppTextStyles.priceSmall.copyWith(
+                                    color:
+                                        Theme.of(context).colorScheme.onSurface,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                _refundStatusPill(sale.status),
+                              ],
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.chevron_right_rounded,
+                              size: 20,
                             ),
                           ],
                         ),
                       ),
-                      Text(
-                        _money(sale.total),
-                        style: AppTextStyles.priceSmall.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.chevron_right_rounded, size: 20),
-                    ],
-                  ),
+                    );
+                    if (index >= 12) {
+                      return tile;
+                    }
+                    return tile
+                        .animate(delay: (80 + 55 * index).ms)
+                        .fadeIn(duration: 380.ms, curve: Curves.easeOutCubic)
+                        .moveY(begin: 14, end: 0, curve: Curves.easeOutCubic);
+                  },
                 ),
-              );
-            },
+              ),
+            ],
           );
         },
       ),
+    );
+  }
+
+  /// Refund status pill mapped through the existing colour semantics:
+  /// refunded = violet, processing = info, cancelled = error. Anything
+  /// else that could reach the list renders as completed emerald.
+  Widget _refundStatusPill(String status) {
+    final mapping = {
+      'refunded': AppColors.refunded,
+      'processing': AppColors.processing,
+      'cancelled': AppColors.cancelled,
+      'pending': AppColors.pending,
+    };
+    return StatusBadge(
+      label: status.toUpperCase(),
+      color: mapping[status] ?? AppColors.completed,
+      icon: status == 'refunded'
+          ? Icons.assignment_return_rounded
+          : status == 'cancelled'
+              ? Icons.block_rounded
+              : Icons.check_rounded,
     );
   }
 
@@ -173,6 +231,89 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
     return '${local.day.toString().padLeft(2, '0')}/'
         '${local.month.toString().padLeft(2, '0')}/${local.year} '
         '$hour:$minute';
+  }
+}
+
+/// Gradient header band giving the return-window context.
+class _ReturnsHeaderBand extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: AppDecor.royalGradient,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.26),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+              ),
+              child: const Icon(
+                Icons.assignment_return_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'RETURNS & REFUNDS',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.75),
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Return to a completed sale',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: AppTextStyles.displayFont,
+                      color: Colors.white,
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'Refunds are only allowed while items are still '
+                    'returnable for the sale.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.72),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(duration: 380.ms, curve: Curves.easeOutCubic)
+        .moveY(begin: 14, end: 0, curve: Curves.easeOutCubic);
   }
 }
 
@@ -200,12 +341,19 @@ class _ReturnSheetState extends State<_ReturnSheet> {
   String? _error;
 
   List<SaleItem> _items = [];
-  Map<String, int> _returnable = {};
-  final Map<String, int> _selected = {};
+  Map<String, double> _returnable = {};
+  final Map<String, double> _selected = {};
 
   String _refundMethod = 'cash';
   bool _restock = true;
   final TextEditingController _reasonController = TextEditingController();
+
+  static const List<String> _reasonPresets = [
+    'Damaged',
+    'Wrong item',
+    'Not as described',
+    'Customer changed mind',
+  ];
 
   @override
   void initState() {
@@ -228,7 +376,7 @@ class _ReturnSheetState extends State<_ReturnSheet> {
       if (!mounted) return;
       setState(() {
         _items = items;
-        _returnable = returnable;
+        _returnable = returnable.cast<String, double>();
         _loading = false;
       });
     } catch (e) {
@@ -243,7 +391,7 @@ class _ReturnSheetState extends State<_ReturnSheet> {
   double get _refundTotal {
     double total = 0;
     for (final item in _items) {
-      final qty = _selected[item.productId] ?? 0;
+      final qty = _selected[item.productId] ?? 0.0;
       total += item.unitPrice * qty;
     }
     return total;
@@ -254,7 +402,7 @@ class _ReturnSheetState extends State<_ReturnSheet> {
   Future<void> _submit() async {
     final lines = <ReturnLine>[];
     for (final item in _items) {
-      final qty = _selected[item.productId] ?? 0;
+      final qty = _selected[item.productId] ?? 0.0;
       if (qty > 0) {
         lines.add(
           ReturnLine(
@@ -292,6 +440,40 @@ class _ReturnSheetState extends State<_ReturnSheet> {
     }
   }
 
+  /// Confirmation gate before the refund is recorded (per the primary
+  /// CTA rules — money-out actions confirm before they commit).
+  Future<void> _confirmRefund() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Process refund?'),
+        content: Text(
+          'Refund ${widget.currency} ${_refundTotal.toStringAsFixed(2)} '
+          'for sale ${widget.sale.id}?\n\n'
+          'This records the return'
+          '${_restock ? ' and restocks the items' : ' without restocking'}.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.brandCoral,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Refund'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _submit();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -313,18 +495,45 @@ class _ReturnSheetState extends State<_ReturnSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Return / Refund',
-                  style: AppTextStyles.titleLarge.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                Text(
-                  'Sale ${widget.sale.id} • ${widget.currency} '
-                  '${widget.sale.total.toStringAsFixed(2)}',
-                  style: AppTextStyles.caption.copyWith(
-                    color: scheme.onSurface.withValues(alpha: 0.6),
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: AppDecor.roseGradient,
+                        borderRadius: BorderRadius.circular(13),
+                        boxShadow: AppDecor.glow(AppColors.brandCoral, alpha: 0.3),
+                      ),
+                      child: const Icon(
+                        Icons.assignment_return_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Return / Refund',
+                            style: AppTextStyles.titleLarge.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            'Sale ${widget.sale.id} • ${widget.currency} '
+                            '${widget.sale.total.toStringAsFixed(2)}',
+                            style: AppTextStyles.caption.copyWith(
+                              color: scheme.onSurface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: AppDimensions.spacingLg),
                 Flexible(
@@ -357,11 +566,42 @@ class _ReturnSheetState extends State<_ReturnSheet> {
                             'Turn off for damaged / unsellable goods',
                           ),
                         ),
+                        const SizedBox(height: AppDimensions.spacingSm),
+                        Text('Quick reasons', style: AppTextStyles.titleSmall),
+                        const SizedBox(height: AppDimensions.spacingSm),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final r in _reasonPresets)
+                              FilterPill(
+                                label: r,
+                                icon: Icons.sell_outlined,
+                                selected:
+                                    _reasonController.text.trim().toLowerCase() ==
+                                        r.toLowerCase(),
+                                onTap: () {
+                                  setState(() {
+                                    _reasonController.text = r;
+                                  });
+                                },
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: AppDimensions.spacingMd),
                         TextField(
                           controller: _reasonController,
-                          decoration: const InputDecoration(
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
                             labelText: 'Reason (optional)',
                             hintText: 'e.g. damaged, wrong item',
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: const BorderSide(
+                                color: AppColors.royalMid,
+                                width: 1.7,
+                              ),
+                            ),
                           ),
                         ),
                         if (_error != null) ...[
@@ -396,6 +636,7 @@ class _ReturnSheetState extends State<_ReturnSheet> {
                             '${_refundTotal.toStringAsFixed(2)}',
                             style: AppTextStyles.priceMedium.copyWith(
                               color: AppColors.errorDark,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ],
@@ -409,7 +650,7 @@ class _ReturnSheetState extends State<_ReturnSheet> {
                         gradient: AppDecor.roseGradient.colors,
                         isLoading: _submitting,
                         onPressed: _hasSelection && !_submitting
-                            ? _submit
+                            ? _confirmRefund
                             : null,
                       ),
                     ),
@@ -422,8 +663,8 @@ class _ReturnSheetState extends State<_ReturnSheet> {
 
   Widget _itemRow(SaleItem item) {
     final scheme = Theme.of(context).colorScheme;
-    final available = _returnable[item.productId] ?? 0;
-    final selected = _selected[item.productId] ?? 0;
+    final available = _returnable[item.productId] ?? 0.0;
+    final selected = _selected[item.productId] ?? 0.0;
     final allReturned = available <= 0;
 
     return Padding(
@@ -469,8 +710,8 @@ class _ReturnSheetState extends State<_ReturnSheet> {
   }
 
   Widget _stepper({
-    required int available,
-    required int selected,
+    required double available,
+    required double selected,
     required SaleItem item,
   }) {
     final scheme = Theme.of(context).colorScheme;
@@ -487,7 +728,7 @@ class _ReturnSheetState extends State<_ReturnSheet> {
             icon: Icons.remove_rounded,
             enabled: selected > 0,
             onTap: () => setState(() {
-              _selected[item.productId] = (selected - 1).clamp(0, available);
+              _selected[item.productId] = (selected - 1).clamp(0.0, available);
             }),
           ),
           SizedBox(
@@ -500,7 +741,7 @@ class _ReturnSheetState extends State<_ReturnSheet> {
             icon: Icons.add_rounded,
             enabled: selected < available,
             onTap: () => setState(() {
-              _selected[item.productId] = (selected + 1).clamp(0, available);
+              _selected[item.productId] = (selected + 1).clamp(0.0, available);
             }),
           ),
         ],

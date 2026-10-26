@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import 'brand_ui.dart';
 import '../theme/app_decor.dart';
 import '../theme/app_dimensions.dart';
 import '../theme/app_text_styles.dart';
@@ -79,9 +80,10 @@ class _GradientButtonState extends State<GradientButton> {
                   ? const SizedBox(
                       width: 22,
                       height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        valueColor: AlwaysStoppedAnimation(Colors.white),
+                      child: AuroraLoader(
+                        size: 22,
+                        strokeWidth: 2,
+                        onDarkSurface: true,
                       ),
                     )
                   : Row(
@@ -605,14 +607,7 @@ class AppLoadingState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 46,
-            height: 46,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              valueColor: AlwaysStoppedAnimation(scheme.primary),
-            ),
-          ),
+          const AuroraLoader(size: 46),
           const SizedBox(height: AppDimensions.spacingLg),
           Text(
             message,
@@ -700,58 +695,6 @@ class TrendPill extends StatelessWidget {
           Icon(icon, size: 13, color: color),
           const SizedBox(width: 4),
           Text(value, style: AppTextStyles.badge.copyWith(color: color)),
-        ],
-      ),
-    );
-  }
-}
-
-/// A circular progress ring with a centered label.
-class ProgressRing extends StatelessWidget {
-  final double progress;
-  final double size;
-  final double strokeWidth;
-  final Color? color;
-  final String? centerLabel;
-
-  const ProgressRing({
-    super.key,
-    required this.progress,
-    this.size = 72,
-    this.strokeWidth = 8,
-    this.color,
-    this.centerLabel,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final tone = color ?? scheme.primary;
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          SizedBox(
-            width: size,
-            height: size,
-            child: CircularProgressIndicator(
-              value: progress.clamp(0.0, 1.0),
-              strokeWidth: strokeWidth,
-              strokeCap: StrokeCap.round,
-              backgroundColor: scheme.onSurface.withValues(alpha: 0.08),
-              valueColor: AlwaysStoppedAnimation(tone),
-            ),
-          ),
-          Text(
-            centerLabel ??
-                '${(progress * 100).clamp(0, 100).toStringAsFixed(0)}%',
-            style: AppTextStyles.numericSmall.copyWith(
-              color: scheme.onSurface,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
         ],
       ),
     );

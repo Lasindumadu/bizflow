@@ -6,6 +6,8 @@ import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/brand_ui.dart';
 import '../../../../core/widgets/modern_widgets.dart';
+import '../../../../core/session/session_authorization.dart';
+import '../../../../core/session/session_controller.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/supplier_repository.dart';
 import 'supplier_detail_screen.dart';
@@ -22,6 +24,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
   final SupplierRepository _repository = SupplierRepository(appDatabase);
 
   late Future<List<SupplierRecord>> _suppliersFuture;
+
+  /// Whether the acting session can manage suppliers (owner or manager).
+  bool get _canManageSupplies => canPerform(
+        sessionController.current,
+        {StaffRole.owner, StaffRole.manager},
+      );
 
   @override
   void initState() {
@@ -100,18 +108,12 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           bottom: false,
           child: Column(
             children: [
-              BrandPageHeader(
-                eyebrow: 'Supply chain',
-                title: 'Suppliers',
-                subtitle: 'Who you buy from, and on what terms.',
-                icon: Icons.local_shipping_rounded,
-                actions: [
-                  BrandHeaderAction(
-                    icon: Icons.add_rounded,
-                    tooltip: 'Add supplier',
-                    onTap: _openAddSupplier,
-                  ),
-                ],
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: _SuppliersHeader(
+                  canManage: _canManageSupplies,
+                  onAdd: _openAddSupplier,
+                ),
               ),
               Expanded(
                 child: RefreshIndicator(
@@ -123,14 +125,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                           ConnectionState.waiting) {
                         return const AppLoadingState(
                           message: 'Loading suppliers…',
-                        ).animate().fadeIn(duration: 300.ms);
+                        );
                       }
 
                       if (snapshot.hasError) {
                         return AppErrorState(
                           message: snapshot.error.toString(),
                           onRetry: _refresh,
-                        ).animate().fadeIn(duration: 300.ms);
+                        );
                       }
 
                       final suppliers =
@@ -146,9 +148,14 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                 title: 'No suppliers yet',
                                 message:
                                     'Add your first supplier to start managing purchase orders.',
-                                actionLabel: 'Add supplier',
-                                onAction: _openAddSupplier,
+                                actionLabel: _canManageSupplies
+                                    ? 'Add supplier'
+                                    : null,
+                                onAction: _canManageSupplies
+                                    ? _openAddSupplier
+                                    : null,
                                 icon: Icons.local_shipping_outlined,
+                                image: AppImages.shoppingCustomers,
                               ),
                             ),
                           ],
@@ -169,7 +176,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
                                   BrandPill(
                                     label:
                                         '${suppliers.length} supplier${suppliers.length == 1 ? '' : 's'}',
-                                    color: AppColors.primary,
+                                    color: AppColors.royalMid,
                                     icon: Icons.local_shipping_rounded,
                                   ),
                                   BrandPill(
@@ -184,20 +191,35 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 
                           final supplier = suppliers[index - 1];
 
+                          final card = _SupplierCard(
+                            supplier: supplier,
+                            onTap: () => _openEditSupplier(supplier),
+                            onDelete: _canManageSupplies
+                                ? () => _confirmDeleteSupplier(supplier)
+                                : null,
+                          );
+
+                          if (index - 1 >= 12) return card;
+
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 10),
-                            child: _SupplierCard(
-                              supplier: supplier,
-                              onTap: () => _openEditSupplier(supplier),
-                              onDelete: () =>
-                                  _confirmDeleteSupplier(supplier),
-                            ),
-                          ).animate(
-                            delay: Duration(milliseconds: 60 * (index - 1)),
-                          ).fadeIn(
-                            duration: 300.ms,
-                            curve: Curves.easeOutCubic,
-                          ).slideY(begin: 0.06, end: 0);
+                            child: card,
+                          )
+                              .animate(
+                                delay: Duration(
+                                  milliseconds: 60 * (index - 1),
+                                ),
+                              )
+                              .fadeIn(
+                                duration: 400.ms,
+                                curve: Curves.easeOutCubic,
+                              )
+                              .moveY(
+                                begin: 14,
+                                end: 0,
+                                duration: 400.ms,
+                                curve: Curves.easeOutCubic,
+                              );
                         },
                       );
                     },
@@ -208,11 +230,157 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openAddSupplier,
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Add supplier'),
-      ).animate().fadeIn(duration: 400.ms, delay: 500.ms),
+      floatingActionButton: _canManageSupplies
+          ? FloatingActionButton.extended(
+              onPressed: _openAddSupplier,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add supplier'),
+            ).animate().fadeIn(duration: 400.ms, delay: 500.ms)
+          : null,
+    );
+  }
+}
+
+/// Photo micro-wash header — warehouse imagery under the brand wash,
+/// replacing the plain gradient band.
+class _SuppliersHeader extends StatelessWidget {
+  final bool canManage;
+  final VoidCallback? onAdd;
+
+  const _SuppliersHeader({required this.canManage, this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: SizedBox(
+        height: 168,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AppDecor.photoHero(
+              image: AppImages.warehouse,
+              anchor: 'left',
+              imageAlignmentY: 0.55,
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 16, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, right: 12),
+                    child: _GlassIconButton(
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: 'Back',
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.local_shipping_rounded,
+                              size: 14,
+                              color: AppColors.auroraTeal,
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'SUPPLY CHAIN',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: AppTextStyles.bodyFont,
+                                  color: Colors.white.withValues(alpha: 0.66),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+                        Text(
+                          'Suppliers',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.displayFont,
+                            color: Colors.white,
+                            fontSize: 23,
+                            fontWeight: FontWeight.w700,
+                            height: 1.15,
+                            letterSpacing: -0.7,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          'Who you buy from, and on what terms.',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.72),
+                            fontSize: 12.5,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  if (canManage)
+                    _GlassIconButton(
+                      icon: Icons.add_rounded,
+                      tooltip: 'Add supplier',
+                      onTap: onAdd,
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  const _GlassIconButton({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.13),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(icon, color: Colors.white, size: 19),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -220,7 +388,7 @@ class _SuppliersScreenState extends State<SuppliersScreen> {
 class _SupplierCard extends StatelessWidget {
   final SupplierRecord supplier;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
 
   const _SupplierCard({
     required this.supplier,
@@ -242,23 +410,36 @@ class _SupplierCard extends StatelessWidget {
         (Icons.schedule_rounded, 'Net ${supplier.paymentTermsDays}'),
     ];
 
+    final initial = supplier.name.trim().isEmpty
+        ? '•'
+        : supplier.name.trim()[0].toUpperCase();
+
     return BrandCard(
       padding: const EdgeInsets.all(14),
       onTap: onTap,
+      accent: AppColors.royalMid,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Logo-initial gradient tile — royal brand.
           Container(
             width: 46,
             height: 46,
             decoration: BoxDecoration(
-              gradient: AppDecor.tealGradient,
+              gradient: AppDecor.royalGradient,
               borderRadius: BorderRadius.circular(14),
+              boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.28),
             ),
-            child: const Icon(
-              Icons.local_shipping_rounded,
-              color: Colors.white,
-              size: 22,
+            child: Center(
+              child: Text(
+                initial,
+                style: TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 12),
@@ -271,8 +452,8 @@ class _SupplierCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontFamily: AppTextStyles.bodyFont,
-                    fontSize: 14,
+                    fontFamily: AppTextStyles.displayFont,
+                    fontSize: 14.5,
                     fontWeight: FontWeight.w700,
                     color: scheme.onSurface,
                   ),
@@ -312,29 +493,33 @@ class _SupplierCard extends StatelessWidget {
             tooltip: 'Supplier actions',
             onSelected: (value) {
               if (value == 'edit') onTap();
-              if (value == 'delete') onDelete();
+              if (value == 'delete') onDelete?.call();
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: 'edit',
-                child: ListTile(
-                  leading: Icon(Icons.edit_outlined),
-                  title: Text('Edit'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: ListTile(
-                  leading: Icon(Icons.delete_outline, color: AppColors.error),
-                  title: Text(
-                    'Delete',
-                    style: TextStyle(color: AppColors.error),
+            itemBuilder: (context) {
+              final items = <PopupMenuEntry<String>>[
+                PopupMenuItem(
+                  value: 'edit',
+                  child: ListTile(
+                    leading: Icon(Icons.edit_outlined),
+                    title: Text('Edit'),
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  contentPadding: EdgeInsets.zero,
                 ),
-              ),
-            ],
+                if (onDelete != null)
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: ListTile(
+                      leading: Icon(Icons.delete_outline, color: AppColors.error),
+                      title: Text(
+                        'Delete',
+                        style: TextStyle(color: AppColors.error),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+              ];
+              return items;
+            },
           ),
         ],
       ),

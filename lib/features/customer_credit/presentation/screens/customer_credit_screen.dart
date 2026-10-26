@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../core/widgets/modern_widgets.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/customer_credit_repository.dart';
@@ -124,34 +125,214 @@ class _CustomerCreditScreenState extends State<CustomerCreditScreen> {
             final accounts = snapshot.data ?? const <CustomerCreditRecord>[];
             final filtered = _filterAccounts(accounts);
 
-            if (filtered.isEmpty) {
-              return AppEmptyState(
-                icon: Icons.credit_card_outlined,
-                title: accounts.isEmpty ? 'No credit accounts' : 'No matching accounts',
-                message: accounts.isEmpty
-                    ? 'Enable credit for customers to track accounts receivable.'
-                    : 'Try changing the filter.',
-                actionLabel: accounts.isEmpty ? 'Manage Customers' : null,
-                onAction: null,
-              ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.9, 0.9), end: const Offset(1.0, 1.0));
+            if (filtered.isEmpty && accounts.isEmpty) {
+              return ListView(
+                padding: const EdgeInsets.all(AppDimensions.screenPadding),
+                children: [
+                  AppEmptyState(
+                    icon: Icons.credit_card_outlined,
+                    title: 'No credit accounts',
+                    message:
+                        'Enable credit for customers to track accounts receivable.',
+                    actionLabel: 'Manage Customers',
+                    onAction: null,
+                  ).animate().fadeIn(duration: 400.ms),
+                ],
+              );
             }
 
             return ListView.builder(
               padding: const EdgeInsets.all(AppDimensions.screenPadding),
-              itemCount: filtered.length,
+              itemCount: filtered.length + 1,
               itemBuilder: (context, index) {
-                final account = filtered[index];
-                return _AccountTile(
+                if (index == 0) {
+                  return _CreditHeaderBand(accounts: accounts)
+                      .animate()
+                      .fadeIn(duration: 380.ms, curve: Curves.easeOutCubic)
+                      .moveY(begin: 14, end: 0, curve: Curves.easeOutCubic);
+                }
+
+                final itemIndex = index - 1;
+                if (itemIndex >= filtered.length) {
+                  return const SizedBox.shrink();
+                }
+
+                if (filtered.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: AppDimensions.spacingSm),
+                    child: AppEmptyState(
+                      icon: Icons.filter_alt_off_rounded,
+                      title: 'No matching accounts',
+                      message: 'Try changing the filter.',
+                    ).animate().fadeIn(duration: 400.ms),
+                  );
+                }
+
+                final account = filtered[itemIndex];
+                final tile = _AccountTile(
                   account: account,
                   onTap: () => _openDetail(account),
                   onDeactivate: account.isActive ? () => _confirmDeactivate(account) : null,
-                ).animate(delay: Duration(milliseconds: 100 + 50 * index))
-                  .fadeIn(duration: 300.ms, curve: Curves.easeOutCubic)
-                  .slideX(begin: 0.1, end: 0);
+                );
+                if (itemIndex >= 12) {
+                  return tile;
+                }
+                return tile
+                    .animate(delay: (90 + 50 * itemIndex).ms)
+                    .fadeIn(duration: 380.ms, curve: Curves.easeOutCubic)
+                    .moveY(begin: 14, end: 0, curve: Curves.easeOutCubic);
               },
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// Photo micro-wash band: mint outstanding hero + royal/red context chips.
+class _CreditHeaderBand extends StatelessWidget {
+  final List<CustomerCreditRecord> accounts;
+
+  const _CreditHeaderBand({required this.accounts});
+
+  @override
+  Widget build(BuildContext context) {
+    final outstanding = accounts.fold<double>(
+      0,
+      (sum, a) => sum + a.currentBalance,
+    );
+    final overLimitCount = accounts.where((a) => a.isOverLimit).length;
+    final owesCount = accounts.where((a) => a.currentBalance > 0).length;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppDimensions.spacingSm),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: SizedBox(
+          height: 150,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                AppImages.shoppingCustomers,
+                fit: BoxFit.cover,
+                alignment: const Alignment(0, 0.35),
+              ),
+              for (final g in AppDecor.photoWash(anchor: 'left'))
+                DecoratedBox(decoration: BoxDecoration(gradient: g)),
+              Padding(
+                padding: const EdgeInsets.all(18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.account_balance_wallet_rounded,
+                          size: 14,
+                          color: AppColors.auroraTeal,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'ACCOUNTS RECEIVABLE'.toUpperCase(),
+                          style: const TextStyle(
+                            color: AppColors.auroraTeal,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '\$${outstanding.toStringAsFixed(2)}',
+                      maxLines: 1,
+                      style: const TextStyle(
+                        fontFamily: AppTextStyles.displayFont,
+                        color: AppColors.onPhoto,
+                        fontSize: 30,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.9,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Total outstanding credit across all customers',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.onPhotoSoft,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _BandStatChip(
+                          label: '$owesCount with balance',
+                          color: AppColors.auroraLilac,
+                          icon: Icons.credit_card_rounded,
+                        ),
+                        const SizedBox(width: 8),
+                        _BandStatChip(
+                          label: '$overLimitCount over limit',
+                          color: overLimitCount > 0
+                              ? AppColors.brandCoral
+                              : AppColors.auroraTeal,
+                          icon: Icons.warning_amber_rounded,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small glass chip used over the photo wash.
+class _BandStatChip extends StatelessWidget {
+  final String label;
+  final Color color;
+  final IconData icon;
+
+  const _BandStatChip({
+    required this.label,
+    required this.color,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              color: AppColors.onPhoto,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -170,11 +351,35 @@ class _AccountTile extends StatelessWidget {
 
   String _money(double v) => '\$${v.toStringAsFixed(2)}';
 
+  String get _initials {
+    final parts = account.customerName.trim().split(RegExp(r'\s+'));
+    if (parts.length >= 2 && parts.first.isNotEmpty && parts.last.isNotEmpty) {
+      return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+    }
+    final name = account.customerName.trim();
+    return name.isEmpty
+        ? '?'
+        : name.substring(0, name.length.clamp(1, 2)).toUpperCase();
+  }
+
+  /// Money semantics stay identical: red when over limit, amber when
+  /// there is a balance, mint when settled.
+  Color get _amountColor {
+    if (account.isOverLimit) return AppColors.error;
+    if (account.currentBalance > 0) return AppColors.warning;
+    return AppColors.brandMint;
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isOverLimit = account.isOverLimit;
     final hasBalance = account.currentBalance > 0;
+    final statusColor = !account.isActive
+        ? AppColors.chartGray
+        : isOverLimit
+            ? AppColors.error
+            : (hasBalance ? AppColors.warning : AppColors.brandMint);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppDimensions.spacingSm),
@@ -186,15 +391,29 @@ class _AccountTile extends StatelessWidget {
           children: [
             Row(
               children: [
-                IconTile(
-                  icon: isOverLimit
-                      ? Icons.warning_amber_rounded
-                      : (hasBalance ? Icons.credit_card_rounded : Icons.credit_card_outlined),
-                  gradient: isOverLimit
-                      ? AppDecor.errorGradient.colors
-                      : (hasBalance ? AppDecor.warningGradient.colors : AppDecor.successGradient.colors),
-                  size: 48,
-                  iconSize: 22,
+                Container(
+                  width: 46,
+                  height: 46,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: isOverLimit
+                        ? AppDecor.errorGradient
+                        : AppDecor.royalGradient,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: AppDecor.glow(
+                      isOverLimit ? AppColors.error : AppColors.royalMid,
+                      alpha: 0.26,
+                    ),
+                  ),
+                  child: Text(
+                    _initials,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: AppDimensions.spacingMd),
                 Expanded(
@@ -211,44 +430,52 @@ class _AccountTile extends StatelessWidget {
                               style: AppTextStyles.titleSmall,
                             ),
                           ),
-                          if (!account.isActive)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: scheme.outline.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(
-                                'INACTIVE',
-                                style: AppTextStyles.labelSmall.copyWith(color: scheme.onSurface.withValues(alpha: 0.6)),
-                              ),
-                            ),
+                          StatusBadge(
+                            label: !account.isActive
+                                ? 'INACTIVE'
+                                : isOverLimit
+                                    ? 'OVER LIMIT'
+                                    : (hasBalance ? 'OWES' : 'SETTLED'),
+                            color: statusColor,
+                            icon: !account.isActive
+                                ? Icons.pause_rounded
+                                : isOverLimit
+                                    ? Icons.warning_amber_rounded
+                                    : (hasBalance
+                                        ? Icons.schedule_rounded
+                                        : Icons
+                                            .check_circle_outline_rounded),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         'Limit: ${_money(account.creditLimit)}  •  Terms: ${account.paymentTerms}',
-                        style: AppTextStyles.caption.copyWith(color: scheme.onSurface.withValues(alpha: 0.6)),
+                        style: AppTextStyles.caption.copyWith(
+                          color: scheme.onSurface.withValues(alpha: 0.6),
+                        ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: AppDimensions.spacingSm),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       _money(account.currentBalance),
                       style: AppTextStyles.priceSmall.copyWith(
-                        color: isOverLimit
-                            ? AppColors.error
-                            : (hasBalance ? AppColors.warning : AppColors.success),
+                        color: _amountColor,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Available: ${_money(account.availableCredit)}',
                       style: AppTextStyles.caption.copyWith(
-                        color: account.availableCredit < 0 ? AppColors.error : scheme.onSurface.withValues(alpha: 0.55),
+                        color: account.availableCredit < 0
+                            ? AppColors.error
+                            : scheme.onSurface.withValues(alpha: 0.55),
                       ),
                     ),
                   ],

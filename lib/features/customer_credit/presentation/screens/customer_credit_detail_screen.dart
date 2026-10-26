@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../core/widgets/modern_widgets.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/customer_credit_repository.dart';
@@ -54,20 +55,17 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
     return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
-  ({Color color, IconData icon, String label}) _getTxnVisual(String type) {
-    switch (type) {
-      case 'invoice':
-        return (color: AppColors.primary, icon: Icons.receipt_long_outlined, label: 'INVOICE');
-      case 'payment':
-        return (color: AppColors.success, icon: Icons.payments_outlined, label: 'PAYMENT');
-      case 'adjustment':
-        return (color: AppColors.warning, icon: Icons.tune_outlined, label: 'ADJUSTMENT');
-      case 'credit_note':
-        return (color: AppColors.info, icon: Icons.assignment_return_outlined, label: 'CREDIT NOTE');
-      default:
-        return (color: AppColors.chartGray, icon: Icons.help_outline, label: type.toUpperCase());
-    }
+  /// Royal focus ring applied on top of the base theme decoration.
+  InputDecoration _royalField(InputDecoration base) {
+    return base.copyWith(
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.royalMid, width: 1.7),
+      ),
+    );
   }
+
+
 
   Future<void> _recordPayment() async {
     final amount = double.tryParse(_paymentAmountController.text.trim());
@@ -194,10 +192,12 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
             TextFormField(
               controller: _paymentAmountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Amount *',
-                prefixIcon: Icon(Icons.attach_money_outlined),
-                hintText: 'e.g. 100.00',
+              decoration: _royalField(
+                const InputDecoration(
+                  labelText: 'Amount *',
+                  prefixIcon: Icon(Icons.attach_money_outlined),
+                  hintText: 'e.g. 100.00',
+                ),
               ),
             ),
             const SizedBox(height: AppDimensions.spacingMd),
@@ -232,6 +232,7 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
                   child: GradientButton(
                     label: _isProcessing ? 'Processing…' : 'Record Payment',
                     icon: Icons.save_rounded,
+                    gradient: AppDecor.royalGradient.colors,
                     isLoading: _isProcessing,
                     onPressed: _isProcessing ? null : _recordPayment,
                   ),
@@ -265,10 +266,12 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
             TextFormField(
               controller: _adjustmentAmountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-              decoration: const InputDecoration(
-                labelText: 'Amount * (positive = charge, negative = credit)',
-                prefixIcon: Icon(Icons.tune_outlined),
-                hintText: 'e.g. 50.00 or -25.00',
+              decoration: _royalField(
+                const InputDecoration(
+                  labelText: 'Amount * (positive = charge, negative = credit)',
+                  prefixIcon: Icon(Icons.tune_outlined),
+                  hintText: 'e.g. 50.00 or -25.00',
+                ),
               ),
             ),
             const SizedBox(height: AppDimensions.spacingMd),
@@ -294,6 +297,7 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
                   child: GradientButton(
                     label: _isProcessing ? 'Processing…' : 'Record Adjustment',
                     icon: Icons.save_rounded,
+                    gradient: AppDecor.royalGradient.colors,
                     isLoading: _isProcessing,
                     onPressed: _isProcessing ? null : _recordAdjustment,
                   ),
@@ -321,7 +325,6 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isOverLimit = widget.account.isOverLimit;
-    final hasBalance = widget.account.currentBalance > 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -347,96 +350,132 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
         onRefresh: _loadTransactions,
         child: CustomScrollView(
           slivers: [
-            // Account summary header
+            // Account summary header — photo micro-wash with mint hero.
             SliverToBoxAdapter(
-              child: Container(
-                padding: const EdgeInsets.all(AppDimensions.screenPadding),
-                decoration: BoxDecoration(
-                  gradient: isOverLimit
-                      ? AppDecor.errorGradient
-                      : (hasBalance ? AppDecor.warningGradient : AppDecor.successGradient),
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(24)),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(24),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        IconTile(
-                          icon: isOverLimit
-                              ? Icons.warning_amber_rounded
-                              : (hasBalance ? Icons.credit_card_rounded : Icons.credit_card_outlined),
-                          gradient: [Colors.white.withValues(alpha: 0.3), Colors.white.withValues(alpha: 0.1)],
-                          size: 60,
-                          iconSize: 30,
-                        ),
-                        const SizedBox(width: AppDimensions.spacingMd),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Current Balance',
-                                style: AppTextStyles.bodyMedium.copyWith(color: Colors.white.withValues(alpha: 0.9)),
-                              ),
-                              Text(
-                                _money(widget.account.currentBalance),
-                                style: AppTextStyles.heading1.copyWith(color: Colors.white),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
+                child: SizedBox(
+                  height: 206,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        AppImages.shoppingCustomers,
+                        fit: BoxFit.cover,
+                        alignment: const Alignment(0, 0.3),
+                      ),
+                      for (final g in AppDecor.photoWash(anchor: 'top'))
+                        DecoratedBox(decoration: BoxDecoration(gradient: g)),
+                      Padding(
+                        padding: const EdgeInsets.all(AppDimensions.screenPadding),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Credit Limit',
-                              style: AppTextStyles.bodySmall.copyWith(color: Colors.white.withValues(alpha: 0.8)),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  size: 14,
+                                  color: AppColors.auroraTeal,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Current Balance'.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: AppColors.auroraTeal,
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ],
                             ),
-                            Text(
-                              _money(widget.account.creditLimit),
-                              style: AppTextStyles.titleLarge.copyWith(color: Colors.white),
+                            const SizedBox(height: 6),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _money(widget.account.currentBalance),
+                                    style: TextStyle(
+                                      fontFamily: AppTextStyles.displayFont,
+                                      color: isOverLimit
+                                          ? AppColors.brandCoral
+                                          : AppColors.brandMint,
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.9,
+                                    ),
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    const Text(
+                                      'Credit Limit',
+                                      style: TextStyle(
+                                        color: AppColors.onPhotoSoft,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                    Text(
+                                      _money(widget.account.creditLimit),
+                                      style: const TextStyle(
+                                        fontFamily: AppTextStyles.displayFont,
+                                        color: AppColors.onPhoto,
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Available: ${_money(widget.account.availableCredit)}',
+                                      style: TextStyle(
+                                        color: widget.account.availableCredit < 0
+                                            ? AppColors.brandCoral
+                                            : AppColors.onPhotoSoft,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                            Text(
-                              'Available: ${_money(widget.account.availableCredit)}',
-                              style: AppTextStyles.caption.copyWith(
-                                color: widget.account.availableCredit < 0
-                                    ? Colors.redAccent
-                                    : Colors.white.withValues(alpha: 0.8),
-                              ),
+                            const Spacer(),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _SummaryItem(
+                                    label: 'Payment Terms',
+                                    value: widget.account.paymentTerms,
+                                    icon: Icons.schedule_outlined,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _SummaryItem(
+                                    label: 'Status',
+                                    value: widget.account.isActive ? 'Active' : 'Inactive',
+                                    icon: widget.account.isActive ? Icons.check_circle_outline : Icons.block_outlined,
+                                    color: widget.account.isActive ? AppColors.auroraTeal : AppColors.brandCoral,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: _SummaryItem(
+                                    label: 'Since',
+                                    value: _formatDate(widget.account.createdAt).split(' ')[0],
+                                    icon: Icons.calendar_today_outlined,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: AppDimensions.spacingMd),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SummaryItem(
-                            label: 'Payment Terms',
-                            value: widget.account.paymentTerms,
-                            icon: Icons.schedule_outlined,
-                          ),
-                        ),
-                        Expanded(
-                          child: _SummaryItem(
-                            label: 'Status',
-                            value: widget.account.isActive ? 'Active' : 'Inactive',
-                            icon: widget.account.isActive ? Icons.check_circle_outline : Icons.block_outlined,
-                            color: widget.account.isActive ? AppColors.success : AppColors.error,
-                          ),
-                        ),
-                        Expanded(
-                          child: _SummaryItem(
-                            label: 'Since',
-                            value: _formatDate(widget.account.createdAt).split(' ')[0],
-                            icon: Icons.calendar_today_outlined,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -448,10 +487,11 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
                 child: Row(
                   children: [
                     Expanded(
-                      child: SoftButton(
+                      child: GradientButton(
                         label: 'Record Payment',
                         icon: Icons.add_card_outlined,
-                        color: AppColors.success,
+                        gradient: AppDecor.royalGradient.colors,
+                        height: 48,
                         onPressed: _showPaymentDialog,
                       ),
                     ),
@@ -501,82 +541,15 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
                     }
 
                     return Column(
-                      children: txns.map((txn) {
-                        final visual = _getTxnVisual(txn.type);
-                        final isPositive = txn.amount > 0;
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: AppDimensions.spacingSm),
-                          child: HoverLiftCard(
-                            padding: const EdgeInsets.all(AppDimensions.spacingMd),
-                            child: Row(
-                              children: [
-                                IconTile(
-                                  icon: visual.icon,
-                                  gradient: [visual.color.withValues(alpha: 0.2), visual.color.withValues(alpha: 0.1)],
-                                  size: 40,
-                                  iconSize: 18,
-                                ),
-                                const SizedBox(width: AppDimensions.spacingMd),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          StatusBadge(
-                                            label: visual.label,
-                                            color: visual.color,
-                                            icon: visual.icon,
-                                          ),
-                                          const SizedBox(width: AppDimensions.spacingSm),
-                                          Expanded(
-                                            child: Text(
-                                              txn.description ?? '',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: AppTextStyles.bodySmall.copyWith(
-                                                color: scheme.onSurface.withValues(alpha: 0.6),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      if (txn.reference != null) ...[
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          txn.reference!,
-                                          style: AppTextStyles.caption.copyWith(
-                                            color: scheme.onSurface.withValues(alpha: 0.5),
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '${isPositive ? '+' : ''}${_money(txn.amount)}',
-                                      style: AppTextStyles.bodyMedium.copyWith(
-                                        color: isPositive ? AppColors.error : AppColors.success,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    Text(
-                                      _formatDate(txn.createdAt),
-                                      style: AppTextStyles.caption.copyWith(
-                                        color: scheme.onSurface.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (var i = 0; i < txns.length; i++)
+                          _TimelineTxnRow(
+                            txn: txns[i],
+                            isLast: i == txns.length - 1,
+                            scheme: scheme,
                           ),
-                        );
-                      }).toList(),
+                      ],
                     );
                   },
                 ),
@@ -584,6 +557,194 @@ class _CustomerCreditDetailScreenState extends State<CustomerCreditDetailScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Ledger row with a timeline rail: gradient status dot + connector line.
+class _TimelineTxnRow extends StatelessWidget {
+  final CustomerCreditTransactionRecord txn;
+  final bool isLast;
+  final ColorScheme scheme;
+
+  const _TimelineTxnRow({
+    required this.txn,
+    required this.isLast,
+    required this.scheme,
+  });
+
+  String get _typeLabel {
+    switch (txn.type) {
+      case 'invoice':
+        return 'INVOICE';
+      case 'payment':
+        return 'PAYMENT';
+      case 'adjustment':
+        return 'ADJUSTMENT';
+      case 'credit_note':
+        return 'CREDIT NOTE';
+      default:
+        return txn.type.toUpperCase();
+    }
+  }
+
+  Color get _typeColor {
+    switch (txn.type) {
+      case 'invoice':
+        return AppColors.royalMid;
+      case 'payment':
+        return AppColors.brandMint;
+      case 'adjustment':
+        return AppColors.warning;
+      case 'credit_note':
+        return AppColors.info;
+      default:
+        return AppColors.chartGray;
+    }
+  }
+
+  String _money(double v) => '\$${v.toStringAsFixed(2)}';
+
+  @override
+  Widget build(BuildContext context) {
+    final isPositive = txn.amount > 0;
+    final typeColor = _typeColor;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final typeIcon = switch (txn.type) {      'invoice' => Icons.receipt_long_outlined,
+      'payment' => Icons.payments_outlined,
+      'adjustment' => Icons.tune_outlined,
+      'credit_note' => Icons.assignment_return_outlined,
+      _ => Icons.help_outline,
+    };
+    String formatDate(DateTime d) {
+      final local = d.toLocal();
+      return '${local.day.toString().padLeft(2, '0')}/'
+          '${local.month.toString().padLeft(2, '0')}/${local.year} '
+          '${local.hour.toString().padLeft(2, '0')}:'
+          '${local.minute.toString().padLeft(2, '0')}';
+    }
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 26,
+            child: Column(
+              children: [
+                Container(
+                  width: 14,
+                  height: 14,
+                  margin: const EdgeInsets.only(top: 16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        typeColor.withValues(alpha: 0.85),
+                        typeColor,
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: AppDecor.glow(typeColor, alpha: 0.4),
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Opacity(
+                      opacity: isDark ? 0.9 : 0.55,
+                      child: Container(
+                        width: 2,
+                        margin: const EdgeInsets.only(top: 4),
+                        decoration: BoxDecoration(
+                          gradient: AppDecor.auroraBar,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: AppDimensions.spacingSm),
+              child: HoverLiftCard(
+                padding: const EdgeInsets.all(AppDimensions.spacingMd),
+                child: Row(
+                  children: [
+                    IconTile(
+                      icon: typeIcon,
+                      gradient: [
+                        typeColor.withValues(alpha: 0.2),
+                        typeColor.withValues(alpha: 0.1),
+                      ],
+                      size: 40,
+                      iconSize: 18,
+                    ),
+                    const SizedBox(width: AppDimensions.spacingMd),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              StatusBadge(
+                                label: _typeLabel,
+                                color: typeColor,
+                                icon: typeIcon,
+                              ),
+                              const SizedBox(width: AppDimensions.spacingSm),
+                              Expanded(
+                                child: Text(
+                                  txn.description ?? '',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: AppTextStyles.bodySmall.copyWith(
+                                    color: scheme.onSurface
+                                        .withValues(alpha: 0.6),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (txn.reference != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              txn.reference!,
+                              style: AppTextStyles.caption.copyWith(
+                                color: scheme.onSurface
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${isPositive ? '+' : ''}${_money(txn.amount)}',
+                          style: AppTextStyles.priceSmall.copyWith(
+                            color: isPositive ? AppColors.error : AppColors.brandMint,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          formatDate(txn.createdAt),
+                          style: AppTextStyles.caption.copyWith(
+                            color: scheme.onSurface.withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

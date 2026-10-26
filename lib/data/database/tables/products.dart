@@ -14,11 +14,14 @@ class Products extends Table {
 
   RealColumn get sellingPrice => real()();
 
-  IntColumn get stockQuantity => integer()();
+  RealColumn get stockQuantity => real()();
 
-  IntColumn get lowStockThreshold => integer()();
+  RealColumn get lowStockThreshold => real()();
 
   TextColumn get barcode => text().withDefault(const Constant(''))();
+
+  /// Optional URL / local path to a product photo shown on POS tiles.
+  TextColumn get productImageUrl => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

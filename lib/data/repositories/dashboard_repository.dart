@@ -224,9 +224,11 @@ class DashboardRepository {
       customerId: row.customerId,
       subtotal: row.subtotal,
       discount: row.discount,
+      taxAmount: row.taxAmount,
       total: row.total,
       paidAmount: row.paidAmount,
       paymentMethod: row.paymentMethod,
+      paymentMethodDetails: row.paymentMethodDetails,
       status: row.status,
       createdAt: row.createdAt,
     );

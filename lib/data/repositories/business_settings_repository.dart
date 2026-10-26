@@ -67,6 +67,8 @@ class BusinessSettingsRepository {
     receiptNote: '',
     loginRequired: false,
     inactivityTimeoutMinutes: 0,
+    taxRate: 0.0,
+    taxInclusive: false,
   );
 
   /// Guards a security-relevant change to `loginRequired`.
@@ -159,6 +161,8 @@ class BusinessSettingsRepository {
     String? receiptNote,
     bool? loginRequired,
     int? inactivityTimeoutMinutes,
+    double? taxRate,
+    bool? taxInclusive,
   }) async {
     // Security gate: flipping the `loginRequired` setting is an owner-only
     // operation, enforced here so no caller can bypass it by going through
@@ -215,6 +219,10 @@ class BusinessSettingsRepository {
             inactivityTimeoutMinutes: inactivityTimeoutMinutes == null
                 ? const Value.absent()
                 : Value(inactivityTimeoutMinutes),
+            taxRate: taxRate == null ? const Value.absent() : Value(taxRate),
+            taxInclusive: taxInclusive == null
+                ? const Value.absent()
+                : Value(taxInclusive),
           ),
         );
 

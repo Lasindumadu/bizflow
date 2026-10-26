@@ -3,9 +3,11 @@ class SaleItem {
   final String saleId;
   final String productId;
   final String productName;
-  final int quantity;
+  final double quantity;
   final double unitPrice;
   final double purchasePrice;
+  final String? batchNumber;
+  final String? expiryDate;
 
   const SaleItem({
     required this.id,
@@ -15,6 +17,8 @@ class SaleItem {
     required this.quantity,
     required this.unitPrice,
     required this.purchasePrice,
+    this.batchNumber,
+    this.expiryDate,
   });
 
   double get total {

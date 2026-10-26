@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
+import '../../../../core/widgets/brand_ui.dart';
 import '../../../../core/widgets/modern_widgets.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/purchase_order_repository.dart';
@@ -163,103 +166,278 @@ class _PurchaseOrderDetailScreenState extends State<PurchaseOrderDetailScreen> {
     final isEditing = widget.po != null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(isEditing ? 'Edit Purchase Order' : 'Create Purchase Order')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(AppDimensions.screenPadding),
-          children: [
-            Text('Supplier & Details', style: AppTextStyles.heading3),
-            const SizedBox(height: AppDimensions.spacingMd),
-            DropdownButtonFormField<SupplierRecord>(
-              initialValue: _selectedSupplier,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Supplier *',
-                prefixIcon: Icon(Icons.local_shipping_outlined),
-              ),
-              items: widget.suppliers
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s.name)))
-                  .toList(),
-              onChanged: (v) => setState(() => _selectedSupplier = v),
-              validator: (v) => v == null ? 'Select a supplier' : null,
-            ),
-            const SizedBox(height: AppDimensions.spacingMd),
-            InkWell(
-              onTap: _pickExpectedDate,
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  labelText: 'Expected Date *',
-                  prefixIcon: Icon(Icons.calendar_today_outlined),
+      body: BrandBackdrop(
+        child: SafeArea(
+          bottom: false,
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                BrandPageHeader(
+                  eyebrow: 'Purchase orders',
+                  title: isEditing ? 'Edit purchase order' : 'New purchase order',
+                  subtitle:
+                      'Pick the supplier, line up the items and mark the expected date.',
+                  icon: Icons.shopping_cart_rounded,
                 ),
-                child: Text(
-                  '${_expectedDate.day.toString().padLeft(2, '0')}/${_expectedDate.month.toString().padLeft(2, '0')}/${_expectedDate.year}',
-                  style: AppTextStyles.bodyMedium,
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 760),
+                        child: Column(
+                          children: [
+                            // Supplier & schedule.
+                            BrandFormSection(
+                              title: 'Supplier & schedule',
+                              subtitle:
+                                  'Who fulfils the order and when it should arrive.',
+                              icon: Icons.local_shipping_outlined,
+                              accent: AppColors.stockTint.last,
+                              child: Column(
+                                children: [
+                                  DropdownButtonFormField<SupplierRecord>(
+                                    initialValue: _selectedSupplier,
+                                    isExpanded: true,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Supplier *',
+                                      prefixIcon:
+                                          Icon(Icons.local_shipping_outlined),
+                                    ),
+                                    items: widget.suppliers
+                                        .map((s) => DropdownMenuItem(
+                                              value: s,
+                                              child: Text(s.name),
+                                            ))
+                                        .toList(),
+                                    onChanged: (v) =>
+                                        setState(() => _selectedSupplier = v),
+                                    validator: (v) =>
+                                        v == null ? 'Select a supplier' : null,
+                                  ),
+                                  const SizedBox(height: AppDimensions.spacingMd),
+                                  InkWell(
+                                    onTap: _pickExpectedDate,
+                                    borderRadius:
+                                        BorderRadius.circular(AppDimensions.inputRadius),
+                                    child: InputDecorator(
+                                      decoration: const InputDecoration(
+                                        labelText: 'Expected Date *',
+                                        prefixIcon:
+                                            Icon(Icons.calendar_today_outlined),
+                                      ),
+                                      child: Text(
+                                        '${_expectedDate.day.toString().padLeft(2, '0')}/${_expectedDate.month.toString().padLeft(2, '0')}/${_expectedDate.year}',
+                                        style:
+                                            AppTextStyles.bodyMedium,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            _ItemsSection(
+                              items: _items,
+                              subtotal: _subtotal,
+                              onAddItem: _addItemRow,
+                              onRemoveItem: _removeItemRow,
+                              onChanged: () => setState(() {}),
+                            ),
+                            const SizedBox(height: 14),
+                            BrandFormSection(
+                              title: 'Notes',
+                              subtitle:
+                                  'Anything the supplier should know.',
+                              icon: Icons.notes_outlined,
+                              accent: AppColors.accent,
+                              child: TextFormField(
+                                controller: _notesController,
+                                maxLines: 3,
+                                decoration: const InputDecoration(
+                                  labelText: 'Internal Notes',
+                                  hintText:
+                                      'Optional notes for this purchase order',
+                                  prefixIcon: Icon(Icons.notes_outlined),
+                                  alignLabelWithHint: true,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ).animate(delay: 60.ms).fadeIn(
+                              duration: 400.ms,
+                              curve: Curves.easeOutCubic,
+                            ).moveY(
+                              begin: 14,
+                              end: 0,
+                              duration: 400.ms,
+                              curve: Curves.easeOutCubic,
+                            ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-
-            Text('Items', style: AppTextStyles.heading3),
-            const SizedBox(height: AppDimensions.spacingSm),
-            ..._items.asMap().entries.map((entry) {
-              final index = entry.key;
-              final item = entry.value;
-              return _POItemRow(
-                item: item,
-                index: index,
-                isLast: index == _items.length - 1,
-                onRemove: () => _removeItemRow(index),
-                onChanged: () => setState(() {}),
-              );
-            }),
-            if (_items.length < 20)
-              Padding(
-                padding: const EdgeInsets.only(top: AppDimensions.spacingSm),
-                child: OutlinedButton.icon(
-                  onPressed: _addItemRow,
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add Item'),
+                // Sticky bar with live order context + primary CTA.
+                BrandStickyBar(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Items: ${_items.length}',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurface
+                                    .withValues(alpha: 0.5),
+                              ),
+                            ),
+                            Text(
+                              'Total: ${_money(_subtotal)}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.displayFont,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                                color: Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        flex: 2,
+                        child: GradientButton(
+                          label: _isSaving
+                              ? 'Saving…'
+                              : (isEditing ? 'Save Changes' : 'Create PO'),
+                          icon: Icons.save_rounded,
+                          isLoading: _isSaving,
+                          gradient: AppDecor.royalGradient.colors,
+                          onPressed: _isSaving ? null : _save,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            const SizedBox(height: AppDimensions.spacingLg),
-
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(AppDimensions.spacingMd),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Subtotal', style: AppTextStyles.bodyLarge),
-                    Text(_money(_subtotal), style: AppTextStyles.priceLarge),
-                  ],
-                ),
-              ),
+              ],
             ),
-            const SizedBox(height: AppDimensions.spacingLg),
-
-            Text('Notes', style: AppTextStyles.heading3),
-            const SizedBox(height: AppDimensions.spacingMd),
-            TextFormField(
-              controller: _notesController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Internal Notes',
-                hintText: 'Optional notes for this purchase order',
-                prefixIcon: Icon(Icons.notes_outlined),
-                alignLabelWithHint: true,
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingXl),
-
-            GradientButton(
-              label: _isSaving ? 'Saving…' : (widget.po != null ? 'Save Changes' : 'Create Purchase Order'),
-              icon: Icons.save_rounded,
-              isLoading: _isSaving,
-              onPressed: _isSaving ? null : _save,
-            ),
-          ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+/// Line-item editor: gradient-numbered premium rows with POS-style
+/// quantity steppers and a mint valuation strip.
+class _ItemsSection extends StatelessWidget {
+  final List<_POItemForm> items;
+  final double subtotal;
+  final VoidCallback onAddItem;
+  final void Function(int index) onRemoveItem;
+  final VoidCallback onChanged;
+
+  const _ItemsSection({
+    required this.items,
+    required this.subtotal,
+    required this.onAddItem,
+    required this.onRemoveItem,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BrandFormSection(
+      title: 'Items',
+      subtitle: 'Products to order, quantities and unit costs.',
+      icon: Icons.inventory_2_outlined,
+      accent: AppColors.royalMid,
+      trailing: items.length < 20
+          ? SizedBox(
+              height: 34,
+              child: SoftButton(
+                label: 'Add item',
+                icon: Icons.add_rounded,
+                expanded: false,
+                onPressed: onAddItem,
+              ),
+            )
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...items.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            return _POItemRow(
+              item: item,
+              index: index,
+              isLast: index == items.length - 1,
+              onRemove: () => onRemoveItem(index),
+              onChanged: onChanged,
+            );
+          }),
+          const SizedBox(height: AppDimensions.spacingMd),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.moneyTint.first.withValues(
+                alpha: Theme.of(context).brightness == Brightness.dark
+                    ? 0.16
+                    : 1,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.brandMintDeep.withValues(
+                  alpha: Theme.of(context).brightness == Brightness.dark
+                      ? 0.30
+                      : 0.25,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  'Subtotal',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: Theme.of(context).colorScheme.onSurface
+                        .withValues(alpha: 0.65),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '\$${subtotal.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.displayFont,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? AppColors.brandMint
+                        : AppColors.brandMintDeep,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -287,7 +465,7 @@ class _POItemForm {
   }
 }
 
-class _POItemRow extends StatelessWidget {
+class _POItemRow extends StatefulWidget {
   final _POItemForm item;
   final int index;
   final bool isLast;
@@ -303,101 +481,283 @@ class _POItemRow extends StatelessWidget {
   });
 
   @override
+  State<_POItemRow> createState() => _POItemRowState();
+}
+
+class _POItemRowState extends State<_POItemRow> {
+  late final TextEditingController _quantityController;
+  late final TextEditingController _unitCostController;
+
+  @override
+  void initState() {
+    super.initState();
+    _quantityController =
+        TextEditingController(text: widget.item.quantity > 0 ? widget.item.quantity.toString() : '');
+    _unitCostController = TextEditingController(
+        text: widget.item.unitCost > 0 ? widget.item.unitCost.toStringAsFixed(2) : '');
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _unitCostController.dispose();
+    super.dispose();
+  }
+
+  void _stepQuantity(int delta) {
+    final current = int.tryParse(_quantityController.text) ?? 0;
+    final next = (current + delta).clamp(1, 100000);
+    _quantityController.text = '$next';
+    widget.item.quantity = next;
+    setState(() {});
+    widget.onChanged();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Card(
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
       margin: const EdgeInsets.only(bottom: AppDimensions.spacingSm),
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.spacingMd),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text('Item ${index + 1}', style: AppTextStyles.labelMedium.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  )),
-                ),
-                if (!isLast || item.productId.isNotEmpty)
-                  IconButton(
-                    onPressed: onRemove,
-                    icon: const Icon(Icons.delete_outline, color: AppColors.error),
-                    tooltip: 'Remove item',
-                  ),
-              ],
-            ),
-            const SizedBox(height: AppDimensions.spacingSm),
-            // Product search (simplified - in real app would use autocomplete)
-            TextFormField(
-              initialValue: item.productName.isNotEmpty ? item.productName : null,
-              decoration: const InputDecoration(
-                labelText: 'Product *',
-                hintText: 'Search or enter product name',
-                prefixIcon: Icon(Icons.inventory_2_outlined),
-              ),
-              validator: (v) {
-                if (item.productId.isEmpty) return 'Select a product';
-                return null;
-              },
-              onSaved: (v) => item.productName = v?.trim() ?? '',
-            ),
-            const SizedBox(height: AppDimensions.spacingSm),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    initialValue: item.quantity > 0 ? item.quantity.toString() : '',
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: 'Qty *',
-                      prefixIcon: Icon(Icons.numbers_outlined),
-                    ),
-                    validator: (v) {
-                      final q = int.tryParse(v ?? '');
-                      if (q == null || q <= 0) return 'Required';
-                      return null;
-                    },
-                    onSaved: (v) => item.quantity = int.tryParse(v ?? '') ?? 1,
-                    onChanged: (_) => onChanged(),
-                  ),
-                ),
-                const SizedBox(width: AppDimensions.spacingMd),
-                Expanded(
-                  child: TextFormField(
-                    initialValue: item.unitCost > 0 ? item.unitCost.toStringAsFixed(2) : '',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: const InputDecoration(
-                      labelText: 'Unit Cost *',
-                      prefixIcon: Icon(Icons.attach_money_outlined),
-                    ),
-                    validator: (v) {
-                      final c = double.tryParse(v ?? '');
-                      if (c == null || c < 0) return 'Required';
-                      return null;
-                    },
-                    onSaved: (v) => item.unitCost = double.tryParse(v ?? '') ?? 0,
-                    onChanged: (_) => onChanged(),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppDimensions.spacingSm),
-            Row(
-              children: [
-                Text(
-                  'Line Total: ',
-                  style: AppTextStyles.bodySmall.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
-                  ),
-                ),
-                Text(
-                  '\$${(item.quantity * item.unitCost).toStringAsFixed(2)}',
-                  style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-          ],
+      padding: const EdgeInsets.all(AppDimensions.spacingMd),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : AppColors.lightBorder,
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Gradient number squircle, POS-line style.
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  gradient: AppDecor.royalGradient,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.24),
+                ),
+                child: Center(
+                  child: Text(
+                    '${widget.index + 1}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Item ${widget.index + 1}',
+                  style: TextStyle(
+                    fontFamily: AppTextStyles.displayFont,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.onSurface.withValues(alpha: 0.8),
+                  ),
+                ),
+              ),
+              if (!widget.isLast || widget.item.productId.isNotEmpty)
+                IconButton(
+                  onPressed: widget.onRemove,
+                  icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                  tooltip: 'Remove item',
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+          const SizedBox(height: AppDimensions.spacingSm),
+          // Product search (simplified - in real app would use autocomplete)
+          TextFormField(
+            initialValue:
+                widget.item.productName.isNotEmpty ? widget.item.productName : null,
+            decoration: const InputDecoration(
+              labelText: 'Product *',
+              hintText: 'Search or enter product name',
+              prefixIcon: Icon(Icons.inventory_2_outlined),
+            ),
+            validator: (v) {
+              if (widget.item.productId.isEmpty) return 'Select a product';
+              return null;
+            },
+            onSaved: (v) => widget.item.productName = v?.trim() ?? '',
+          ),
+          const SizedBox(height: AppDimensions.spacingSm),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Qty *',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.8,
+                        color: scheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    // POS-style stepper: minus · qty · plus.
+                    Row(
+                      children: [
+                        _StepButton(
+                          icon: Icons.remove_rounded,
+                          onTap: () => _stepQuantity(-1),
+                        ),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _quantityController,
+                            keyboardType: TextInputType.number,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.displayFont,
+                              fontWeight: FontWeight.w800,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                              color: scheme.onSurface,
+                            ),
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: AppColors.stockTint.last.withValues(
+                                alpha: isDark ? 0.10 : 0.05,
+                              ),
+                              isDense: true,
+                              contentPadding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            validator: (v) {
+                              final q = int.tryParse(v ?? '');
+                              if (q == null || q <= 0) return 'Required';
+                              return null;
+                            },
+                            onSaved: (v) =>
+                                widget.item.quantity = int.tryParse(v ?? '') ?? 1,
+                            onChanged: (v) {
+                              widget.item.quantity = int.tryParse(v) ?? 1;
+                              widget.onChanged();
+                            },
+                          ),
+                        ),
+                        _StepButton(
+                          icon: Icons.add_rounded,
+                          onTap: () => _stepQuantity(1),
+                        ),
+                      ],
+                    ),
+                    if (int.tryParse(_quantityController.text) == null ||
+                        (int.tryParse(_quantityController.text) ?? 0) <= 0)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Required',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: scheme.error,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppDimensions.spacingMd),
+              Expanded(
+                child: TextFormField(
+                  controller: _unitCostController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Unit Cost *',
+                    prefixIcon: Icon(Icons.attach_money_outlined),
+                  ),
+                  style: TextStyle(
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    color: scheme.onSurface,
+                  ),
+                  validator: (v) {
+                    final c = double.tryParse(v ?? '');
+                    if (c == null || c < 0) return 'Required';
+                    return null;
+                  },
+                  onSaved: (v) =>
+                      widget.item.unitCost = double.tryParse(v ?? '') ?? 0,
+                  onChanged: (v) {
+                    widget.item.unitCost = double.tryParse(v) ?? 0;
+                    widget.onChanged();
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimensions.spacingSm),
+          Row(
+            children: [
+              Text(
+                'Line Total: ',
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  color: scheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+              Text(
+                '\$${(widget.item.quantity * widget.item.unitCost).toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: scheme.onSurface,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Round +/- stepper button matching the POS cart lines.
+class _StepButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _StepButton({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 30,
+        height: 30,
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        decoration: BoxDecoration(
+          color: scheme.primaryContainer,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, size: 16, color: scheme.onPrimaryContainer),
       ),
     );
   }

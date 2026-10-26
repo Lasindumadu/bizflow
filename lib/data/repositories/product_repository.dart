@@ -148,7 +148,7 @@ class ProductRepository {
 
   Future<void> changeStock({
     required String productId,
-    required int quantity,
+    required double quantity,
     required String type,
     String note = '',
   }) async {
@@ -187,9 +187,9 @@ class ProductRepository {
               id: '${now.microsecondsSinceEpoch}',
               productId: productId,
               type: type,
-              quantity: quantity.abs(),
-              previousStock: previousStock,
-              newStock: newStock,
+              quantity: quantity.abs().toDouble(),
+              previousStock: previousStock.toDouble(),
+              newStock: newStock.toDouble(),
               staffId: Value(actor.staff?.id),
               note: Value(note),
               createdAt: now,

@@ -80,6 +80,8 @@ class SaleRepository {
     required double total,
     required double paidAmount,
     String paymentMethod = 'cash',
+    double taxAmount = 0.0,
+    String? paymentMethodDetails,
     required DateTime createdAt,
     required List<model.SaleItem> items,
   }) async {
@@ -106,14 +108,14 @@ class SaleRepository {
     final actor = await _authorizeCashier();
 
     return database.transaction(() async {
-      final Map<String, int> productQuantities = {};
+      final Map<String, double> productQuantities = {};
 
       for (final item in items) {
         if (item.quantity <= 0) {
           throw StateError('Invalid quantity for ${item.productName}.');
         }
 
-        final currentQuantity = productQuantities[item.productId] ?? 0;
+        final currentQuantity = productQuantities[item.productId] ?? 0.0;
 
         productQuantities[item.productId] = currentQuantity + item.quantity;
       }
@@ -153,6 +155,11 @@ class SaleRepository {
               total: total,
               paidAmount: paidAmount,
               paymentMethod: Value(paymentMethod),
+              taxAmount: Value(taxAmount),
+              paymentMethodDetails:
+                  paymentMethodDetails == null
+                      ? const Value.absent()
+                      : Value(paymentMethodDetails),
               status: const Value('completed'),
               createdAt: createdAt,
             ),
@@ -181,6 +188,8 @@ class SaleRepository {
                 unitPrice: item.unitPrice,
                 purchasePrice: product.purchasePrice,
                 total: item.total,
+                batchNumber: Value(item.batchNumber),
+                expiryDate: Value(item.expiryDate),
               ),
             );
       }
@@ -192,9 +201,9 @@ class SaleRepository {
 
         final product = await productQuery.getSingle();
 
-        final int previousStock = product.stockQuantity;
-        final int soldQuantity = entry.value;
-        final int newStock = previousStock - soldQuantity;
+        final double previousStock = product.stockQuantity.toDouble();
+        final double soldQuantity = entry.value.toDouble();
+        final double newStock = previousStock - soldQuantity;
 
         await (database.update(database.products)
               ..where((table) => table.id.equals(entry.key)))
@@ -220,7 +229,7 @@ class SaleRepository {
         if (onLowStock != null &&
             previousStock > product.lowStockThreshold &&
             newStock <= product.lowStockThreshold) {
-          onLowStock!(product.name, newStock);
+          onLowStock!(product.name, newStock.toInt());
         }
       }
 
@@ -259,9 +268,11 @@ class SaleRepository {
         staffId: actor.staff?.id,
         subtotal: subtotal,
         discount: discount,
+        taxAmount: 0.0,
         total: total,
         paidAmount: paidAmount,
         paymentMethod: paymentMethod,
+        paymentMethodDetails: null,
         status: 'completed',
         createdAt: createdAt,
       );
@@ -302,10 +313,10 @@ class SaleRepository {
 
       // Combine quantities in case the same product
       // appears on multiple sale-item rows.
-      final Map<String, int> productQuantities = {};
+      final Map<String, double> productQuantities = {};
 
       for (final item in items) {
-        final currentQuantity = productQuantities[item.productId] ?? 0;
+        final currentQuantity = productQuantities[item.productId] ?? 0.0;
 
         productQuantities[item.productId] = currentQuantity + item.quantity;
       }
@@ -339,9 +350,9 @@ class SaleRepository {
                 id: DateTime.now().microsecondsSinceEpoch.toString(),
                 productId: entry.key,
                 type: 'REFUND',
-                quantity: returnedQuantity,
-                previousStock: previousStock,
-                newStock: newStock,
+                quantity: returnedQuantity.toDouble(),
+                previousStock: previousStock.toDouble(),
+                newStock: newStock.toDouble(),
                 note: Value('Cancellation of sale $saleId'),
                 staffId: Value(actor.staff?.id),
                 createdAt: DateTime.now(),
@@ -367,7 +378,7 @@ class SaleRepository {
                 entityId: Value(saleId),
                 summary: Value(
                   'Cancelled sale $saleId and restored '
-                  '${productQuantities.values.fold<int>(0, (a, b) => a + b)} '
+                  '${productQuantities.values.fold<double>(0.0, (a, b) => a + b)} '
                   'unit(s) to stock',
                 ),
                 afterJson: const Value('{"status":"cancelled"}'),
@@ -425,9 +436,11 @@ class SaleRepository {
       staffId: row.staffId,
       subtotal: row.subtotal,
       discount: row.discount,
+      taxAmount: row.taxAmount,
       total: row.total,
       paidAmount: row.paidAmount,
       paymentMethod: row.paymentMethod,
+      paymentMethodDetails: row.paymentMethodDetails,
       status: row.status,
       createdAt: row.createdAt,
     );
@@ -442,6 +455,8 @@ class SaleRepository {
       quantity: row.quantity,
       unitPrice: row.unitPrice,
       purchasePrice: row.purchasePrice,
+      batchNumber: row.batchNumber,
+      expiryDate: row.expiryDate,
     );
   }
 }

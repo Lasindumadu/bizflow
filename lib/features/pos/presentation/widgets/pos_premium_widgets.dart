@@ -161,7 +161,7 @@ class PosProductTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isOutOfStock
-                ? AppColors.lightTextDisabled.withValues(alpha: 0.5)
+                ? s.outline.withValues(alpha: 0.5)
                 : lowStock
                     ? AppColors.error.withValues(alpha: 0.5)
                     : s.outline.withValues(alpha: 0.7),
@@ -194,7 +194,7 @@ class PosProductTile extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 11,
-                color: isOutOfStock ? s.onSurface.withValues(alpha: 0.4) : AppColors.lightTextTertiary,
+                color: isOutOfStock ? s.onSurface.withValues(alpha: 0.4) : s.onSurfaceVariant,
               ),
             ),
             const Spacer(),

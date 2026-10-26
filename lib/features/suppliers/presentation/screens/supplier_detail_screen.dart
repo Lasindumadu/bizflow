@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/widgets/brand_ui.dart';
+import '../../../../core/widgets/modern_widgets.dart';
 import '../../../../data/database/database_provider.dart';
+import '../../../../core/session/session_authorization.dart';
+import '../../../../core/session/session_controller.dart';
 import '../../../../data/repositories/supplier_repository.dart';
 
 /// Add/edit supplier screen.
@@ -30,6 +35,12 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
   final _notesController = TextEditingController();
 
   bool _isSaving = false;
+
+  /// Whether the acting session can manage suppliers (owner or manager).
+  bool get _canManageSupplies => canPerform(
+        sessionController.current,
+        {StaffRole.owner, StaffRole.manager},
+      );
 
   @override
   void initState() {
@@ -153,7 +164,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
                               title: 'Company',
                               subtitle: 'Legal name and main contact person.',
                               icon: Icons.business_rounded,
-                              accent: AppColors.cyan,
+                              accent: AppColors.royalEnd,
                               child: Column(
                                 children: [
                                   TextFormField(
@@ -190,7 +201,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
                               subtitle:
                                   'How to place orders and follow up on delivery.',
                               icon: Icons.call_rounded,
-                              accent: AppColors.brandMint,
+                              accent: AppColors.stockTint.last,
                               child: Column(
                                 children: [
                                   TextFormField(
@@ -244,7 +255,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
                               subtitle:
                                   'Used for purchase orders and payment reminders.',
                               icon: Icons.handshake_outlined,
-                              accent: AppColors.brandAmber,
+                              accent: AppColors.brandMintDeep,
                               child: Column(
                                 children: [
                                   TextFormField(
@@ -302,32 +313,31 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
                               ),
                             ),
                           ],
-                        ),
+                        ).animate(delay: 60.ms).fadeIn(
+                              duration: 400.ms,
+                              curve: Curves.easeOutCubic,
+                            ).moveY(
+                              begin: 14,
+                              end: 0,
+                              duration: 400.ms,
+                              curve: Curves.easeOutCubic,
+                            ),
                       ),
                     ),
                   ),
                 ),
               ),
               BrandStickyBar(
-                child: FilledButton.icon(
-                  onPressed: _isSaving ? null : _save,
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.check_rounded, size: 19),
-                  label: Text(
-                    _isSaving
-                        ? 'Saving…'
-                        : isEditing
-                        ? 'Save changes'
-                        : 'Create supplier',
-                  ),
+                child: GradientButton(
+                  label: _isSaving
+                      ? 'Saving…'
+                      : isEditing
+                      ? 'Save changes'
+                      : 'Create supplier',
+                  icon: Icons.check_rounded,
+                  isLoading: _isSaving,
+                  gradient: AppDecor.royalGradient.colors,
+                  onPressed: _canManageSupplies && !_isSaving ? _save : null,
                 ),
               ),
             ],

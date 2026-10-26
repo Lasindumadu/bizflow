@@ -13,7 +13,7 @@ class SaleReturnItems extends Table {
   TextColumn get productName => text()();
 
   /// Quantity returned on this line.
-  IntColumn get quantity => integer()();
+  RealColumn get quantity => real()();
 
   /// Unit price refunded per item.
   RealColumn get unitPrice => real()();

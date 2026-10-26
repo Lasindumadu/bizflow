@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/session/session_controller.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/brand_ui.dart';
 import '../../../../data/database/database_provider.dart';
@@ -44,6 +45,10 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isVerifying = false;
   String? _error;
 
+  /// Bumped every time a NEW error appears so the one-shot shake
+  /// (flutter_animate) replays only for fresh errors.
+  int _errorSeq = 0;
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +68,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _onPinChanged() {
     if (mounted) setState(() {});
+  }
+
+  /// Single place to raise an error — also ticks the shake sequence.
+  void _fail(String message, {void Function()? extra}) {
+    setState(() {
+      _error = message;
+      _errorSeq++;
+      extra?.call();
+    });
   }
 
   Future<void> _loadStaff() async {
@@ -89,10 +103,8 @@ class _LoginScreenState extends State<LoginScreen> {
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _isLoadingStaff = false;
-        _error = 'Could not load staff accounts. Try again.';
-      });
+      _fail('Could not load staff accounts. Try again.');
+      setState(() => _isLoadingStaff = false);
     }
   }
 
@@ -134,13 +146,13 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_isVerifying) return;
     final selected = _selected;
     if (selected == null) {
-      setState(() => _error = 'Select your staff account first.');
+      _fail('Select your staff account first.');
       return;
     }
     final pin = _pinController.text;
     final pinError = StaffAccountRepository.validatePin(pin);
     if (pinError != null) {
-      setState(() => _error = pinError);
+      _fail(pinError);
       return;
     }
 
@@ -164,28 +176,18 @@ class _LoginScreenState extends State<LoginScreen> {
         widget.onAuthenticated?.call();
         setState(() => _isVerifying = false);
       case StaffAuthStatus.invalidPin:
-        setState(() {
-          _isVerifying = false;
-          _error = 'Incorrect PIN. Please try again.';
-        });
+        _fail('Incorrect PIN. Please try again.');
+        setState(() => _isVerifying = false);
       case StaffAuthStatus.accountNotFound:
-        setState(() {
-          _isVerifying = false;
-          _error = 'That account no longer exists.';
-        });
+        _fail('That account no longer exists.');
         unawaited(_loadStaff());
       case StaffAuthStatus.disabled:
-        setState(() {
-          _isVerifying = false;
-          _selected = null;
-          _error = 'This account is deactivated. Ask the owner to reactivate it.';
-        });
+        _fail('This account is deactivated. Ask the owner to reactivate it.');
+        setState(() => _selected = null);
         unawaited(_loadStaff());
       case StaffAuthStatus.locked:
-        setState(() {
-          _isVerifying = false;
-          _error = _lockedMessage(result.lockedUntil);
-        });
+        _fail(_lockedMessage(result.lockedUntil));
+        setState(() => _isVerifying = false);
     }
   }
 
@@ -215,99 +217,84 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.brandInk,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: Image.asset(
-              AppImages.backdrop,
-              fit: BoxFit.cover,
-              alignment: Alignment.center,
-            ),
-          ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF070A14).withValues(alpha: 0.82),
-                    const Color(0xFF0B0F20).withValues(alpha: 0.62),
-                    const Color(0xFF070A14).withValues(alpha: 0.88),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-            ),
-          ),
-          const Positioned.fill(child: GrainOverlay()),
-          SafeArea(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final wide = constraints.maxWidth >= 960;
-                return Center(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: wide ? 48 : 20,
-                      vertical: 28,
-                    ),
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1160),
-                      child: wide
-                          ? Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                const Expanded(
-                                  flex: 6,
-                                  child: _LoginStory(),
-                                ),
-                                const SizedBox(width: 56),
-                                Expanded(
-                                  flex: 4,
-                                  child: _buildAuthCard(),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              children: [
-                                const _LoginStory(compact: true),
-                                const SizedBox(height: 24),
-                                ConstrainedBox(
-                                  constraints:
-                                      const BoxConstraints(maxWidth: 460),
-                                  child: _buildAuthCard(),
-                                ),
-                              ],
-                            ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth >= 980;
+          if (wide) {
+            // Desktop split: branded photo story left, PIN deck right.
+            return Row(
+              children: [
+                const Expanded(flex: 11, child: _BrandPanel()),
+                Expanded(
+                  flex: 9,
+                  child: BrandBackdrop(
+                    child: Center(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 28,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: _buildAuthCard(),
+                        ),
+                      ),
                     ),
                   ),
-                );
-              },
+                ),
+              ],
+            );
+          }
+          // Mobile: compact photo hero on top, then the card.
+          return BrandBackdrop(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+              child: Column(
+                children: [
+                  const _CompactBrandHero(),
+                  const SizedBox(height: 18),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: _buildAuthCard(),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
   Widget _buildAuthCard() {
-    return Container(
-      padding: const EdgeInsets.all(26),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+
+    final card = Container(
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF0D1222).withValues(alpha: 0.88),
+        color: isDark
+            ? const Color(0xFF0D1222).withValues(alpha: 0.88)
+            : Colors.white.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : AppColors.lightBorder,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.45),
-            blurRadius: 60,
-            offset: const Offset(0, 28),
+            color: (isDark ? Colors.black : AppColors.brandInk)
+                .withValues(alpha: isDark ? 0.45 : 0.14),
+            blurRadius: 56,
+            offset: const Offset(0, 26),
             spreadRadius: -12,
           ),
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.16),
-            blurRadius: 80,
-            offset: const Offset(0, 20),
-            spreadRadius: -20,
+            color: AppColors.primary.withValues(alpha: isDark ? 0.16 : 0.10),
+            blurRadius: 72,
+            offset: const Offset(0, 18),
+            spreadRadius: -18,
           ),
         ],
       ),
@@ -322,14 +309,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Welcome back',
                       style: TextStyle(
                         fontFamily: AppTextStyles.displayFont,
-                        fontSize: 25,
+                        fontSize: 24,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.8,
-                        color: Colors.white,
+                        color: scheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 5),
@@ -338,35 +325,38 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(
                         fontSize: 12.5,
                         height: 1.45,
-                        color: Colors.white.withValues(alpha: 0.54),
+                        color: scheme.onSurface.withValues(alpha: 0.56),
                       ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.brandMint.withValues(alpha: 0.12),
+                  color: AppColors.brandMint.withValues(
+                    alpha: isDark ? 0.12 : 0.12,
+                  ),
                   borderRadius: BorderRadius.circular(999),
                   border: Border.all(
-                    color: AppColors.brandMint.withValues(alpha: 0.25),
+                    color: AppColors.brandMint.withValues(alpha: 0.28),
                   ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.shield_outlined,
                       size: 11,
-                      color: AppColors.brandMint,
+                      color: AppColors.brandMintDeep,
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
                       'SECURE',
                       style: TextStyle(
-                        color: AppColors.brandMint,
+                        color: isDark
+                            ? AppColors.brandMint
+                            : AppColors.brandMintDeep,
                         fontSize: 8.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 0.6,
@@ -377,19 +367,32 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
           if (_isLoadingStaff)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 36),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 36),
               child: Center(
-                child: CircularProgressIndicator(color: AppColors.primaryLight),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const AuroraLoader(size: 26, strokeWidth: 2.4),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Loading your team…',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: scheme.onSurface.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             )
           else if (_staff.isEmpty)
             _emptyState()
           else ...[
             _buildStaffPicker(),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
             _buildPinPad(),
           ],
           if (_error != null) ...[
@@ -405,24 +408,32 @@ class _LoginScreenState extends State<LoginScreen> {
               Icon(
                 Icons.lock_outline_rounded,
                 size: 12,
-                color: Colors.white.withValues(alpha: 0.28),
+                color: scheme.onSurface.withValues(alpha: 0.30),
               ),
               const SizedBox(width: 5),
               Text(
                 'Local access · no cloud account needed',
                 style: TextStyle(
                   fontSize: 10.5,
-                  color: Colors.white.withValues(alpha: 0.30),
+                  color: scheme.onSurface.withValues(alpha: 0.34),
                 ),
               ),
             ],
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.04, end: 0);
+    );
+
+    return card
+        .animate()
+        .fadeIn(duration: 420.ms, curve: Curves.easeOutCubic)
+        .moveY(begin: 12, end: 0, curve: Curves.easeOutCubic);
   }
 
   Widget _buildStaffPicker() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -432,7 +443,7 @@ class _LoginScreenState extends State<LoginScreen> {
             fontSize: 9.5,
             fontWeight: FontWeight.w800,
             letterSpacing: 1.2,
-            color: Colors.white.withValues(alpha: 0.38),
+            color: scheme.onSurface.withValues(alpha: 0.42),
           ),
         ),
         const SizedBox(height: 9),
@@ -454,13 +465,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
                           color: selected
-                              ? AppColors.primary.withValues(alpha: 0.18)
-                              : Colors.white.withValues(alpha: 0.04),
+                              ? AppColors.primary.withValues(
+                                  alpha: isDark ? 0.18 : 0.10,
+                                )
+                              : scheme.onSurface.withValues(
+                                  alpha: isDark ? 0.04 : 0.035,
+                                ),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: selected
-                                ? AppColors.primaryLight.withValues(alpha: 0.55)
-                                : Colors.white.withValues(alpha: 0.07),
+                                ? AppColors.primaryLight.withValues(
+                                    alpha: isDark ? 0.55 : 0.60,
+                                  )
+                                : scheme.onSurface.withValues(
+                                    alpha: isDark ? 0.07 : 0.08,
+                                  ),
                           ),
                         ),
                         child: Row(
@@ -469,17 +488,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                gradient: selected
-                                    ? const LinearGradient(
-                                        colors: [
-                                          Color(0xFF8B6CFF),
-                                          Color(0xFF5B5BF7),
-                                        ],
-                                      )
-                                    : null,
-                                color: selected
-                                    ? null
-                                    : Colors.white.withValues(alpha: 0.07),
+                                gradient: selected ? AppDecor.royalGradient : null,
+                                color:
+                                    selected ? null : scheme.primary.withValues(
+                                  alpha: isDark ? 0.14 : 0.10,
+                                ),
                                 shape: BoxShape.circle,
                               ),
                               child: Center(
@@ -488,7 +501,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: TextStyle(
                                     color: selected
                                         ? Colors.white
-                                        : Colors.white.withValues(alpha: 0.64),
+                                        : scheme.onSurface
+                                            .withValues(alpha: 0.62),
                                     fontSize: 12,
                                     fontWeight: FontWeight.w800,
                                   ),
@@ -506,8 +520,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         : account.displayName,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: scheme.onSurface,
                                       fontSize: 12.5,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -515,8 +529,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   Text(
                                     '@${account.username} · ${account.role.name}',
                                     style: TextStyle(
-                                      color:
-                                          Colors.white.withValues(alpha: 0.38),
+                                      color: scheme.onSurface
+                                          .withValues(alpha: 0.42),
                                       fontSize: 10.5,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -536,7 +550,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                 border: Border.all(
                                   color: selected
                                       ? AppColors.brandMint
-                                      : Colors.white.withValues(alpha: 0.18),
+                                      : scheme.onSurface.withValues(
+                                          alpha: 0.20,
+                                        ),
                                 ),
                               ),
                               child: selected
@@ -563,6 +579,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildPinPad() {
     final pin = _pinController.text;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -574,7 +593,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 fontSize: 9.5,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.2,
-                color: Colors.white.withValues(alpha: 0.38),
+                color: scheme.onSurface.withValues(alpha: 0.42),
               ),
             ),
             const Spacer(),
@@ -583,7 +602,7 @@ class _LoginScreenState extends State<LoginScreen> {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.w600,
-                color: AppColors.primaryLight.withValues(alpha: 0.85),
+                color: scheme.primary.withValues(alpha: 0.85),
               ),
             ),
           ],
@@ -602,7 +621,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.number,
                 maxLength: StaffAccountRepository.maxPinLength,
                 onSubmitted: (_) => _verify(),
-                style: const TextStyle(color: Colors.white),
+                style: TextStyle(color: scheme.onSurface),
                 decoration: const InputDecoration(
                   counterText: '',
                   border: InputBorder.none,
@@ -616,14 +635,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: 56,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.035),
-                  borderRadius: BorderRadius.circular(15),
+                  color: scheme.onSurface.withValues(
+                    alpha: isDark ? 0.045 : 0.035,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    color: scheme.onSurface.withValues(alpha: 0.09),
                   ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
+                  key: ValueKey('pin-dots-$_errorSeq'),
                   children: List.generate(
                     StaffAccountRepository.maxPinLength,
                     (index) {
@@ -637,7 +659,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           shape: BoxShape.circle,
                           color: filled
                               ? AppColors.brandMint
-                              : Colors.white.withValues(alpha: 0.12),
+                              : scheme.onSurface.withValues(alpha: 0.14),
                           boxShadow: filled
                               ? [
                                   BoxShadow(
@@ -657,7 +679,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         _PinKeypad(
           enabled: !_isVerifying && _selected != null,
           onDigit: _tapDigit,
@@ -670,54 +692,72 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _signInButton() {
     final canSignIn = _selected != null &&
         _pinController.text.length >= StaffAccountRepository.minPinLength;
+    final enabled = !_isVerifying && canSignIn;
     return SizedBox(
       height: 50,
-      child: FilledButton(
-        onPressed: _isVerifying || !canSignIn ? null : _verify,
-        style: FilledButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          disabledBackgroundColor: Colors.white.withValues(alpha: 0.07),
-          foregroundColor: Colors.white,
-          disabledForegroundColor: Colors.white.withValues(alpha: 0.30),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 160),
+        opacity: enabled ? 1 : 0.55,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            gradient: enabled ? AppDecor.royalGradient : null,
+            color: enabled
+                ? null
+                : Theme.of(context).colorScheme.onSurface.withValues(
+                    alpha: 0.06,
+                  ),
+            boxShadow: enabled
+                ? AppDecor.glow(AppColors.royalMid, alpha: 0.34)
+                : null,
           ),
-          elevation: 0,
-        ),
-        child: _isVerifying
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
-                  color: Colors.white,
-                ),
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'Open my workspace',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(width: 7),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 17,
-                    color: Colors.white.withValues(
-                      alpha: canSignIn ? 1 : 0.30,
-                    ),
-                  ),
-                ],
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: enabled ? _verify : null,
+              borderRadius: BorderRadius.circular(16),
+              child: Center(
+                child: _isVerifying
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: AuroraLoader(
+                          size: 20,
+                          strokeWidth: 2,
+                          onDarkSurface: true,
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text(
+                            'Open my workspace',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 7),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 17,
+                            color: Colors.white.withValues(
+                              alpha: enabled ? 1 : 0.30,
+                            ),
+                          ),
+                        ],
+                      ),
               ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
   Widget _emptyState() {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 20),
       child: Column(
@@ -726,21 +766,23 @@ class _LoginScreenState extends State<LoginScreen> {
             width: 62,
             height: 62,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
+              color: scheme.onSurface.withValues(alpha: 0.05),
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+              border: Border.all(
+                color: scheme.onSurface.withValues(alpha: 0.09),
+              ),
             ),
             child: Icon(
               Icons.person_off_outlined,
               size: 28,
-              color: Colors.white.withValues(alpha: 0.45),
+              color: scheme.onSurface.withValues(alpha: 0.45),
             ),
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'No active staff accounts',
             style: TextStyle(
-              color: Colors.white,
+              color: scheme.onSurface,
               fontSize: 14,
               fontWeight: FontWeight.w700,
             ),
@@ -750,7 +792,7 @@ class _LoginScreenState extends State<LoginScreen> {
             'Ask the owner to create or reactivate a staff account, then refresh.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.45),
+              color: scheme.onSurface.withValues(alpha: 0.45),
               fontSize: 11.5,
               height: 1.45,
             ),
@@ -761,7 +803,7 @@ class _LoginScreenState extends State<LoginScreen> {
             icon: const Icon(Icons.refresh_rounded, size: 16),
             label: const Text('Refresh'),
             style: TextButton.styleFrom(
-              foregroundColor: AppColors.primaryLight,
+              foregroundColor: scheme.primary,
             ),
           ),
         ],
@@ -771,27 +813,30 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildError() {
     return Container(
+      key: ValueKey('error-$_errorSeq'),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppColors.brandCoral.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(
-          color: AppColors.brandCoral.withValues(alpha: 0.28),
+        color: AppColors.error.withValues(
+          alpha: Theme.of(context).brightness == Brightness.dark ? 0.12 : 0.08,
         ),
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.30)),
       ),
       child: Row(
         children: [
           const Icon(
             Icons.error_outline_rounded,
             size: 16,
-            color: AppColors.brandCoral,
+            color: AppColors.error,
           ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _error!,
-              style: const TextStyle(
-                color: Color(0xFFFFB3C1),
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFFFDA4AF)
+                    : const Color(0xFFB91C1C),
                 fontSize: 11.5,
                 fontWeight: FontWeight.w600,
                 height: 1.4,
@@ -800,135 +845,283 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 200.ms).shakeX(amount: 4);
+    ).animate(key: ValueKey('error-shake-$_errorSeq')).shakeX(amount: 4);
   }
 }
 
-/// Left-hand brand story shown on wide layouts.
-class _LoginStory extends StatelessWidget {
-  final bool compact;
-  const _LoginStory({this.compact = false});
+/// ─────────────────────────────────────────────────────────────
+/// Aurora 2.0 brand panels
+/// ─────────────────────────────────────────────────────────────
+
+/// Desktop left panel — real photography under the brand wash,
+/// carrying the Sora wordmark, tagline and three aurora features.
+class _BrandPanel extends StatelessWidget {
+  const _BrandPanel();
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Row(
-          children: [
-            BrandMark(size: compact ? 42 : 54),
-            const SizedBox(width: 12),
-            Column(
+    final features = const [
+      (
+        Icons.bolt_rounded,
+        'Checkout in seconds',
+        'Tap, total, done — the till never slows the queue.',
+      ),
+      (
+        Icons.wifi_off_rounded,
+        'Works offline',
+        'Sell anywhere; everything syncs when you are back.',
+      ),
+      (
+        Icons.insights_rounded,
+        'Live insight',
+        'Revenue, stock and customers in one calm view.',
+      ),
+    ];
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(0),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          AppDecor.photoHero(
+            image: AppImages.purpleAbstract,
+            anchor: 'left',
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(52, 48, 48, 44),
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Row(
+                  children: [
+                    const BrandMark(size: 54),
+                    const SizedBox(width: 13),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'BizFlow',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.displayFont,
+                            fontSize: 27,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -1.2,
+                            color: AppColors.onPhoto,
+                          ),
+                        ),
+                        Text(
+                          'RETAIL OPERATING SYSTEM',
+                          style: TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 2.0,
+                            color: AppColors.onPhotoSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const Spacer(),
                 Text(
-                  'BizFlow',
-                  style: TextStyle(
+                  'Retail,\nin flow.',
+                  style: const TextStyle(
                     fontFamily: AppTextStyles.displayFont,
-                    fontSize: compact ? 26 : 32,
+                    fontSize: 56,
+                    height: 1.02,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: -1.2,
-                    color: Colors.white,
+                    letterSpacing: -2.2,
+                    color: AppColors.onPhoto,
                   ),
                 ),
+                const SizedBox(height: 14),
                 Text(
-                  'RETAIL OPERATING SYSTEM',
+                  'One calm place to sell, track stock, understand your '
+                  'numbers and keep every customer coming back.',
                   style: TextStyle(
-                    fontSize: 8.5,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 2.0,
-                    color: Colors.white.withValues(alpha: 0.38),
+                    fontSize: 14,
+                    height: 1.6,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.onPhotoMuted,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                ...features.indexed.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _StoryFeatureRow(
+                      icon: item.$2.$1,
+                      label: item.$2.$2,
+                      detail: item.$2.$3,
+                    )
+                        .animate(delay: (60 * item.$1 + 120).ms)
+                        .fadeIn(
+                          duration: 380.ms,
+                          curve: Curves.easeOutCubic,
+                        )
+                        .moveY(
+                          begin: 14,
+                          end: 0,
+                          curve: Curves.easeOutCubic,
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  'Local-first · PIN protected · yours',
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.onPhotoSoft,
                   ),
                 ),
               ],
             ),
-          ],
-        ),
-        SizedBox(height: compact ? 18 : 34),
-        Text(
-          'Retail,\nin flow.',
-          style: TextStyle(
-            fontFamily: AppTextStyles.displayFont,
-            fontSize: compact ? 34 : 56,
-            height: 1.02,
-            fontWeight: FontWeight.w700,
-            letterSpacing: -2.2,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 14),
-        Text(
-          'One calm place to sell, track stock, understand your numbers '
-          'and keep every customer coming back.',
-          style: TextStyle(
-            fontSize: compact ? 12.5 : 14,
-            height: 1.6,
-            fontWeight: FontWeight.w500,
-            color: Colors.white.withValues(alpha: 0.55),
-          ),
-        ),
-        if (!compact) ...[
-          const SizedBox(height: 28),
-          SizedBox(
-            height: 230,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Image.asset(
-                AppImages.posIllustration,
-                fit: BoxFit.contain,
-              ),
-            ),
           ),
         ],
-        const SizedBox(height: 18),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: const [
-            _StoryFeature(icon: Icons.bolt_rounded, label: 'Checkout in seconds'),
-            _StoryFeature(icon: Icons.offline_bolt_outlined, label: 'Works offline'),
-            _StoryFeature(icon: Icons.insights_rounded, label: 'Live insight'),
+      ),
+    )
+        .animate()
+        .fadeIn(duration: 420.ms, curve: Curves.easeOutCubic)
+        .scale(
+          begin: const Offset(1.02, 1.02),
+          end: const Offset(1, 1),
+          duration: 420.ms,
+          curve: Curves.easeOutCubic,
+        );
+  }
+}
+
+/// Mobile top hero — a compact photo-backed brand strip.
+class _CompactBrandHero extends StatelessWidget {
+  const _CompactBrandHero();
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: SizedBox(
+        height: 176,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            AppDecor.photoHero(image: AppImages.purpleAbstract, anchor: 'top'),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const BrandMark(size: 44),
+                      const SizedBox(width: 11),
+                      const Text(
+                        'BizFlow',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          fontSize: 23,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -1.0,
+                          color: AppColors.onPhoto,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Retail,\nin flow.',
+                    style: const TextStyle(
+                      fontFamily: AppTextStyles.displayFont,
+                      fontSize: 30,
+                      height: 1.05,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -1.4,
+                      color: AppColors.onPhoto,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Checkout in seconds · Works offline · Live insight',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.onPhotoSoft,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(duration: 420.ms, curve: Curves.easeOutCubic)
+        .moveY(begin: 12, end: 0, curve: Curves.easeOutCubic);
+  }
+}
+
+class _StoryFeatureRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String detail;
+
+  const _StoryFeatureRow({
+    required this.icon,
+    required this.label,
+    required this.detail,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            gradient: AppDecor.flowGradient,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: AppDecor.glow(AppColors.auroraTeal, alpha: 0.28),
+          ),
+          child: Icon(icon, size: 18, color: Colors.white),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.onPhoto,
+                ),
+              ),
+              Text(
+                detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.onPhotoSoft,
+                ),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 }
 
-class _StoryFeature extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _StoryFeature({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.055),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: AppColors.brandMint),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withValues(alpha: 0.68),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+/// ─────────────────────────────────────────────────────────────
+/// Keypad
+/// ─────────────────────────────────────────────────────────────
 
 /// A tactile numeric keypad. Keeps the physical-keyboard path intact.
 class _PinKeypad extends StatelessWidget {
@@ -954,13 +1147,13 @@ class _PinKeypad extends StatelessWidget {
       children: [
         ...keys.map(
           (row) => Padding(
-            padding: const EdgeInsets.only(bottom: 7),
+            padding: const EdgeInsets.only(bottom: 8),
             child: Row(
               children: row
                   .map(
                     (key) => Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 3.5),
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: _KeypadKey(
                           label: key,
                           enabled: enabled,
@@ -977,13 +1170,13 @@ class _PinKeypad extends StatelessWidget {
           children: [
             const Expanded(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 3.5),
-                child: SizedBox(height: 46),
+                padding: EdgeInsets.symmetric(horizontal: 4),
+                child: SizedBox(height: 48),
               ),
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3.5),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: _KeypadKey(
                   label: '0',
                   enabled: enabled,
@@ -993,7 +1186,7 @@ class _PinKeypad extends StatelessWidget {
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 3.5),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: _KeypadKey(
                   icon: Icons.backspace_outlined,
                   enabled: enabled,
@@ -1027,49 +1220,89 @@ class _KeypadKey extends StatefulWidget {
 
 class _KeypadKeyState extends State<_KeypadKey> {
   bool _pressed = false;
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: widget.enabled ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: widget.enabled
-          ? (_) {
-              setState(() => _pressed = false);
-              widget.onTap();
-            }
-          : null,
-      onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.94 : 1,
-        duration: const Duration(milliseconds: 100),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          height: 46,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(
-              alpha: widget.enabled
-                  ? (_pressed ? 0.11 : 0.055)
-                  : 0.025,
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseAlpha = widget.enabled ? (_pressed ? 0.12 : 0.06) : 0.03;
+    final hoverAlpha = widget.enabled && _hovered && !_pressed;
+
+    return MouseRegion(
+      onEnter: widget.enabled ? (_) => setState(() => _hovered = true) : null,
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: widget.enabled
+          ? SystemMouseCursors.click
+          : MouseCursor.defer,
+      child: GestureDetector(
+        onTapDown: widget.enabled ? (_) => setState(() => _pressed = true) : null,
+        onTapUp: widget.enabled
+            ? (_) {
+                setState(() => _pressed = false);
+                widget.onTap();
+              }
+            : null,
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedScale(
+          scale: _pressed ? 0.95 : (hoverAlpha ? 1.02 : 1),
+          duration: const Duration(milliseconds: 110),
+          curve: Curves.easeOut,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 140),
+            curve: Curves.easeOutCubic,
+            height: 48,
+            decoration: BoxDecoration(
+              color: scheme.onSurface.withValues(
+                alpha: isDark ? baseAlpha + (hoverAlpha ? 0.025 : 0) : baseAlpha,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: hoverAlpha
+                    ? AppColors.primaryLight.withValues(alpha: 0.45)
+                    : scheme.onSurface.withValues(
+                        alpha: isDark ? 0.08 : 0.09,
+                      ),
+              ),
+              boxShadow: _pressed
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.18),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                        spreadRadius: -2,
+                      ),
+                    ]
+                  : null,
             ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-          ),
-          child: Center(
-            child: widget.icon != null
-                ? Icon(
-                    widget.icon,
-                    size: 18,
-                    color: Colors.white.withValues(alpha: 0.55),
-                  )
-                : Text(
-                    widget.label!,
-                    style: TextStyle(
-                      fontFamily: AppTextStyles.displayFont,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withValues(alpha: 0.82),
-                    ),
-                  ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.enabled ? widget.onTap : null,
+                borderRadius: BorderRadius.circular(14),
+                splashColor: AppColors.primary.withValues(alpha: 0.08),
+                highlightColor: AppColors.primary.withValues(alpha: 0.05),
+                child: Center(
+                  child: widget.icon != null
+                      ? Icon(
+                          widget.icon,
+                          size: 18,
+                          color: scheme.onSurface.withValues(alpha: 0.55),
+                        )
+                      : Text(
+                          widget.label!,
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.displayFont,
+                            fontSize: 17,
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurface.withValues(
+                              alpha: widget.enabled ? 0.85 : 0.35,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

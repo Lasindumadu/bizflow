@@ -4,9 +4,11 @@ class Sale {
   final String? staffId;
   final double subtotal;
   final double discount;
+  final double taxAmount;
   final double total;
   final double paidAmount;
   final String paymentMethod;
+  final String? paymentMethodDetails;
   final String status;
   final DateTime createdAt;
 
@@ -16,9 +18,11 @@ class Sale {
     this.staffId,
     required this.subtotal,
     required this.discount,
+    required this.taxAmount,
     required this.total,
     required this.paidAmount,
     required this.paymentMethod,
+    this.paymentMethodDetails,
     this.status = 'completed',
     required this.createdAt,
   });

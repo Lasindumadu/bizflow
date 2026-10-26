@@ -206,7 +206,11 @@ class LoyaltyRepository {
   }
 
   /// Recomputes and stores the tier for every customer (used after import).
+  /// Requires a valid session (rejects locked sessions, deactivated accounts,
+  /// and missing sessions when loginRequired=true). In login-disabled mode
+  /// the null-staff actor is accepted, preserving legacy behavior.
   Future<void> refreshTiers() async {
+    await _authorizeLoyaltySession();
     final rows = await database.select(database.customers).get();
     for (final row in rows) {
       final tier = LoyaltyService.tierFor(row.loyaltyPoints).name;

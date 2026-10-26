@@ -280,11 +280,11 @@ class ReportRepository {
         productData[item.productId] = _ProductSalesData(
           productId: item.productId,
           productName: item.productName,
-          quantitySold: item.quantity,
+          quantitySold: item.quantity.toInt(),
           revenue: item.total,
         );
       } else {
-        existing.quantitySold += item.quantity;
+        existing.quantitySold += item.quantity.toInt();
         existing.revenue += item.total;
       }
     }
@@ -392,7 +392,7 @@ class ReportRepository {
       );
       acc.revenue += revenue;
       acc.cost += cost;
-      acc.units += item.quantity;
+      acc.units += item.quantity.toInt();
     }
 
     final result =
@@ -429,7 +429,7 @@ class ReportRepository {
       final acc = grouped.putIfAbsent(category, () => _MarginAccumulator());
       acc.revenue += item.unitPrice * item.quantity;
       acc.cost += item.purchasePrice * item.quantity;
-      acc.units += item.quantity;
+      acc.units += item.quantity.toInt();
     }
 
     final result =

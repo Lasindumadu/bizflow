@@ -8,7 +8,7 @@ import 'audit_repository.dart';
 class ReturnLine {
   final String productId;
   final String productName;
-  final int quantity;
+  final double quantity;
   final double unitPrice;
   final double purchasePrice;
 
@@ -76,28 +76,28 @@ class ReturnRepository {
 
   /// For each product on [saleId], how many units remain returnable, taking
   /// previously recorded returns into account.
-  Future<Map<String, int>> getReturnableQuantities(String saleId) async {
+  Future<Map<String, double>> getReturnableQuantities(String saleId) async {
     final items = await (database.select(
       database.saleItems,
     )..where((t) => t.saleId.equals(saleId))).get();
 
-    final soldByProduct = <String, int>{};
+    final soldByProduct = <String, double>{};
     for (final item in items) {
       soldByProduct[item.productId] =
           (soldByProduct[item.productId] ?? 0) + item.quantity;
     }
 
     final returnItems = await _returnItemsForSale(saleId);
-    final returnedByProduct = <String, int>{};
+    final returnedByProduct = <String, double>{};
     for (final item in returnItems) {
       returnedByProduct[item.productId] =
           (returnedByProduct[item.productId] ?? 0) + item.quantity;
     }
 
-    return {
+    return <String, double>{
       for (final entry in soldByProduct.entries)
-        entry.key: (entry.value - (returnedByProduct[entry.key] ?? 0)).clamp(
-          0,
+        entry.key: (entry.value - (returnedByProduct[entry.key] ?? 0.0)).clamp(
+          0.0,
           entry.value,
         ),
     };
@@ -129,10 +129,10 @@ class ReturnRepository {
 
       // Re-check the latest returnable quantities inside the transaction.
       final returnable = await getReturnableQuantities(saleId);
-      final requested = <String, int>{};
+      final requested = <String, double>{};
       for (final line in validLines) {
         requested[line.productId] =
-            (requested[line.productId] ?? 0) + line.quantity;
+            (requested[line.productId] ?? 0.0) + line.quantity;
       }
 
       for (final entry in requested.entries) {
@@ -269,7 +269,7 @@ class ReturnRepository {
 
   Future<void> _restock({
     required String productId,
-    required int quantity,
+    required double quantity,
     required String returnId,
     String? staffId,
   }) async {
@@ -294,9 +294,9 @@ class ReturnRepository {
             id: 'mov_${DateTime.now().microsecondsSinceEpoch}_$productId',
             productId: productId,
             type: 'RETURN',
-            quantity: quantity,
-            previousStock: previousStock,
-            newStock: newStock,
+            quantity: quantity.toDouble(),
+            previousStock: previousStock.toDouble(),
+            newStock: newStock.toDouble(),
             note: Value('Return $returnId'),
             staffId: Value(staffId),
             createdAt: DateTime.now(),

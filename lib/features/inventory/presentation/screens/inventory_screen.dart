@@ -1,13 +1,17 @@
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/brand_ui.dart';
+import '../../../../core/session/session_authorization.dart';
+import '../../../../core/session/session_controller.dart';
 import '../../../../data/database/database_provider.dart';
+import '../../../../data/database/app_database.dart';
+import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../data/repositories/product_repository.dart';
 import '../../../../data/repositories/stock_movement_repository.dart';
 import '../../../../models/product.dart';
@@ -28,12 +32,26 @@ class InventoryScreenState extends State<InventoryScreen> {
   final StockMovementRepository _stockMovementRepository =
       StockMovementRepository(appDatabase);
 
+  final BusinessSettingsRepository _businessSettingsRepository =
+      BusinessSettingsRepository(appDatabase);
+
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey _stockSectionKey = GlobalKey();
+
   StreamSubscription<List<Product>>? _productsSubscription;
 
   List<Product> _products = [];
   String _searchQuery = '';
+  String _stockFilter = 'all'; // all | low | out — list view filter only.
+  String _currency = 'USD';
   bool _isLoading = true;
   bool _hasError = false;
+
+  /// Whether the acting session can adjust stock (owner or manager).
+  bool get _canManageStock => canPerform(
+        sessionController.current,
+        {StaffRole.owner, StaffRole.manager},
+      );
 
   @override
   void initState() {
@@ -42,8 +60,37 @@ class InventoryScreenState extends State<InventoryScreen> {
     _watchProducts();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadBusinessSettings();
+  }
+
+  @override
+  void dispose() {
+    _productsSubscription?.cancel();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
   Future<void> refreshBusinessSettings() async {
-    // Inventory screen does not depend on business settings
+    await _loadBusinessSettings();
+  }
+
+  Future<void> _loadBusinessSettings() async {
+    try {
+      final settings = await _businessSettingsRepository.getSettings();
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _currency = settings.currency;
+      });
+    } catch (_) {
+      // Display-only: fall back to the default currency code.
+    }
   }
 
   void _watchProducts() {
@@ -79,12 +126,6 @@ class InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
-  @override
-  void dispose() {
-    _productsSubscription?.cancel();
-    super.dispose();
-  }
-
   List<Product> get _filteredProducts {
     final query = _searchQuery.trim().toLowerCase();
 
@@ -97,16 +138,31 @@ class InventoryScreenState extends State<InventoryScreen> {
                 product.barcode.trim().toLowerCase().contains(query);
           }).toList();
 
-    filtered.sort(
+    final viewFiltered = switch (_stockFilter) {
+      'low' => filtered.where((product) => product.isLowStock).toList(),
+      'out' =>
+        filtered.where((product) => product.stockQuantity == 0).toList(),
+      _ => filtered,
+    };
+
+    viewFiltered.sort(
       (a, b) =>
           a.name.trim().toLowerCase().compareTo(b.name.trim().toLowerCase()),
     );
 
-    return filtered;
+    return viewFiltered;
   }
 
-  int get _totalUnits {
-    return _products.fold(0, (total, product) => total + product.stockQuantity);
+  double get _totalUnits {
+    return _products.fold(0.0, (total, product) => total + product.stockQuantity);
+  }
+
+  double get _stockValue {
+    return _products.fold(
+      0,
+      (total, product) =>
+          total + product.stockQuantity * product.purchasePrice,
+    );
   }
 
   int get _lowStockCount {
@@ -119,6 +175,18 @@ class InventoryScreenState extends State<InventoryScreen> {
     return _products.where((product) {
       return product.stockQuantity == 0;
     }).length;
+  }
+
+  void _scrollToStock() {
+    final target = _stockSectionKey.currentContext;
+    if (target == null) return;
+
+    Scrollable.ensureVisible(
+      target,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOutCubic,
+      alignment: 0.05,
+    );
   }
 
   Future<void> _performStockAction(
@@ -175,42 +243,26 @@ class InventoryScreenState extends State<InventoryScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('${product.name} - Stock History'),
+          title: const Row(
+            children: [
+              Icon(Icons.history_rounded, size: 22),
+              SizedBox(width: 8),
+              Expanded(child: Text('Stock movement')),
+            ],
+          ),
           content: SizedBox(
             width: 600,
             height: 400,
             child: movements.isEmpty
                 ? const Center(child: Text('No stock movements yet.'))
-                : ListView.separated(
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
                     itemCount: movements.length,
-                    separatorBuilder: (context, index) {
-                      return const Divider();
-                    },
                     itemBuilder: (context, index) {
-                      final movement = movements[index];
-
-                      return ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          child: Icon(
-                            movement.type == 'STOCK_IN'
-                                ? Icons.add
-                                : movement.type == 'STOCK_OUT'
-                                ? Icons.remove
-                                : Icons.tune,
-                          ),
-                        ),
-                        title: Text(movement.type.replaceAll('_', ' ')),
-                        subtitle: Text(
-                          '${movement.previousStock} → ${movement.newStock}'
-                          '${movement.note.isEmpty ? '' : '\n${movement.note}'}',
-                        ),
-                        trailing: Text(
-                          movement.type == 'STOCK_OUT'
-                              ? '-${movement.quantity}'
-                              : '+${movement.quantity}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
+                      return _MovementTimelineRow(
+                        movement: movements[index],
+                        isFirst: index == 0,
+                        isLast: index == movements.length - 1,
                       );
                     },
                   ),
@@ -229,8 +281,6 @@ class InventoryScreenState extends State<InventoryScreen> {
   }
 
   Widget _buildErrorState() {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppDimensions.screenPadding),
@@ -241,13 +291,13 @@ class InventoryScreenState extends State<InventoryScreen> {
               width: 72,
               height: 72,
               decoration: BoxDecoration(
-                color: colorScheme.error.withValues(alpha: 0.10),
+                color: AppColors.error.withValues(alpha: 0.10),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.inventory_2_outlined,
                 size: 36,
-                color: colorScheme.error,
+                color: AppColors.error,
               ),
             ),
             const SizedBox(height: AppDimensions.spacingLg),
@@ -274,6 +324,213 @@ class InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  /// Hero stat row: in-stock value (mint), low stock (amber),
+  /// out of stock (error).
+  Widget _buildKpiRow() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45);
+
+    Widget kpi({
+      required String label,
+      required String value,
+      required IconData icon,
+      required Color soft,
+      required Color deep,
+      required List<Color> fill,
+    }) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: isDark ? deep.withValues(alpha: 0.22) : soft,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: deep.withValues(alpha: isDark ? 0.35 : 0.28),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: fill),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 14),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      label.toUpperCase(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                        color: muted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              CountUpText(
+                double.tryParse(value) ?? 0,
+                decimals: label == 'In-stock value' ? 2 : 0,
+                prefix: label == 'In-stock value' ? '$_currency ' : '',
+                style: TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: isDark
+                      ? (label == 'In-stock value'
+                          ? AppColors.brandMint
+                          : deep)
+                      : deep,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        kpi(
+          label: 'In-stock value',
+          value: _stockValue.toStringAsFixed(2),
+          icon: Icons.account_balance_wallet_rounded,
+          soft: AppColors.moneyTint.first,
+          deep: AppColors.brandMintDeep,
+          fill: AppDecor.flowGradient.colors,
+        ),
+        const SizedBox(width: 10),
+        kpi(
+          label: 'Low stock',
+          value: '$_lowStockCount',
+          icon: Icons.warning_amber_rounded,
+          soft: AppColors.growthTint.first,
+          deep: AppColors.warningDark,
+          fill: AppDecor.amberGradient.colors,
+        ),
+        const SizedBox(width: 10),
+        kpi(
+          label: 'Out of stock',
+          value: '$_outOfStockCount',
+          icon: Icons.remove_circle_outline_rounded,
+          soft: AppColors.errorContainer,
+          deep: AppColors.errorDark,
+          fill: AppDecor.errorGradient.colors,
+        ),
+      ],
+    ).animate(delay: 80.ms).fadeIn(duration: 380.ms).moveY(
+          begin: 14,
+          end: 0,
+          duration: 380.ms,
+          curve: Curves.easeOutCubic,
+        );
+  }
+
+  /// Royal-selected quick filter chips for the stock view.
+  Widget _buildFilterChips() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    Widget chip(String value, String label, IconData icon) {
+      final selected = _stockFilter == value;
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          gradient: selected ? AppDecor.royalGradient : null,
+          color: selected ? null : (isDark ? Colors.transparent : Colors.white),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? Colors.transparent
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.14)
+                    : AppColors.lightBorder),
+          ),
+          boxShadow: selected
+              ? AppDecor.glow(AppColors.royalMid, alpha: 0.28)
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _stockFilter = value),
+            borderRadius: BorderRadius.circular(999),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 14,
+                    color: selected
+                        ? Colors.white
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withValues(alpha: 0.6),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: selected
+                          ? Colors.white
+                          : Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: 0.75),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                chip('all', 'All stock', Icons.inventory_2_outlined),
+                const SizedBox(width: 8),
+                chip('low', 'Low stock', Icons.warning_amber_rounded),
+                const SizedBox(width: 8),
+                chip('out', 'Out of stock', Icons.remove_circle_outline_rounded),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ).animate(delay: 160.ms).fadeIn(duration: 380.ms).moveY(
+          begin: 14,
+          end: 0,
+          duration: 380.ms,
+          curve: Curves.easeOutCubic,
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final products = _filteredProducts;
@@ -285,6 +542,7 @@ class InventoryScreenState extends State<InventoryScreen> {
       body: _hasError
           ? _buildErrorState().animate().fadeIn(duration: 300.ms).shake()
           : SingleChildScrollView(
+              controller: _scrollController,
               padding: const EdgeInsets.all(AppDimensions.screenPadding),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -293,44 +551,23 @@ class InventoryScreenState extends State<InventoryScreen> {
                     eyebrow: 'Stock control',
                     title: 'Inventory',
                     subtitle:
-                        '${_products.length} products · $_totalUnits units on hand · '
-                        '$_lowStockCount low on stock.',
+                        '${_products.length} SKUs · $_totalUnits units on hand · '
+                        'stock value $_currency ${_stockValue.toStringAsFixed(2)}',
                     showIllustration: false,
-                  ).animate().fadeIn(duration: 350.ms).slideY(begin: -0.05, end: 0),
+                    image: AppImages.warehouse,
+                    action: _buildHeroCta(),
+                  ).animate().fadeIn(duration: 350.ms).slideY(
+                        begin: -0.05,
+                        end: 0,
+                        duration: 350.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
                   const SizedBox(height: AppDimensions.spacingLg),
-                  Wrap(
-                    spacing: AppDimensions.spacingMd,
-                    runSpacing: AppDimensions.spacingMd,
-                    children: [
-                      _InventorySummaryCard(
-                        title: 'Products',
-                        value: '${_products.length}',
-                        icon: Icons.inventory_2_outlined,
-                        color: AppColors.primaryDark,
-                      ).animate(delay: 100.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
-                      _InventorySummaryCard(
-                        title: 'Total Units',
-                        value: '$_totalUnits',
-                        icon: Icons.layers_outlined,
-                        color: AppColors.accent,
-                      ).animate(delay: 200.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
-                      _InventorySummaryCard(
-                        title: 'Low Stock',
-                        value: '$_lowStockCount',
-                        icon: Icons.warning_amber_outlined,
-                        color: AppColors.tertiary,
-                      ).animate(delay: 300.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
-                      _InventorySummaryCard(
-                        title: 'Out of Stock',
-                        value: '$_outOfStockCount',
-                        icon: Icons.remove_shopping_cart_outlined,
-                        color: AppColors.errorDark,
-                      ).animate(delay: 400.ms).fadeIn(duration: 300.ms).slideY(begin: 0.2, end: 0),
-                    ],
-                  ),
-                  const SizedBox(height: AppDimensions.spacingXl),
+                  _buildKpiRow(),
+                  const SizedBox(height: AppDimensions.spacingLg),
                   BrandCard(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    radius: 999,
                     child: TextField(
                       onChanged: (value) {
                         setState(() {
@@ -347,17 +584,32 @@ class InventoryScreenState extends State<InventoryScreen> {
                         focusedBorder: InputBorder.none,
                       ),
                     ),
-                  ).animate().fadeIn(duration: 300.ms, delay: 500.ms).slideY(begin: 0.1, end: 0),
+                  ).animate(delay: 160.ms).fadeIn(duration: 380.ms).moveY(
+                        begin: 14,
+                        end: 0,
+                        duration: 380.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
+                  const SizedBox(height: AppDimensions.spacingMd),
+                  _buildFilterChips(),
                   const SizedBox(height: AppDimensions.spacingXl),
-                  SectionHeading(
-                    title: 'Stock on hand',
-                    subtitle: '${products.length} items in this view',
-                    icon: Icons.warehouse_rounded,
-                    trailing: BrandPill(
-                      label: '$_totalUnits UNITS',
-                      color: AppColors.primary,
+                  KeyedSubtree(
+                    key: _stockSectionKey,
+                    child: SectionHeading(
+                      title: 'Stock on hand',
+                      subtitle: '${products.length} items in this view',
+                      icon: Icons.warehouse_rounded,
+                      trailing: BrandPill(
+                        label: '$_totalUnits UNITS',
+                        color: AppColors.stockTint.last,
+                      ),
                     ),
-                  ).animate().fadeIn(duration: 300.ms, delay: 600.ms).slideX(begin: -0.1, end: 0),
+                  ).animate(delay: 200.ms).fadeIn(duration: 380.ms).moveY(
+                        begin: 14,
+                        end: 0,
+                        duration: 380.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
                   const SizedBox(height: AppDimensions.spacingMd),
                   if (_isLoading)
                     const Center(
@@ -366,7 +618,7 @@ class InventoryScreenState extends State<InventoryScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            CircularProgressIndicator(),
+                            AuroraLoader(size: 44),
                             SizedBox(height: AppDimensions.spacingMd),
                             Text(
                               'Loading inventory...',
@@ -377,40 +629,70 @@ class InventoryScreenState extends State<InventoryScreen> {
                       ),
                     ).animate().fadeIn(duration: 300.ms)
                   else if (products.isEmpty)
-                    const BrandEmptyState(
-                      compact: true,
+                    BrandEmptyState(
                       icon: Icons.inventory_2_outlined,
                       title: 'No products found',
-                      message: 'Try another search or add products first.',
-                    ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.9, 0.9), end: const Offset(1.0, 1.0))
+                      message: _searchQuery.isNotEmpty || _stockFilter != 'all'
+                          ? 'Try another search or clear the filters.'
+                          : 'Add products first to start tracking stock.',
+                      image: AppImages.warehouse,
+                    ).animate().fadeIn(duration: 400.ms)
                   else
                     ...products.asMap().entries.map(
                       (entry) {
                         final index = entry.key;
                         final product = entry.value;
-                        return InventoryProductCard(
+
+                        final card = InventoryProductCard(
                           product: product,
-                          onStockIn: () {
-                            _performStockAction(product, StockActionType.stockIn);
-                          },
-                          onStockOut: () {
-                            _performStockAction(
-                              product,
-                              StockActionType.stockOut,
-                            );
-                          },
-                          onAdjustment: () {
-                            _performStockAction(
-                              product,
-                              StockActionType.adjustment,
-                            );
-                          },
+                          canManageStock: _canManageStock,
+                          onStockIn: _canManageStock
+                              ? () {
+                                  _performStockAction(
+                                    product,
+                                    StockActionType.stockIn,
+                                  );
+                                }
+                              : null,
+                          onStockOut: _canManageStock
+                              ? () {
+                                  _performStockAction(
+                                    product,
+                                    StockActionType.stockOut,
+                                  );
+                                }
+                              : null,
+                          onAdjustment: _canManageStock
+                              ? () {
+                                  _performStockAction(
+                                    product,
+                                    StockActionType.adjustment,
+                                  );
+                                }
+                              : null,
                           onHistory: () {
                             _showHistory(product);
                           },
-                        ).animate(delay: Duration(milliseconds: 700 + 50 * index))
-                          .fadeIn(duration: 300.ms, curve: Curves.easeOutCubic)
-                          .slideX(begin: 0.1, end: 0);
+                        );
+
+                        // Stagger only the first screenful; rows below
+                        // arrive instantly so scrolling never lags.
+                        if (index >= 12) return card;
+
+                        return card
+                            .animate(
+                              delay: Duration(milliseconds: 60 * index + 240),
+                            )
+                            .fadeIn(
+                              duration: 400.ms,
+                              curve: Curves.easeOutCubic,
+                            )
+                            .moveY(
+                              begin: 14,
+                              end: 0,
+                              duration: 400.ms,
+                              curve: Curves.easeOutCubic,
+                            );
                       },
                     ),
                 ],
@@ -418,31 +700,207 @@ class InventoryScreenState extends State<InventoryScreen> {
             ),
     );
   }
+
+  /// Primary hero CTA — jumps the operator straight to the stock list.
+  Widget _buildHeroCta() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedScale(
+          scale: 1,
+          duration: const Duration(milliseconds: 120),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: AppDecor.royalGradient,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.35),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _scrollToStock,
+                borderRadius: BorderRadius.circular(12),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.inventory_2_rounded,
+                        size: 17,
+                        color: Colors.white,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Count stock',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.layers_rounded,
+                size: 15,
+                color: AppColors.brandMint,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '$_totalUnits units',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _InventorySummaryCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
+/// Timeline-style stock movement row with a dot rail tinted by the
+/// movement sign: mint for stock in, rose for stock out, gray for
+/// adjustments.
+class _MovementTimelineRow extends StatelessWidget {
+  final StockMovement movement;
+  final bool isFirst;
+  final bool isLast;
 
-  const _InventorySummaryCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
+  const _MovementTimelineRow({
+    required this.movement,
+    required this.isFirst,
+    required this.isLast,
   });
+
+  bool get _isIn => movement.type == 'STOCK_IN';
+  bool get _isOut => movement.type == 'STOCK_OUT';
+
+  Color _dotColor(bool isDark) {
+    if (_isIn) return isDark ? AppColors.brandMint : AppColors.brandMintDeep;
+    if (_isOut) return isDark ? AppColors.roseLight : AppColors.rose;
+    return AppColors.chartGray;
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 196,
-      child: MetricCard(
-        compact: true,
-        label: title,
-        value: value,
-        icon: icon,
-        gradient: [color, color.withValues(alpha: 0.72)],
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scheme = Theme.of(context).colorScheme;
+    final dot = _dotColor(isDark);
+    final muted = scheme.onSurface.withValues(alpha: 0.5);
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 26,
+            child: Column(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  margin: const EdgeInsets.only(top: 14),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: dot,
+                    boxShadow: AppDecor.glow(dot, alpha: 0.35),
+                  ),
+                ),
+                if (!isLast)
+                  Expanded(
+                    child: Container(
+                      width: 2,
+                      color: scheme.onSurface.withValues(alpha: 0.08),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        movement.type.replaceAll('_', ' ').toLowerCase(),
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        _isOut
+                            ? '-${movement.quantity.abs()}'
+                            : '+${movement.quantity.abs()}',
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          color: _isIn
+                              ? (isDark
+                                  ? AppColors.brandMint
+                                  : AppColors.brandMintDeep)
+                              : (_isOut
+                                  ? (isDark
+                                      ? AppColors.roseLight
+                                      : AppColors.rose)
+                                  : AppColors.chartGray),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${movement.previousStock} → ${movement.newStock} units',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      color: scheme.onSurface.withValues(alpha: 0.6),
+                    ),
+                  ),
+                  if (movement.note.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      movement.note,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11.5, color: muted),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

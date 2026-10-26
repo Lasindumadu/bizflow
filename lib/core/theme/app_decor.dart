@@ -355,4 +355,83 @@ class AppDecor {
       boxShadow: layeredShadow(context),
     );
   }
+
+  // ─────────────────────────────────────────────
+  // Aurora 2.0 — signature gradients & photo wash
+  // ─────────────────────────────────────────────
+
+  /// The brand hero gradient — royal iris into deep indigo.
+  static const royalGradient = LinearGradient(
+    colors: [AppColors.royalStart, AppColors.royalMid, AppColors.royalEnd],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    stops: [0.0, 0.52, 1.0],
+  );
+
+  /// Horizontal signature bar used on progress, badges and rails.
+  static const auroraBar = LinearGradient(
+    colors: [AppColors.royalStart, AppColors.royalMid, AppColors.auroraTeal],
+  );
+
+  /// Mint→blue gradient for "live" money flows.
+  static const flowGradient = LinearGradient(
+    colors: [AppColors.auroraTeal, AppColors.auroraBlue],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  /// Sunset sweep for promos and celebration moments.
+  static const sunsetGradient = LinearGradient(
+    colors: [Color(0xFFFF8A7B), Color(0xFFFF6B8A), Color(0xFF8B5CF6)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  /// Overlay stack that makes any photo brand-legible:
+  /// ink wash + brand tint + top sheen.
+  static List<LinearGradient> photoWash({String anchor = 'left'}) {
+    final begin = anchor == 'left' ? Alignment.centerLeft : Alignment.topCenter;
+    final end = anchor == 'left' ? Alignment.centerRight : Alignment.bottomCenter;
+    return [
+      LinearGradient(
+        colors: [
+          AppColors.photoInk.withValues(alpha: 0.93),
+          AppColors.photoWash.withValues(alpha: 0.78),
+          AppColors.primary.withValues(alpha: 0.42),
+        ],
+        begin: begin,
+        end: end,
+      ),
+      LinearGradient(
+        colors: [Colors.white.withValues(alpha: 0.09), Colors.transparent],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ];
+  }
+
+  /// Photo hero stack — image + brand wash — ready to drop behind
+  /// any headline block so every page carries the imagery.
+  static Widget photoHero({
+    required String image,
+    String anchor = 'left',
+    double imageAlignmentY = 0.4,
+  }) {
+    return LayoutBuilder(
+      builder: (context, _) => Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            image,
+            fit: BoxFit.cover,
+            alignment: Alignment(0, imageAlignmentY),
+          ),
+          for (final g in photoWash(anchor: anchor))
+            DecoratedBox(
+              decoration: BoxDecoration(gradient: g),
+            ),
+        ],
+      ),
+    );
+  }
 }

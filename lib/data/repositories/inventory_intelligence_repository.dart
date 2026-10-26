@@ -5,11 +5,11 @@ class ReorderSuggestion {
   final String productId;
   final String name;
   final String sku;
-  final int currentStock;
-  final int lowStockThreshold;
+  final double currentStock;
+  final double lowStockThreshold;
   final int soldLast30Days;
   final double averageDailySales;
-  final int suggestedReorderQuantity;
+  final double suggestedReorderQuantity;
 
   const ReorderSuggestion({
     required this.productId,
@@ -36,7 +36,7 @@ class DeadStockItem {
   final String productId;
   final String name;
   final String sku;
-  final int stockQuantity;
+  final double stockQuantity;
   final double stockValue;
   final DateTime? lastSoldAt;
 
@@ -100,9 +100,9 @@ class InventoryIntelligenceRepository {
           sku: product.sku,
           currentStock: product.stockQuantity,
           lowStockThreshold: product.lowStockThreshold,
-          soldLast30Days: sold,
+          soldLast30Days: sold.toInt(),
           averageDailySales: avgDaily,
-          suggestedReorderQuantity: suggested < 1 ? 1 : suggested,
+          suggestedReorderQuantity: suggested < 1 ? 1.0 : suggested,
         ),
       );
     }
@@ -151,7 +151,7 @@ class InventoryIntelligenceRepository {
 
     double costValue = 0;
     double retailValue = 0;
-    int units = 0;
+    double units = 0;
 
     for (final p in products) {
       costValue += p.purchasePrice * p.stockQuantity;
@@ -171,7 +171,7 @@ class InventoryIntelligenceRepository {
   // ── helpers ────────────────────────────────────────────────────────────────
 
   /// Quantity sold per product over the last [windowDays] (completed sales).
-  Future<Map<String, int>> _getSoldQuantities(int windowDays) async {
+  Future<Map<String, double>> _getSoldQuantities(int windowDays) async {
     final since = DateTime.now().subtract(Duration(days: windowDays));
 
     final sales = await (database.select(
@@ -189,7 +189,7 @@ class InventoryIntelligenceRepository {
       database.saleItems,
     )..where((t) => t.saleId.isIn(recentSaleIds))).get();
 
-    final map = <String, int>{};
+    final map = <String, double>{};
     for (final item in items) {
       map[item.productId] = (map[item.productId] ?? 0) + item.quantity;
     }
@@ -223,7 +223,7 @@ class InventoryIntelligenceRepository {
 /// Aggregate valuation of the current inventory.
 class StockValuation {
   final int productCount;
-  final int totalUnits;
+  final double totalUnits;
   final double costValue;
   final double retailValue;
   final double potentialProfit;

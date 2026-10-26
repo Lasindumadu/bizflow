@@ -95,7 +95,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         future: _saleFuture,
         builder: (context, saleSnapshot) {
           if (saleSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(child: AuroraLoader(size: 46));
           }
 
           if (saleSnapshot.hasError) {
@@ -114,7 +114,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
             future: _customerFuture,
             builder: (context, customerSnapshot) {
               if (customerSnapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+                return const Center(child: AuroraLoader(size: 46));
               }
 
               if (customerSnapshot.hasError) {
@@ -129,7 +129,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                 builder: (context, itemsSnapshot) {
                   if (itemsSnapshot.connectionState ==
                       ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(child: AuroraLoader(size: 46));
                   }
 
                   if (itemsSnapshot.hasError) {
@@ -146,7 +146,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
                     builder: (context, businessSettingsSnapshot) {
                       if (businessSettingsSnapshot.connectionState ==
                           ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
+                        return const Center(child: AuroraLoader(size: 46));
                       }
 
                       if (businessSettingsSnapshot.hasError) {
@@ -187,92 +187,131 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     required List<SaleItem> items,
     required BusinessSetting businessSettings,
   }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final isDark = theme.brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return SingleChildScrollView(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          BrandPageHeader(
-            eyebrow: 'Sale ${sale.id}',
-            title: 'Digital receipt',
-            subtitle: 'A customer-ready copy you can print or export.',
-            icon: Icons.receipt_long_rounded,
-            actions: [
-              BrandHeaderAction(
-                icon: Icons.picture_as_pdf_outlined,
-                tooltip: 'Open PDF receipt',
-                onTap: _openPdfPreview,
-              ),
-            ],
-          ),
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-                child: Container(
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: isDark ? AppColors.darkSurface : Colors.white,
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(
-                      color: isDark
-                          ? Colors.white.withValues(alpha: 0.08)
-                          : AppColors.lightBorder,
-                    ),
-                    boxShadow: AppDecor.layeredShadow(context),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildBusinessHeader(businessSettings),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(22, 20, 22, 26),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            _buildSaleInformation(sale),
-
-                            const SizedBox(height: AppDimensions.spacingLg),
-
-                            _buildCustomerInformation(sale, customer),
-
-                            const SizedBox(height: AppDimensions.spacingLg),
-
-                            Divider(color: colorScheme.outlineVariant),
-
-                            const SizedBox(height: AppDimensions.spacingLg),
-
-                            _buildItems(items, businessSettings.currency),
-
-                            const SizedBox(height: AppDimensions.spacingLg),
-
-                            Divider(color: colorScheme.outlineVariant),
-
-                            const SizedBox(height: AppDimensions.spacingLg),
-
-                            _buildSummary(sale, businessSettings.currency),
-
-                            const SizedBox(height: AppDimensions.spacingXl),
-
-                            Divider(color: colorScheme.outlineVariant),
-
-                            const SizedBox(height: AppDimensions.spacingLg),
-
-                            _buildFooter(),
-                          ],
-                        ),
+    return BrandBackdrop(
+      showArtwork: true,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            BrandPageHeader(
+              eyebrow: 'Sale ${sale.id}',
+              title: 'Digital receipt',
+              subtitle: 'A customer-ready copy you can print or export.',
+              icon: Icons.receipt_long_rounded,
+              actions: [
+                BrandHeaderAction(
+                  icon: Icons.picture_as_pdf_outlined,
+                  tooltip: 'Open PDF receipt',
+                  onTap: _openPdfPreview,
+                ),
+              ],
+            ),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                  child: Container(
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: isDark ? AppColors.darkSurface : Colors.white,
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.08)
+                            : AppColors.lightBorder,
                       ),
-                    ],
+                      boxShadow: AppDecor.layeredShadow(context),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildBusinessHeader(businessSettings),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(22, 20, 22, 26),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _buildSaleInformation(sale),
+
+                              const SizedBox(height: AppDimensions.spacingLg),
+
+                              _buildCustomerInformation(sale, customer),
+
+                              const SizedBox(height: AppDimensions.spacingLg),
+
+                              const _DashedDivider(),
+
+                              const SizedBox(height: AppDimensions.spacingLg),
+
+                              _buildItems(items, businessSettings.currency),
+
+                              const SizedBox(height: AppDimensions.spacingLg),
+
+                              const _DashedDivider(),
+
+                              const SizedBox(height: AppDimensions.spacingLg),
+
+                              _buildSummary(sale, businessSettings.currency),
+
+                              const SizedBox(height: AppDimensions.spacingXl),
+
+                              const _DashedDivider(),
+
+                              const SizedBox(height: AppDimensions.spacingLg),
+
+                              _buildFooter(),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+            // Primary gradient print CTA — uses the existing PDF pipeline.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: AppDecor.royalGradient,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: AppDecor.glow(
+                          AppColors.royalMid,
+                          alpha: 0.32,
+                        ),
+                      ),
+                      child: FilledButton.icon(
+                        onPressed: _openPdfPreview,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        icon: const Icon(Icons.print_rounded, size: 19),
+                        label: const Text(
+                          'Print or export receipt',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -281,11 +320,7 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
       decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF141033), Color(0xFF2C2266), Color(0xFF14405B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: AppDecor.royalGradient,
       ),
       child: Column(
         children: [
@@ -632,9 +667,9 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
           decoration: BoxDecoration(
-            gradient: AppDecor.primaryGradient,
+            gradient: AppDecor.royalGradient,
             borderRadius: BorderRadius.circular(14),
-            boxShadow: AppDecor.glow(AppColors.primary, alpha: 0.25),
+            boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.28),
           ),
           child: Row(
             children: [
@@ -795,6 +830,61 @@ class _ReceiptScreenState extends State<ReceiptScreen> {
         return method.toUpperCase();
     }
   }
+}
+
+/// Receipt-style dashed rule drawn with a tiny CustomPaint, replacing the
+/// solid hairline between receipt sections.
+class _DashedDivider extends StatelessWidget {
+  const _DashedDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SizedBox(
+      height: 1,
+      child: CustomPaint(
+        painter: _DashedLinePainter(
+          color: (isDark ? Colors.white : AppColors.lightBorderStrong)
+              .withValues(alpha: isDark ? 0.22 : 1),
+        ),
+      ),
+    );
+  }
+}
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+
+  const _DashedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
+
+    const dashWidth = 6.0;
+    const dashGap = 5.0;
+
+    var x = 0.0;
+    while (x < size.width) {
+      canvas.drawLine(
+        Offset(x, size.height / 2),
+        Offset(
+          x + dashWidth > size.width ? size.width : x + dashWidth,
+          size.height / 2,
+        ),
+        paint,
+      );
+      x += dashWidth + dashGap;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedLinePainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class _ReceiptInfoRow extends StatelessWidget {

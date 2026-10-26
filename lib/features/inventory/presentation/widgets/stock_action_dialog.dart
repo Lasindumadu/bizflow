@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
+import '../../../../core/theme/app_text_styles.dart';
 import '../../../../models/product.dart';
 
 enum StockActionType { stockIn, stockOut, adjustment }
@@ -53,8 +56,37 @@ class _StockActionDialogState extends State<StockActionDialog> {
     }
   }
 
-  int? get _calculatedStock {
-    final quantity = int.tryParse(_quantityController.text.trim());
+  /// Section tint for this movement — stock flows use the blue pair;
+  /// the sign decides mint (in) vs rose (out).
+  ({Color soft, Color deep, List<Color> fill, IconData icon}) get _tone {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    switch (widget.actionType) {
+      case StockActionType.stockIn:
+        return (
+          soft: AppColors.moneyTint.first,
+          deep: isDark ? AppColors.brandMint : AppColors.brandMintDeep,
+          fill: AppDecor.flowGradient.colors,
+          icon: Icons.south_west_rounded,
+        );
+      case StockActionType.stockOut:
+        return (
+          soft: AppColors.roseSoft,
+          deep: isDark ? AppColors.roseLight : AppColors.rose,
+          fill: AppDecor.roseGradient.colors,
+          icon: Icons.north_east_rounded,
+        );
+      case StockActionType.adjustment:
+        return (
+          soft: AppColors.stockTint.first,
+          deep: AppColors.stockTint.last,
+          fill: [AppColors.skyLight, AppColors.stockTint.last],
+          icon: Icons.tune_rounded,
+        );
+    }
+  }
+
+  double? get _calculatedStock {
+    final quantity = double.tryParse(_quantityController.text.trim());
 
     if (quantity == null) {
       return null;
@@ -79,9 +111,9 @@ class _StockActionDialogState extends State<StockActionDialog> {
       return;
     }
 
-    final input = int.parse(_quantityController.text.trim());
+    final input = double.parse(_quantityController.text.trim());
 
-    final int stockChange;
+    final double stockChange;
 
     switch (widget.actionType) {
       case StockActionType.stockIn:
@@ -107,9 +139,25 @@ class _StockActionDialogState extends State<StockActionDialog> {
   @override
   Widget build(BuildContext context) {
     final calculatedStock = _calculatedStock;
+    final tone = _tone;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return AlertDialog(
-      title: Text(_title),
+      title: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: tone.fill),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(tone.icon, color: Colors.white, size: 19),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: Text(_title)),
+        ],
+      ),
       content: SizedBox(
         width: 450,
         child: Form(
@@ -120,14 +168,24 @@ class _StockActionDialogState extends State<StockActionDialog> {
             children: [
               Text(
                 widget.product.name,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  fontFamily: AppTextStyles.displayFont,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                ),
               ),
 
               const SizedBox(height: AppDimensions.spacingXs),
 
               Text(
                 'Current stock: ${widget.product.stockQuantity} units',
-                style: const TextStyle(color: Colors.grey),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  color: Theme.of(context).colorScheme.onSurface
+                      .withValues(alpha: 0.55),
+                ),
               ),
 
               const SizedBox(height: AppDimensions.spacingLg),
@@ -193,7 +251,8 @@ class _StockActionDialogState extends State<StockActionDialog> {
                     borderRadius: BorderRadius.circular(
                       AppDimensions.buttonRadius,
                     ),
-                    border: Border.all(color: Colors.grey.shade300),
+                    color: tone.deep.withValues(alpha: isDark ? 0.16 : 0.08),
+                    border: Border.all(color: tone.deep.withValues(alpha: 0.25)),
                   ),
                   child: Row(
                     children: [
@@ -201,7 +260,12 @@ class _StockActionDialogState extends State<StockActionDialog> {
                       const Spacer(),
                       Text(
                         '$calculatedStock units',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          fontWeight: FontWeight.w800,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                          color: tone.deep,
+                        ),
                       ),
                     ],
                   ),
@@ -218,7 +282,11 @@ class _StockActionDialogState extends State<StockActionDialog> {
           },
           child: const Text('Cancel'),
         ),
-        FilledButton(onPressed: _submit, child: Text(_title)),
+        FilledButton.icon(
+          onPressed: _submit,
+          icon: Icon(tone.icon, size: 17),
+          label: Text(_title),
+        ),
       ],
     );
   }
@@ -226,7 +294,7 @@ class _StockActionDialogState extends State<StockActionDialog> {
 
 class StockActionResult {
   final String type;
-  final int quantity;
+  final double quantity;
   final String note;
 
   const StockActionResult({

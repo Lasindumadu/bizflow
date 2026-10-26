@@ -5,9 +5,10 @@ class Product {
   final String category;
   final double purchasePrice;
   final double sellingPrice;
-  final int stockQuantity;
-  final int lowStockThreshold;
+  final double stockQuantity;
+  final double lowStockThreshold;
   final String barcode;
+  final String? productImageUrl;
 
   const Product({
     required this.id,
@@ -19,6 +20,7 @@ class Product {
     required this.stockQuantity,
     required this.lowStockThreshold,
     this.barcode = '',
+    this.productImageUrl,
   });
 
   bool get isLowStock {

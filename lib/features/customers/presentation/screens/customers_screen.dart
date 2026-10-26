@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
+import '../../../../core/session/session_authorization.dart';
+import '../../../../core/session/session_controller.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -30,6 +33,11 @@ class CustomersScreenState extends State<CustomersScreen> {
   late final Stream<List<Customer>> _customersStream;
   String _currency = 'USD';
   bool _isLoadingSettings = true;
+  String _customerFilter = _filterAll;
+
+  static const _filterAll = 'All';
+  static const _filterOwesOnly = 'Owes credit';
+  static const _filterLoyaltyOnly = 'Loyalty members';
   @override
   void initState() {
     super.initState();
@@ -41,6 +49,12 @@ class CustomersScreenState extends State<CustomersScreen> {
     Navigator.of(context)
         .push(MaterialPageRoute(builder: (_) => const AddCustomerScreen()));
   }
+
+  /// Whether the acting session is the owner (customer deletion is owner-only).
+  bool get _isOwner => canPerform(
+        sessionController.current,
+        {StaffRole.owner},
+      );
 
   Future<void> refreshBusinessSettings() async {
     await _loadBusinessSettings();
@@ -252,85 +266,268 @@ class CustomersScreenState extends State<CustomersScreen> {
                 if (snapshot.hasError) {
                   return _buildErrorState(snapshot.error.toString());
                 }
-                // final query = _searchController.text.trim().toLowerCase();
                 final customers = snapshot.data ?? [];
+                final loyaltyMembers =
+                    customers.where((c) => c.pointsBalance > 0).length;
+                final showLoyaltyOnly = _customerFilter == _filterLoyaltyOnly;
+                final showOwesOnly = _customerFilter == _filterOwesOnly;
                 final filteredCustomers =
                     customers.where((customer) {
                       final query = _searchController.text.trim().toLowerCase();
-                      if (query.isEmpty) {
-                        return true;
+                      if (query.isNotEmpty) {
+                        final matchesQuery =
+                            customer.name.toLowerCase().contains(query) ||
+                                customer.phone.toLowerCase().contains(query) ||
+                                customer.email.toLowerCase().contains(query);
+                        if (!matchesQuery) {
+                          return false;
+                        }
                       }
-                      return customer.name.toLowerCase().contains(query) ||
-                          customer.phone.toLowerCase().contains(query) ||
-                          customer.email.toLowerCase().contains(query);
+                      if (showLoyaltyOnly && customer.pointsBalance <= 0) {
+                        return false;
+                      }
+                      if (showOwesOnly && customer.outstandingBalance <= 0) {
+                        return false;
+                      }
+                      return true;
                     }).toList()..sort(
                       (a, b) => a.name.trim().toLowerCase().compareTo(
                         b.name.trim().toLowerCase(),
                       ),
                     );
-                return Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: PageHero(
-                        eyebrow: 'Relationships',
-                        title: 'Customers & loyalty',
-                        subtitle:
-                            '${customers.length} people in your directory · '
-                            'balances, credit and points in one place.',
-                        showIllustration: false,
-                        action: FilledButton.icon(
-                          onPressed: _openAddCustomer,
-                          icon: const Icon(
-                            Icons.person_add_alt_1_rounded,
-                            size: 18,
-                          ),
-                          label: const Text('Add customer'),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: AppColors.primary,
+                // Slivers instead of a pinned Column: hero, KPI strip,
+                // filters and search all scroll away with the content so
+                // customer cards reclaim the full screen while scrolling.
+                return CustomScrollView(
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: PageHero(
+                          eyebrow: 'Relationships',
+                          title: 'Customers & loyalty',
+                          subtitle:
+                              '${customers.length} customers · '
+                              '$loyaltyMembers loyalty members · '
+                              'balances, credit and points in one place.',
+                          showIllustration: false,
+                          image: AppImages.shoppingCustomers,
+                          action: _HeroGradientCta(
+                            icon: Icons.person_add_alt_1_rounded,
+                            label: 'Add customer',
+                            onTap: _openAddCustomer,
                           ),
                         ),
-                      ),
+                      )
+                          .animate()
+                          .fadeIn(
+                            duration: 380.ms,
+                            curve: Curves.easeOutCubic,
+                          )
+                          .moveY(begin: 14, end: 0, curve: Curves.easeOutCubic),
                     ),
-                    _buildSearchField(),
-                    Expanded(
-                      child: filteredCustomers.isEmpty
-                          ? customers.isEmpty
-                                ? _buildEmptyState()
-                                : _buildNoResultsState()
-                          : ListView.separated(
-                              padding: const EdgeInsets.all(
-                                AppDimensions.screenPadding,
-                              ),
-                              itemCount: filteredCustomers.length,
-                              separatorBuilder: (context, index) {
-                                return const SizedBox(
-                                  height: AppDimensions.spacingMd,
-                                );
-                              },
-                              itemBuilder: (context, index) {
-                                final customer = filteredCustomers[index];
-                                return _CustomerCard(
-                                  customer: customer,
-                                  currency: _currency,
-                                  onEdit: () {
-                                    _openEditCustomer(customer);
-                                  },
-                                  onDelete: () {
-                                    _confirmDeleteCustomer(customer);
-                                  },
-                                  onCredit: () {
-                                    _openCustomerCredit(customer);
-                                  },
-                                );
-                              },
-                            ),
+                    SliverToBoxAdapter(child: _buildKpiRow(customers)),
+                    SliverToBoxAdapter(child: _buildFilterChips()),
+                    SliverToBoxAdapter(child: _buildSearchField()),
+                    if (filteredCustomers.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          child: customers.isEmpty
+                              ? _buildEmptyState(
+                                  key: const ValueKey('empty'),
+                                )
+                              : _buildNoResultsState(),
+                        ),
+                      )
+                    else
+                      _buildCustomerList(filteredCustomers),
+                    // Breathing room under the last card.
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppDimensions.spacingXl),
                     ),
                   ],
                 );
               },
             ),
+    );
+  }
+
+  /// KPI strip: people (care rose), loyalty (amber), money owed (mint).
+  Widget _buildKpiRow(List<Customer> customers) {
+    final loyaltyMembers = customers.where((c) => c.pointsBalance > 0).length;
+    final totalPoints = customers.fold<int>(0, (sum, c) => sum + c.pointsBalance);
+    final outstanding = customers.fold<double>(
+      0,
+      (sum, c) => sum + c.outstandingBalance,
+    );
+
+    final cards = [
+      MetricCard(
+        compact: true,
+        label: 'Total customers',
+        value: '${customers.length}',
+        icon: Icons.groups_2_rounded,
+        gradient: const [Color(0xFFFB7185), AppColors.rose],
+      ),
+      MetricCard(
+        compact: true,
+        label: 'Loyalty points',
+        value: '$totalPoints',
+        helper: '$loyaltyMembers members earning',
+        icon: Icons.stars_rounded,
+        gradient: const [AppColors.tertiaryLight, AppColors.tertiaryDark],
+      ),
+      MetricCard(
+        compact: true,
+        label: 'Credit outstanding',
+        value: '$_currency ${outstanding.toStringAsFixed(2)}',
+        helper: 'owed across all customers',
+        icon: Icons.account_balance_wallet_rounded,
+        gradient: const [AppColors.brandMint, AppColors.brandMintDeep],
+      ),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      child: Row(
+        children: [
+          for (var i = 0; i < cards.length; i++) ...[
+            Expanded(child: cards[i]),
+            if (i < cards.length - 1) const SizedBox(width: 12),
+          ],
+        ],
+      )
+          .animate(delay: 90.ms)
+          .fadeIn(duration: 380.ms, curve: Curves.easeOutCubic)
+          .moveY(begin: 14, end: 0, curve: Curves.easeOutCubic),
+    );
+  }
+
+  /// Royal-selected quick filters (presentation-only refinement).
+  Widget _buildFilterChips() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final chips = [
+      (_filterAll, Icons.all_inclusive_rounded),
+      (_filterOwesOnly, Icons.account_balance_wallet_rounded),
+      (_filterLoyaltyOnly, Icons.stars_rounded),
+    ];
+
+    Widget buildChip(String label, IconData icon) {
+      final selected = _customerFilter == label;
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          gradient: selected ? AppDecor.royalGradient : null,
+          color: selected
+              ? null
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.white),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? Colors.transparent
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : AppColors.lightBorder),
+          ),
+          boxShadow: selected
+              ? AppDecor.glow(AppColors.royalMid, alpha: 0.28)
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () => setState(() => _customerFilter = label),
+            borderRadius: BorderRadius.circular(999),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 15,
+                    color: selected
+                        ? Colors.white
+                        : Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: selected
+                          ? Colors.white
+                          : Theme.of(context).colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final chip in chips) ...[
+              buildChip(chip.$1, chip.$2),
+              const SizedBox(width: 8),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// First screenful gets the staggered entrance; longer lists skip motion.
+  /// Returned as a [SliverList] so it composes inside the page's
+  /// [CustomScrollView].
+  Widget _buildCustomerList(List<Customer> filteredCustomers) {
+    final itemCount = filteredCustomers.length;
+    return SliverList.separated(
+      key: const ValueKey('list'),
+      itemCount: filteredCustomers.length,
+      separatorBuilder: (context, index) {
+        return const SizedBox(
+          height: AppDimensions.spacingMd,
+        );
+      },
+      itemBuilder: (context, index) {
+        final customer = filteredCustomers[index];
+        final tile = _CustomerCard(
+          customer: customer,
+          currency: _currency,
+          onEdit: () {
+            _openEditCustomer(customer);
+          },
+          onDelete: _isOwner
+              ? () {
+                  _confirmDeleteCustomer(customer);
+                }
+              : null,
+          onCredit: () {
+            _openCustomerCredit(customer);
+          },
+        );
+        if (index >= itemCount.clamp(0, 12)) {
+          return tile;
+        }
+        return tile
+            .animate(delay: (120 + 60 * index).ms)
+            .fadeIn(duration: 380.ms, curve: Curves.easeOutCubic)
+            .moveY(begin: 14, end: 0, curve: Curves.easeOutCubic);
+      },
     );
   }
 
@@ -385,21 +582,7 @@ class CustomersScreenState extends State<CustomersScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  gradient: AppDecor.indigoGradient,
-                  shape: BoxShape.circle,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppDimensions.spacingLg),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: AppColors.onPrimary,
-                  ),
-                ),
-              ),
+              const AuroraLoader(size: 52),
               const SizedBox(height: AppDimensions.spacingLg),
               Text(
                 'Loading customers',
@@ -423,8 +606,9 @@ class CustomersScreenState extends State<CustomersScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState({Key? key}) {
     return Center(
+      key: key,
       child: BrandEmptyState(
         title: 'No customers yet',
         message:
@@ -433,6 +617,7 @@ class CustomersScreenState extends State<CustomersScreen> {
         actionLabel: 'Add customer',
         onAction: _openAddCustomer,
         icon: Icons.people_outline_rounded,
+        image: AppImages.shoppingCustomers,
       ),
     );
   }
@@ -504,7 +689,7 @@ class _CustomerCard extends StatelessWidget {
   final Customer customer;
   final String currency;
   final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final VoidCallback onCredit;
 
   const _CustomerCard({
@@ -527,10 +712,12 @@ class _CustomerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final hasPhone = customer.phone.trim().isNotEmpty;
     final hasEmail = customer.email.trim().isNotEmpty;
     final owes = customer.outstandingBalance > 0;
     final hasPoints = customer.pointsBalance > 0;
+    final pointsColor = isDark ? AppColors.rose : AppColors.careTint[1];
 
     return BrandCard(
       padding: const EdgeInsets.all(14),
@@ -540,30 +727,26 @@ class _CustomerCard extends StatelessWidget {
           Container(
             width: 44,
             height: 44,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF8B6CFF), Color(0xFF5B5BF7)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
+              gradient: AppDecor.royalGradient,
+              borderRadius: BorderRadius.circular(14),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.25),
+                  color: AppColors.royalMid.withValues(alpha: 0.28),
                   blurRadius: 12,
                   offset: const Offset(0, 5),
                   spreadRadius: -3,
                 ),
               ],
             ),
-            child: Center(
-              child: Text(
-                _initials,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                ),
+            child: Text(
+              _initials,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.3,
               ),
             ),
           ),
@@ -592,6 +775,7 @@ class _CustomerCard extends StatelessWidget {
                         label:
                             '$currency ${customer.outstandingBalance.toStringAsFixed(2)}',
                         color: AppColors.error,
+                        icon: Icons.account_balance_wallet_rounded,
                       ),
                   ],
                 ),
@@ -624,7 +808,7 @@ class _CustomerCard extends StatelessWidget {
                       label: hasPoints
                           ? '${customer.pointsBalance} PTS'
                           : 'NO POINTS',
-                      color: AppColors.primary,
+                      color: pointsColor,
                       icon: Icons.stars_rounded,
                     ),
                   ],
@@ -643,38 +827,114 @@ class _CustomerCard extends StatelessWidget {
             ),
             onSelected: (value) {
               if (value == 'edit') onEdit();
-              if (value == 'delete') onDelete();
+              if (value == 'delete') onDelete?.call();
               if (value == 'credit') onCredit();
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
-                value: 'edit',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.edit_outlined, size: 18),
-                  title: Text('Edit customer'),
+            itemBuilder: (context) {
+              final items = <PopupMenuEntry<String>>[
+                PopupMenuItem(
+                  value: 'edit',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.edit_outlined, size: 18),
+                    title: Text('Edit customer'),
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'credit',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.credit_card_outlined, size: 18),
-                  title: Text('Credit account'),
+                PopupMenuItem(
+                  value: 'credit',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.credit_card_outlined, size: 18),
+                    title: Text('Credit account'),
+                  ),
                 ),
-              ),
-              PopupMenuItem(
-                value: 'delete',
-                child: ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Icon(Icons.delete_outline_rounded, size: 18),
-                  title: Text('Delete'),
-                ),
-              ),
-            ],
+                if (onDelete != null)
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Icon(Icons.delete_outline_rounded, size: 18),
+                      title: Text('Delete'),
+                    ),
+                  ),
+              ];
+              return items;
+            },
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Primary gradient CTA used inside the photo hero — royal brand ramp
+/// with a glow + press scale, per the Aurora 2.0 button rules.
+class _HeroGradientCta extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _HeroGradientCta({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  State<_HeroGradientCta> createState() => _HeroGradientCtaState();
+}
+
+class _HeroGradientCtaState extends State<_HeroGradientCta> {
+  bool _pressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = AnimatedScale(
+      scale: _pressed ? 0.97 : 1,
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOut,
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          gradient: AppDecor.royalGradient,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.35)),
+          boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.4),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            borderRadius: BorderRadius.circular(999),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(widget.icon, size: 18, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    widget.label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Listener(
+      onPointerDown: (_) => setState(() => _pressed = true),
+      onPointerUp: (_) => setState(() => _pressed = false),
+      onPointerCancel: (_) => setState(() => _pressed = false),
+      child: button,
     );
   }
 }

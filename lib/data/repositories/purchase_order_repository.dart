@@ -412,7 +412,7 @@ class PurchaseOrderRepository {
         if (product != null) {
           await _productRepository.changeStock(
             productId: item.productId,
-            quantity: receivedQty,
+            quantity: receivedQty.toDouble(),
             type: 'RECEIPT',
             note: 'PO receipt $id${notes.isEmpty ? '' : ' — $notes'}',
           );

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../data/database/database_provider.dart';
 import '../../data/repositories/business_settings_repository.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/pos/presentation/utils/parked_sales.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_decor.dart';
 import '../theme/app_dimensions.dart';
@@ -11,6 +12,7 @@ import '../session/session_controller.dart';
 import '../theme/theme_controller.dart';
 import 'app_shell.dart';
 import 'brand_badge.dart';
+import 'brand_ui.dart';
 
 /// Runs the minimum startup work the app genuinely needs before the shell
 /// can be shown:
@@ -33,7 +35,15 @@ Future<void> _initializeEssentialServices() async {
     // Keep the in-memory defaults (same behavior as today's cold start).
   }
 
-  // 2) Database open — essential. Any failure propagates so the gate can
+  // 2) Persistent held carts — restore parked sales from shared_preferences
+  //    so they survive app restart.
+  try {
+    await parkedSalesStore.init();
+  } catch (_) {
+    // Held carts are non-essential; start with an empty store on failure.
+  }
+
+  // 3) Database open — essential. Any failure propagates so the gate can
   //   surface a recoverable error state with Retry.
   //   The first statement on the lazy singleton triggers open + migration.
   await appDatabase.customSelect('SELECT 1').getSingle();
@@ -192,6 +202,10 @@ class _StartupGateState extends State<StartupGate> {
 }
 
 /// Full-screen branded surface shared by the loading and error states.
+///
+/// Aurora 2.0: the purple-abstract photography sits under a dense brand
+/// wash (ink 93% → royal 42%) so both the loading and error content stay
+/// perfectly readable on any theme.
 class _BrandedSurface extends StatelessWidget {
   const _BrandedSurface({required this.child});
 
@@ -199,21 +213,24 @@ class _BrandedSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: BoxDecoration(
-        gradient: isDark
-            ? const LinearGradient(
-                colors: [Color(0xFF0F172A), Color(0xFF1E1B4B)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : AppDecor.primaryGradient,
+      clipBehavior: Clip.antiAlias,
+      decoration: const BoxDecoration(),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.asset(
+            AppImages.purpleAbstract,
+            fit: BoxFit.cover,
+            alignment: Alignment.centerRight,
+          ),
+          for (final g in AppDecor.photoWash(anchor: 'left'))
+            DecoratedBox(decoration: BoxDecoration(gradient: g)),
+          child,
+        ],
       ),
-      child: child,
     );
   }
 }
@@ -236,15 +253,36 @@ class _StartupBranding extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const BrandBadge(size: 72),
+                  // One-shot elastic entrance for the brand mark — plays
+                  // once on build, never loops.
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 430),
+                    curve: Curves.elasticOut,
+                    child: const BrandBadge(size: 72),
+                    builder: (context, t, child) =>
+                        Transform.scale(scale: t, child: child),
+                  ),
                   const SizedBox(height: AppDimensions.spacingLg),
-                  Text(
-                    'BizFlow',
-                    textAlign: TextAlign.center,
-                    style: AppTextStyles.displaySmall.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 380),
+                    curve: Curves.easeOutCubic,
+                    child: Text(
+                      'BizFlow',
+                      textAlign: TextAlign.center,
+                      style: AppTextStyles.displaySmall.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.8,
+                      ),
+                    ),
+                    builder: (context, t, child) => Opacity(
+                      opacity: t,
+                      child: Transform.translate(
+                        offset: Offset(0, 10 * (1 - t)),
+                        child: child,
+                      ),
                     ),
                   ),
                   const SizedBox(height: AppDimensions.spacingXs),
@@ -252,18 +290,14 @@ class _StartupBranding extends StatelessWidget {
                     'Point of Sale & Inventory',
                     textAlign: TextAlign.center,
                     style: AppTextStyles.bodyMedium.copyWith(
-                      color: Colors.white.withValues(alpha: 0.75),
+                      color: AppColors.onPhotoMuted,
                     ),
                   ),
                   const SizedBox(height: AppDimensions.spacingXxl),
-                  const SizedBox(
-                    width: 36,
-                    height: 36,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 3,
-                      color: Colors.white,
-                      backgroundColor: Colors.white24,
-                    ),
+                  AuroraLoader(
+                    size: 54,
+                    strokeWidth: 3.2,
+                    onDarkSurface: true,
                   ),
                   const SizedBox(height: AppDimensions.spacingMd),
                   Text(

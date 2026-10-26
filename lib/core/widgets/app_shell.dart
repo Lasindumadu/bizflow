@@ -1,9 +1,12 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../core/services/notification_store.dart';
 import '../../../core/session/session_controller.dart';
+import '../../../core/session/session_authorization.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_decor.dart';
 import '../../../core/theme/app_text_styles.dart';
@@ -42,11 +45,66 @@ class _AppShellState extends State<AppShell>
     with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   bool _sidebarCollapsed = false;
+  bool _userCardHovered = false;
 
-  /// Soft fade + lift applied whenever the active section changes.
+  /// Focus node for global keyboard shortcuts (Ctrl/Cmd + key).
+  final FocusNode _shortcutFocusNode = FocusNode();
+
+  /// Whether the acting session can access owner+manager features.
+  bool get _canManage => canPerform(
+        sessionController.current,
+        {StaffRole.owner, StaffRole.manager},
+      );
+
+  /// Whether the acting session can access owner-only features.
+  bool get _isOwner => canPerform(
+        sessionController.current,
+        {StaffRole.owner},
+      );
+
+  /// Allowed roles per nav index. Empty set means accessible to all roles.
+  static const Map<int, Set<StaffRole>> _navItemRoles = {
+    0: {}, // Home/Dashboard — all
+    2: {}, // POS Terminal — all
+    3: {}, // Sales — all
+    4: {}, // Customers — all
+    8: {}, // More Tools — all
+    1: {StaffRole.owner, StaffRole.manager}, // Products — owner/manager
+    5: {StaffRole.owner, StaffRole.manager}, // Inventory — owner/manager
+    6: {StaffRole.owner, StaffRole.manager}, // Expenses — owner/manager
+    7: {StaffRole.owner, StaffRole.manager}, // Analytics/Reports — owner/manager
+  };
+
+  /// Navigation items visible to the current role.
+  ///
+  /// Each item is gated individually via [SessionAuthorization.canPerform]
+  /// rather than a coarse static role list, so cashiers never see
+  /// owner/manager-only sections.
+  List<_NavItem> get _visibleNavItems {
+    return _navItems.where((item) {
+      final allowed = _navItemRoles[item.index] ?? <StaffRole>{};
+      return canPerform(sessionController.current, allowed);
+    }).toList();
+  }
+
+  /// Whether a nav index is gated behind owner/manager privileges.
+  bool _isNavGated(int index) {
+    final allowed = _navItemRoles[index];
+    return allowed != null && allowed.isNotEmpty;
+  }
+
+  /// Ensures [_currentIndex] points to a visible nav item.
+  void _ensureVisibleIndex() {
+    if (!_visibleNavItems.any((item) => item.index == _currentIndex)) {
+      _currentIndex = _visibleNavItems.first.index;
+    }
+  }
+
+  /// Soft fade + lift + depth applied whenever the active section changes.
   late final AnimationController _pageController;
   late final Animation<double> _pageOpacity;
   late final Animation<Offset> _pageOffset;
+  late final Animation<double> _pageScale;
 
   final GlobalKey<DashboardScreenState> _dashboardScreenKey =
       GlobalKey<DashboardScreenState>();
@@ -80,7 +138,7 @@ class _AppShellState extends State<AppShell>
     sessionController.addListener(_onSessionChanged);
     _pageController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 340),
+      duration: const Duration(milliseconds: 320),
       value: 1,
     );
     _pageOpacity = CurvedAnimation(
@@ -88,8 +146,18 @@ class _AppShellState extends State<AppShell>
       curve: Curves.easeOutCubic,
     );
     _pageOffset = Tween<Offset>(
-      begin: const Offset(0, 0.015),
+      // Fractional slide ≈ 18px at typical canvas heights — a touch richer
+      // than before, but still instant-feeling on tap (320ms, no delay).
+      begin: const Offset(0, 0.022),
       end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _pageController,
+      curve: Curves.easeOutCubic,
+    ));
+    _pageScale = Tween<double>(
+      // Gentle depth: the incoming page breathes from 98.4% to full size.
+      begin: 0.984,
+      end: 1.0,
     ).animate(CurvedAnimation(
       parent: _pageController,
       curve: Curves.easeOutCubic,
@@ -103,6 +171,7 @@ class _AppShellState extends State<AppShell>
     _inactivityTimer?.cancel();
     sessionController.removeListener(_onSessionChanged);
     _pageController.dispose();
+    _shortcutFocusNode.dispose();
     super.dispose();
   }
 
@@ -181,6 +250,7 @@ class _AppShellState extends State<AppShell>
 
     _restorePosCart();
     _armInactivityTimer();
+    _ensureVisibleIndex();
     setState(() {
       _isShowingLockScreen = false;
     });
@@ -357,6 +427,52 @@ class _AppShellState extends State<AppShell>
     );
   }
 
+  // ─────────────────────────────────────────────
+  // Global keyboard shortcuts (Ctrl/Cmd + key)
+  // ─────────────────────────────────────────────
+
+  bool _isCtrlCmd(RawKeyEvent event) =>
+      HardwareKeyboard.instance.isControlPressed ||
+      HardwareKeyboard.instance.isMetaPressed;
+
+  void _handleKeyEvent(RawKeyEvent event) {
+    if (!_isCtrlCmd(event) || event is! RawKeyDownEvent) {
+      return;
+    }
+
+    switch (event.logicalKey) {
+      case LogicalKeyboardKey.keyK:
+        UniversalSearchOverlay.show(context);
+        break;
+      case LogicalKeyboardKey.keyN:
+        _openPos();
+        break;
+      case LogicalKeyboardKey.keyP:
+        // Products (screen index 1)
+        if (_visibleNavItems.any((item) => item.index == 1)) {
+          _onNavigationSelected(1);
+        }
+        break;
+      case LogicalKeyboardKey.keyU:
+        // Customers (screen index 4)
+        if (_visibleNavItems.any((item) => item.index == 4)) {
+          _onNavigationSelected(4);
+        }
+        break;
+      case LogicalKeyboardKey.keyS:
+        // Sales (screen index 3)
+        if (_visibleNavItems.any((item) => item.index == 3)) {
+          _onNavigationSelected(3);
+        }
+        break;
+      case LogicalKeyboardKey.comma:
+        _openSettings();
+        break;
+      default:
+        break;
+    }
+  }
+
   void _openStaffManagement() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const StaffManagementScreen()),
@@ -388,18 +504,27 @@ class _AppShellState extends State<AppShell>
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTapDown: (_) => _resetInactivity(),
-          child: body,
+          child: RawKeyboardListener(
+            focusNode: _shortcutFocusNode,
+            autofocus: true,
+            onKey: _handleKeyEvent,
+            child: body,
+          ),
         );
       },
     );
   }
 
   Widget _buildPageStack() {
-    return FadeTransition(
-      opacity: _pageOpacity,
-      child: SlideTransition(
-        position: _pageOffset,
-        child: IndexedStack(index: _currentIndex, children: _screens),
+    return ScaleTransition(
+      scale: _pageScale,
+      filterQuality: FilterQuality.low,
+      child: FadeTransition(
+        opacity: _pageOpacity,
+        child: SlideTransition(
+          position: _pageOffset,
+          child: IndexedStack(index: _currentIndex, children: _screens),
+        ),
       ),
     );
   }
@@ -432,6 +557,7 @@ class _AppShellState extends State<AppShell>
       bottomNavigationBar: _MobileDock(
         currentIndex: _currentIndex,
         onSelected: _onNavigationSelected,
+        canManageProducts: _canManage,
       ),
     );
   }
@@ -533,6 +659,25 @@ class _AppShellState extends State<AppShell>
                 ),
               ),
             ),
+            // Aurora 2.0 micro-detail — a faint lilac breath behind the
+            // workspace group so the rail never reads as flat ink.
+            Positioned(
+              top: 180,
+              left: -110,
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      AppColors.auroraLilac.withValues(alpha: 0.09),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
             Column(
               children: [
                 _buildSidebarHeader(),
@@ -543,7 +688,7 @@ class _AppShellState extends State<AppShell>
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                     children: [
                       if (!_sidebarCollapsed) const _SidebarLabel('WORKSPACE'),
-                      ..._navItems
+                      ..._visibleNavItems
                           .where((item) => item.index == 0 ||
                               item.index == 2 ||
                               item.index == 1 ||
@@ -552,7 +697,7 @@ class _AppShellState extends State<AppShell>
                           .map(_buildSidebarItem),
                       const SizedBox(height: 14),
                       if (!_sidebarCollapsed) const _SidebarLabel('MANAGE'),
-                      ..._navItems
+                      ..._visibleNavItems
                           .where((item) => item.index >= 5)
                           .map(_buildSidebarItem),
                     ],
@@ -600,24 +745,34 @@ class _AppShellState extends State<AppShell>
                         ),
                       ),
                       const SizedBox(width: 6),
+                      // Aurora 2.0 "PRO" — signature rail-gradient pill
+                      // with a soft brand halo instead of flat mint.
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 1.5,
+                          horizontal: 7,
+                          vertical: 2.5,
                         ),
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF2DD4BF), Color(0xFF14B8A6)],
-                          ),
-                          borderRadius: BorderRadius.circular(5),
+                          gradient: AppDecor.auroraBar,
+                          borderRadius: BorderRadius.circular(999),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.royalStart.withValues(
+                                alpha: 0.38,
+                              ),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                              spreadRadius: -2,
+                            ),
+                          ],
                         ),
                         child: const Text(
                           'PRO',
                           style: TextStyle(
-                            color: Color(0xFF04372F),
+                            color: Colors.white,
                             fontSize: 8,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: 0.4,
+                            letterSpacing: 0.6,
                           ),
                         ),
                       ),
@@ -653,6 +808,7 @@ class _AppShellState extends State<AppShell>
       selected: _currentIndex == item.index,
       collapsed: _sidebarCollapsed,
       onTap: () => _onNavigationSelected(item.index),
+      isGated: _isNavGated(item.index),
     );
   }
 
@@ -675,6 +831,7 @@ class _AppShellState extends State<AppShell>
             onLockNow: _lockNow,
             onSignOut: _signOutNow,
             onOpenStaff: _openStaffManagement,
+            canOpenStaff: _isOwner,
           ),
         ),
       );
@@ -693,17 +850,46 @@ class _AppShellState extends State<AppShell>
             ),
             child: Row(
               children: [
-                Container(
-                  width: 7,
-                  height: 7,
-                  decoration: const BoxDecoration(
-                    color: AppColors.brandMint,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Color(0x662DD4BF),
-                        blurRadius: 8,
-                        spreadRadius: 2,
+                SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // One-shot mint pulse — a halo blooms once on entry
+                      // (never loops) to signal "live" without distracting.
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 1100),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, t, _) => Container(
+                          width: 8 + 12 * t,
+                          height: 8 + 12 * t,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: AppColors.brandMint.withValues(
+                                alpha: (1 - t) * 0.55,
+                              ),
+                              width: 1.6,
+                            ),
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: AppColors.brandMint,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Color(0x662DD4BF),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -736,49 +922,84 @@ class _AppShellState extends State<AppShell>
             ),
           ),
           const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-            ),
-            child: Row(
-              children: [
-                _Avatar(name: name, size: 34),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
+          // User footer card — hover reveals an aurora-lilac affordance:
+          // border bloom, soft brand glow and a nudge chevron.
+          MouseRegion(
+            onEnter: (_) => setState(() => _userCardHovered = true),
+            onExit: (_) => setState(() => _userCardHovered = false),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              transform: Matrix4.translationValues(
+                0,
+                _userCardHovered ? -1.5 : 0,
+                0,
+              ),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: _userCardHovered
+                    ? Colors.white.withValues(alpha: 0.085)
+                    : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: _userCardHovered
+                      ? AppColors.accentLight.withValues(alpha: 0.38)
+                      : Colors.white.withValues(alpha: 0.07),
+                ),
+                boxShadow: _userCardHovered
+                    ? AppDecor.glow(AppColors.primary, alpha: 0.22)
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  _Avatar(name: name, size: 34),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      Text(
-                        role,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.40),
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w500,
+                        Text(
+                          role,
+                          style: TextStyle(
+                            color: _userCardHovered
+                                ? AppColors.auroraLilac.withValues(alpha: 0.85)
+                                : Colors.white.withValues(alpha: 0.40),
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                _SessionMenuButton(
-                  compact: true,
-                  onLockNow: _lockNow,
-                  onSignOut: _signOutNow,
-                  onOpenStaff: _openStaffManagement,
-                ),
-              ],
+                  AnimatedOpacity(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    opacity: _userCardHovered ? 1 : 0.3,
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: AppColors.auroraLilac.withValues(alpha: 0.9),
+                    ),
+                  ),
+                  _SessionMenuButton(
+                    compact: true,
+                    onLockNow: _lockNow,
+                    onSignOut: _signOutNow,
+                    onOpenStaff: _openStaffManagement,
+                    canOpenStaff: _isOwner,
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -788,108 +1009,143 @@ class _AppShellState extends State<AppShell>
 
   Widget _buildTopBar(BuildContext context, {required bool isTablet}) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      height: 76,
-      padding: const EdgeInsets.fromLTRB(20, 10, 17, 4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Workspace',
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                        color: scheme.onSurface.withValues(alpha: 0.35),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 5),
-                      child: Icon(
-                        Icons.chevron_right_rounded,
-                        size: 13,
-                        color: scheme.onSurface.withValues(alpha: 0.25),
-                      ),
-                    ),
-                    Text(
-                      _activeItem.label,
-                      style: TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
-                        color: scheme.primary.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  _activeItem.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: AppTextStyles.displayFont,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.5,
-                    color: scheme.onSurface,
-                  ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(
+            height: 76,
+            padding: const EdgeInsets.fromLTRB(20, 10, 17, 4),
+            decoration: BoxDecoration(
+              // Frosted "brighter glass" — translucent white fill in both
+              // themes with a white-alpha hairline and soft lift shadow.
+              color: (isDark ? Colors.white : Colors.white)
+                  .withValues(alpha: isDark ? 0.055 : 0.72),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.10)
+                    : Colors.white.withValues(alpha: 0.85),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.18)
+                      : AppColors.shadowColor.withValues(alpha: 0.05),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                  spreadRadius: -4,
                 ),
               ],
             ),
-          ),
-          if (!isTablet) ...[
-            _HeaderSearchButton(
-              onTap: () => UniversalSearchOverlay.show(context),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Workspace',
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.bodyFont,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.4,
+                              color: scheme.onSurface.withValues(alpha: 0.36),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 5),
+                            child: Icon(
+                              Icons.chevron_right_rounded,
+                              size: 13,
+                              color: scheme.onSurface.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          Text(
+                            _activeItem.label,
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.bodyFont,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.6,
+                              color: scheme.primary.withValues(alpha: 0.9),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        _activeItem.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: AppTextStyles.displayFont,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.55,
+                          color: scheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (!isTablet) ...[
+                  _HeaderSearchButton(
+                    onTap: () => UniversalSearchOverlay.show(context),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                _CircleAction(
+                  tooltip: 'Search (⌘K)',
+                  icon: Icons.search_rounded,
+                  onTap: () => UniversalSearchOverlay.show(context),
+                  compactOnly: !isTablet,
+                ),
+                const SizedBox(width: 6),
+                _CircleAction(
+                  tooltip: themeController.isDark
+                      ? 'Switch to light mode'
+                      : 'Switch to dark mode',
+                  icon: themeController.isDark
+                      ? Icons.light_mode_rounded
+                      : Icons.dark_mode_rounded,
+                  iconColor: themeController.isDark
+                      ? AppColors.brandAmber
+                      : scheme.onSurface.withValues(alpha: 0.7),
+                  onTap: themeController.toggle,
+                ),
+                const SizedBox(width: 6),
+                _NotificationBell(onTap: _openNotifications),
+                const SizedBox(width: 6),
+                if (_isOwner)
+                  _CircleAction(
+                    tooltip: 'Settings (⌘,)',
+                    icon: Icons.tune_rounded,
+                    onTap: _openSettings,
+                  ),
+                const SizedBox(width: 10),
+                if (!isTablet)
+                  _QuickPosButton(onTap: _openPos)
+                else
+                  _CircleAction(
+                    tooltip: 'New Sale (⌘N)',
+                    icon: Icons.bolt_rounded,
+                    iconColor: Colors.white,
+                    background: AppDecor.royalGradient,
+                    onTap: _openPos,
+                  ),
+              ],
             ),
-            const SizedBox(width: 8),
-          ],
-          _CircleAction(
-            tooltip: 'Search',
-            icon: Icons.search_rounded,
-            onTap: () => UniversalSearchOverlay.show(context),
-            compactOnly: !isTablet,
           ),
-          const SizedBox(width: 6),
-          _CircleAction(
-            tooltip: themeController.isDark
-                ? 'Switch to light mode'
-                : 'Switch to dark mode',
-            icon: themeController.isDark
-                ? Icons.light_mode_rounded
-                : Icons.dark_mode_rounded,
-            iconColor: themeController.isDark
-                ? AppColors.brandAmber
-                : scheme.onSurface.withValues(alpha: 0.7),
-            onTap: themeController.toggle,
-          ),
-          const SizedBox(width: 6),
-          _NotificationBell(onTap: _openNotifications),
-          const SizedBox(width: 6),
-          _CircleAction(
-            tooltip: 'Settings',
-            icon: Icons.tune_rounded,
-            onTap: _openSettings,
-          ),
-          const SizedBox(width: 10),
-          if (!isTablet)
-            _QuickPosButton(onTap: _openPos)
-          else
-            _CircleAction(
-              tooltip: 'Open POS',
-              icon: Icons.bolt_rounded,
-              iconColor: Colors.white,
-              background: AppDecor.indigoGradient,
-              onTap: _openPos,
-            ),
-        ],
+        ),
       ),
     );
   }
@@ -925,12 +1181,14 @@ class _SidebarNavItem extends StatefulWidget {
   final bool selected;
   final bool collapsed;
   final VoidCallback onTap;
+  final bool isGated;
 
   const _SidebarNavItem({
     required this.item,
     required this.selected,
     required this.collapsed,
     required this.onTap,
+    this.isGated = false,
   });
 
   @override
@@ -945,93 +1203,154 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
     final item = widget.item;
     final selected = widget.selected;
 
-    final content = AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOutCubic,
-      margin: const EdgeInsets.symmetric(vertical: 2.5),
-      padding: EdgeInsets.symmetric(
-        horizontal: widget.collapsed ? 0 : 12,
-        vertical: 10.5,
-      ),
-      decoration: BoxDecoration(
-        gradient: selected ? AppDecor.indigoGradient : null,
-        color: !selected && _hovered
-            ? Colors.white.withValues(alpha: 0.055)
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(13),
-        border: selected
-            ? Border.all(color: Colors.white.withValues(alpha: 0.16))
-            : null,
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 7),
-                  spreadRadius: -4,
-                ),
-              ]
-            : null,
-      ),
-      child: widget.collapsed
-          ? Center(
-              child: Icon(
-                selected ? item.filledIcon : item.outlinedIcon,
-                size: 20,
-                color: selected
-                    ? Colors.white
-                    : Colors.white.withValues(alpha: _hovered ? 0.85 : 0.48),
-              ),
-            )
-          : Row(
-              children: [
-                Icon(
-                  selected ? item.filledIcon : item.outlinedIcon,
-                  size: 19,
-                  color: selected
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: _hovered ? 0.88 : 0.48),
-                ),
-                const SizedBox(width: 11),
-                Expanded(
-                  child: Text(
-                    item.label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight:
-                          selected ? FontWeight.w700 : FontWeight.w500,
-                      letterSpacing: 0.05,
+    // Aurora 2.0 active pill: soft royal-gradient fill over the ink rail,
+    // a signature aurora notch bar on the left edge and a brand glow.
+    final content = Stack(
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(vertical: 2.5),
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.collapsed ? 0 : (selected ? 18 : 14),
+            vertical: 10.5,
+          ),
+          decoration: BoxDecoration(
+            gradient: selected
+                ? LinearGradient(
+                    colors: AppDecor.royalGradient.colors
+                        .map((c) => c.withValues(alpha: 0.24))
+                        .toList(),
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: selected
+                ? Colors.white.withValues(alpha: 0.07)
+                : (!selected && _hovered)
+                    ? Colors.white.withValues(alpha: 0.055)
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(13),
+            border: selected
+                ? Border.all(color: Colors.white.withValues(alpha: 0.16))
+                : null,
+            boxShadow: selected
+                ? AppDecor.glow(AppColors.primary, alpha: 0.30)
+                : null,
+          ),
+          child: widget.collapsed
+              ? Center(
+                  child: Icon(
+                    selected ? item.filledIcon : item.outlinedIcon,
+                    size: 20,
+                    color: selected
+                        ? Colors.white
+                        : Colors.white.withValues(alpha: _hovered ? 0.85 : 0.48),
+                  ),
+                )
+              : Row(
+                  children: [
+                    Icon(
+                      selected ? item.filledIcon : item.outlinedIcon,
+                      size: 19,
                       color: selected
                           ? Colors.white
-                          : Colors.white.withValues(alpha: 0.74),
+                          : Colors.white.withValues(alpha: _hovered ? 0.88 : 0.48),
                     ),
-                  ),
-                ),
-                if (selected)
-                  Container(
-                    width: 5,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.white.withValues(alpha: 0.8),
-                          blurRadius: 6,
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: selected
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              letterSpacing: 0.05,
+                              color: selected
+                                  ? Colors.white
+                                  : Colors.white.withValues(alpha: 0.74),
+                            ),
+                          ),
+                          if (widget.isGated && !selected)
+                            const SizedBox(height: 2),
+                          if (widget.isGated && !selected)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.lock_outline_rounded,
+                                  size: 10,
+                                  color: Colors.white70,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'owner/manager',
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white.withValues(alpha: 0.55),
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (selected)
+                      Container(
+                        width: 5.5,
+                        height: 5.5,
+                        decoration: BoxDecoration(
+                          color: AppColors.auroraTeal,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.auroraTeal.withValues(alpha: 0.8),
+                              blurRadius: 7,
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  )
-                else if (item.isProminent)
-                  Icon(
-                    Icons.arrow_outward_rounded,
-                    size: 13,
-                    color: Colors.white.withValues(alpha: 0.30),
+                      )
+                    else if (item.isProminent)
+                      Icon(
+                        Icons.arrow_outward_rounded,
+                        size: 13,
+                        color: Colors.white.withValues(
+                          alpha: _hovered ? 0.55 : 0.30,
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        // Signature aurora notch — the "active rail" tick on the pill's
+        // left edge, glowing mint→royal like the brand bar.
+        if (selected)
+          Positioned(
+            left: 0,
+            top: 8,
+            bottom: 8,
+            child: Container(
+              width: 3.2,
+              decoration: BoxDecoration(
+                gradient: AppDecor.auroraBar,
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.auroraTeal.withValues(alpha: 0.55),
+                    blurRadius: 8,
+                    spreadRadius: -1,
                   ),
-              ],
+                ],
+              ),
             ),
+          ),
+      ],
     );
 
     final tappable = Material(
@@ -1140,6 +1459,7 @@ class _HeaderSearchButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
+        hoverColor: AppColors.primary.withValues(alpha: 0.10),
         child: Container(
           width: 224,
           height: 40,
@@ -1231,6 +1551,7 @@ class _CircleAction extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(11),
+          hoverColor: AppColors.primary.withValues(alpha: 0.10),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             width: 38,
@@ -1266,40 +1587,56 @@ class _CircleAction extends StatelessWidget {
   }
 }
 
-class _QuickPosButton extends StatelessWidget {
+class _QuickPosButton extends StatefulWidget {
   final VoidCallback onTap;
   const _QuickPosButton({required this.onTap});
 
   @override
+  State<_QuickPosButton> createState() => _QuickPosButtonState();
+}
+
+class _QuickPosButtonState extends State<_QuickPosButton> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          decoration: BoxDecoration(
-            gradient: AppDecor.indigoGradient,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: AppDecor.glow(AppColors.primary, alpha: 0.35),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.bolt_rounded, color: Colors.white, size: 17),
-              SizedBox(width: 6),
-              Text(
-                'New sale',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.1,
+    return AnimatedScale(
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOutCubic,
+      scale: _pressed ? 0.97 : 1,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          onTapDown: (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          borderRadius: BorderRadius.circular(13),
+          hoverColor: AppColors.primary.withValues(alpha: 0.10),
+          child: Container(
+            height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: BoxDecoration(
+              gradient: AppDecor.royalGradient,
+              borderRadius: BorderRadius.circular(13),
+              boxShadow: AppDecor.glow(AppColors.primary, alpha: 0.42),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.bolt_rounded, color: Colors.white, size: 17),
+                SizedBox(width: 7),
+                Text(
+                  'New sale',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.1,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -1367,7 +1704,7 @@ class _MobileTopBar extends StatelessWidget {
               ),
             ),
             _CircleAction(
-              tooltip: 'Search',
+              tooltip: 'Search (⌘K)',
               icon: Icons.search_rounded,
               onTap: onSearch,
             ),
@@ -1375,7 +1712,7 @@ class _MobileTopBar extends StatelessWidget {
             _NotificationBell(onTap: onNotifications),
             const SizedBox(width: 6),
             _CircleAction(
-              tooltip: 'Settings',
+              tooltip: 'Settings (⌘,)',
               icon: Icons.tune_rounded,
               onTap: onSettings,
             ),
@@ -1389,8 +1726,13 @@ class _MobileTopBar extends StatelessWidget {
 class _MobileDock extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onSelected;
+  final bool canManageProducts;
 
-  const _MobileDock({required this.currentIndex, required this.onSelected});
+  const _MobileDock({
+    required this.currentIndex,
+    required this.onSelected,
+    required this.canManageProducts,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1432,13 +1774,14 @@ class _MobileDock extends StatelessWidget {
                 selected: currentIndex == 0,
                 onTap: () => onSelected(0),
               ),
-              _MobileDockItem(
-                label: 'Products',
-                icon: Icons.inventory_2_outlined,
-                activeIcon: Icons.inventory_2_rounded,
-                selected: currentIndex == 1,
-                onTap: () => onSelected(1),
-              ),
+              if (canManageProducts)
+                _MobileDockItem(
+                  label: 'Products',
+                  icon: Icons.inventory_2_outlined,
+                  activeIcon: Icons.inventory_2_rounded,
+                  selected: currentIndex == 1,
+                  onTap: () => onSelected(1),
+                ),
               GestureDetector(
                 onTap: () => onSelected(2),
                 child: AnimatedContainer(
@@ -1446,7 +1789,7 @@ class _MobileDock extends StatelessWidget {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    gradient: AppDecor.indigoGradient,
+                    gradient: AppDecor.royalGradient,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: scheme.surface,
@@ -1502,29 +1845,65 @@ class _MobileDockItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
+    // Aurora accent for the active item — royal tint + a tiny live dot.
+    final activeColor = AppColors.royalMid;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(14),
+        hoverColor: AppColors.primary.withValues(alpha: 0.08),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: selected
-                ? scheme.primary.withValues(alpha: 0.10)
+                ? activeColor.withValues(alpha: 0.10)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                selected ? activeIcon : icon,
-                size: 21,
-                color: selected
-                    ? scheme.primary
-                    : scheme.onSurface.withValues(alpha: 0.45),
+              // Tiny aurora dot — sits above the active item and springs
+              // in with an elastic settle.
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 290),
+                curve:
+                    selected ? Curves.elasticOut : Curves.easeOutCubic,
+                height: 5,
+                width: 5,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? AppColors.auroraTeal : Colors.transparent,
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.auroraTeal.withValues(alpha: 0.7),
+                            blurRadius: 6,
+                          ),
+                        ]
+                      : null,
+                ),
+              ),
+              const SizedBox(height: 3),
+              // Springy active scale — the icon gently overshoots to 1.15
+              // and settles. One short tween, never blocks the tap.
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 1, end: selected ? 1.15 : 1),
+                duration: const Duration(milliseconds: 320),
+                curve: selected ? Curves.elasticOut : Curves.easeOut,
+                child: Icon(
+                  selected ? activeIcon : icon,
+                  size: 21,
+                  color: selected
+                      ? activeColor
+                      : scheme.onSurface.withValues(alpha: 0.45),
+                ),
+                builder: (context, s, child) =>
+                    Transform.scale(scale: s, child: child),
               ),
               const SizedBox(height: 2),
               Text(
@@ -1533,7 +1912,7 @@ class _MobileDockItem extends StatelessWidget {
                   fontSize: 9.5,
                   fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
                   color: selected
-                      ? scheme.primary
+                      ? activeColor
                       : scheme.onSurface.withValues(alpha: 0.45),
                 ),
               ),
@@ -1586,6 +1965,7 @@ class _NotificationBell extends StatelessWidget {
             child: InkWell(
               onTap: onTap,
               borderRadius: BorderRadius.circular(11),
+              hoverColor: AppColors.primary.withValues(alpha: 0.10),
               child: Container(
                 width: 38,
                 height: 38,
@@ -1639,12 +2019,14 @@ class _SessionMenuButton extends StatelessWidget {
   final VoidCallback onLockNow;
   final VoidCallback onSignOut;
   final VoidCallback onOpenStaff;
+  final bool canOpenStaff;
   final bool compact;
 
   const _SessionMenuButton({
     required this.onLockNow,
     required this.onSignOut,
     required this.onOpenStaff,
+    required this.canOpenStaff,
     this.compact = false,
   });
 
@@ -1687,47 +2069,51 @@ class _SessionMenuButton extends StatelessWidget {
             onSignOut();
         }
       },
-      itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          enabled: false,
-          child: Text(
-            current == null
-                ? 'Local workspace'
-                : '${current.displayName.isEmpty ? current.username : current.displayName}'
-                    ' · ${current.role.name}',
-            style: TextStyle(
-              fontSize: 12,
-              color: scheme.onSurface.withValues(alpha: 0.65),
+      itemBuilder: (context) {
+        final items = <PopupMenuEntry<String>>[
+          PopupMenuItem<String>(
+            enabled: false,
+            child: Text(
+              current == null
+                  ? 'Local workspace'
+                  : '${current.displayName.isEmpty ? current.username : current.displayName}'
+                      ' · ${current.role.name}',
+              style: TextStyle(
+                fontSize: 12,
+                color: scheme.onSurface.withValues(alpha: 0.65),
+              ),
             ),
           ),
-        ),
-        const PopupMenuDivider(),
-        const PopupMenuItem<String>(
-          value: 'lock',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.lock_outline_rounded, size: 18),
-            title: Text('Lock now'),
+          const PopupMenuDivider(),
+          const PopupMenuItem<String>(
+            value: 'lock',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.lock_outline_rounded, size: 18),
+              title: Text('Lock now'),
+            ),
           ),
-        ),
-        const PopupMenuItem<String>(
-          value: 'staff',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.group_outlined, size: 18),
-            title: Text('Staff & access'),
+          if (canOpenStaff)
+            const PopupMenuItem<String>(
+              value: 'staff',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.group_outlined, size: 18),
+                title: Text('Staff & access'),
+              ),
+            ),
+          const PopupMenuDivider(),
+          const PopupMenuItem<String>(
+            value: 'signout',
+            child: ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.logout_rounded, size: 18),
+              title: Text('Sign out'),
+            ),
           ),
-        ),
-        const PopupMenuDivider(),
-        const PopupMenuItem<String>(
-          value: 'signout',
-          child: ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.logout_rounded, size: 18),
-            title: Text('Sign out'),
-          ),
-        ),
-      ],
+        ];
+        return items;
+      },
     );
   }
 }
@@ -1842,8 +2228,7 @@ class _LockScreenDialogState extends State<_LockScreenDialog> {
       child: Dialog(
         backgroundColor: Colors.transparent,
         child: Container(
-          width: 360,
-          padding: const EdgeInsets.all(26),
+          width: 380,
           decoration: BoxDecoration(
             color: isDark ? AppColors.darkSurface : Colors.white,
             borderRadius: BorderRadius.circular(26),
@@ -1861,109 +2246,151 @@ class _LockScreenDialogState extends State<_LockScreenDialog> {
               ),
             ],
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const BrandMark(size: 50),
-              const SizedBox(height: 16),
-              Text(
-                'Session locked',
-                style: TextStyle(
-                  fontFamily: AppTextStyles.displayFont,
-                  fontSize: 21,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -0.5,
-                  color: scheme.onSurface,
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text(
-                'Enter your PIN to jump back into BizFlow.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  color: scheme.onSurface.withValues(alpha: 0.55),
-                ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: scheme.error.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: scheme.error.withValues(alpha: 0.25),
-                    ),
-                  ),
-                  child: Row(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(25),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Photo-backed brand chrome: purpleAbstract under a dense
+                // brand wash (anchor left) so the headline always sits on
+                // readable ink in both themes.
+                SizedBox(
+                  width: double.infinity,
+                  height: 168,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Icon(
-                        Icons.error_outline_rounded,
-                        size: 16,
-                        color: scheme.error,
+                      Image.asset(
+                        AppImages.purpleAbstract,
+                        fit: BoxFit.cover,
+                        alignment: Alignment.centerRight,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _error!,
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: scheme.error,
-                            fontWeight: FontWeight.w600,
-                          ),
+                      for (final g in AppDecor.photoWash(anchor: 'left'))
+                        DecoratedBox(
+                          decoration: BoxDecoration(gradient: g),
+                        ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const BrandMark(size: 46),
+                            const Spacer(),
+                            Text(
+                              'Session locked',
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.displayFont,
+                                fontSize: 21,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.5,
+                                color: AppColors.onPhoto,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              'Enter your PIN to jump back into BizFlow.',
+                              textAlign: TextAlign.left,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.4,
+                                color: AppColors.onPhotoMuted,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                 ),
-              ],
-              const SizedBox(height: 18),
-              TextField(
-                controller: _pinController,
-                focusNode: _pinFocus,
-                obscureText: true,
-                maxLength: StaffAccountRepository.maxPinLength,
-                autofocus: true,
-                enabled: !_isVerifying,
-                decoration: InputDecoration(
-                  labelText: 'PIN',
-                  hintText:
-                      '${StaffAccountRepository.minPinLength}-${StaffAccountRepository.maxPinLength} digits',
-                  counterText: '',
-                  prefixIcon: const Icon(Icons.lock_outline_rounded, size: 19),
-                ),
-                onSubmitted: (_) => _verifyPin(),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: _isVerifying ? null : _signOut,
-                      child: const Text('Sign out'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _isVerifying ? null : _verifyPin,
-                      icon: _isVerifying
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
+                Padding(
+                  padding: const EdgeInsets.all(26),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_error != null)
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: scheme.error.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: scheme.error.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.error_outline_rounded,
+                                size: 16,
+                                color: scheme.error,
                               ),
-                            )
-                          : const Icon(Icons.lock_open_rounded, size: 18),
-                      label: Text(_isVerifying ? 'Verifying…' : 'Unlock'),
-                    ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _error!,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: scheme.error,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        controller: _pinController,
+                        focusNode: _pinFocus,
+                        obscureText: true,
+                        maxLength: StaffAccountRepository.maxPinLength,
+                        autofocus: true,
+                        enabled: !_isVerifying,
+                        decoration: InputDecoration(
+                          labelText: 'PIN',
+                          hintText:
+                              '${StaffAccountRepository.minPinLength}-${StaffAccountRepository.maxPinLength} digits',
+                          counterText: '',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded,
+                              size: 19),
+                        ),
+                        onSubmitted: (_) => _verifyPin(),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: _isVerifying ? null : _signOut,
+                              child: const Text('Sign out'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: _isVerifying ? null : _verifyPin,
+                              icon: _isVerifying
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: AuroraLoader(
+                                        size: 16,
+                                        strokeWidth: 2,
+                                        onDarkSurface: true,
+                                      ),
+                                    )
+                                  : const Icon(Icons.lock_open_rounded,
+                                      size: 18),
+                              label: Text(_isVerifying ? 'Verifying…' : 'Unlock'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

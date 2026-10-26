@@ -7,11 +7,11 @@ class StockMovements extends Table {
 
   TextColumn get type => text()();
 
-  IntColumn get quantity => integer()();
+  RealColumn get quantity => real()();
 
-  IntColumn get previousStock => integer()();
+  RealColumn get previousStock => real()();
 
-  IntColumn get newStock => integer()();
+  RealColumn get newStock => real()();
 
   TextColumn get note => text().withDefault(const Constant(''))();
 

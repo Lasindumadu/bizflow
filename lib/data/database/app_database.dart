@@ -61,9 +61,9 @@ class AppDatabase extends _$AppDatabase {
       );
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
-  static const int currentSchemaVersion = 15;
+  static const int currentSchemaVersion = 16;
 
   @override
   MigrationStrategy get migration {
@@ -73,6 +73,30 @@ class AppDatabase extends _$AppDatabase {
       },
 
       onUpgrade: (Migrator m, int from, int to) async {
+        // Shared helper: add a column only if the table exists and the column
+        // is missing. Used by every migration gate that alters existing tables.
+        Future<void> addColumnIfMissing(
+          String table,
+          String column,
+          String ddl,
+        ) async {
+          final tableExists = await customSelect(
+            "SELECT name FROM sqlite_master "
+            "WHERE type = 'table' AND name = '$table'",
+          ).get();
+          if (tableExists.isEmpty) return;
+
+          final existing = await customSelect(
+            "SELECT name FROM pragma_table_info('$table') "
+            "WHERE name = '$column'",
+          ).get();
+          if (existing.isEmpty) {
+            await customStatement(
+              'ALTER TABLE "$table" ADD COLUMN "$column" $ddl',
+            );
+          }
+        }
+
         if (from < 2) {
           await m.addColumn(sales, sales.status);
         }
@@ -86,7 +110,6 @@ class AppDatabase extends _$AppDatabase {
         }
 
         if (from < 5) {
-          // Loyalty programme.
           await m.addColumn(customers, customers.loyaltyPoints);
           await m.addColumn(customers, customers.loyaltyTier);
           await m.addColumn(businessSettings, businessSettings.loyaltyEnabled);
@@ -98,32 +121,24 @@ class AppDatabase extends _$AppDatabase {
         }
 
         if (from < 6) {
-          // Separate spendable balance from lifetime (tier) points so that
-          // redeeming points never demotes a customer's tier.
           await m.addColumn(customers, customers.pointsBalance);
-
-          // Existing customers: assume their current points are both the
-          // lifetime total and the spendable balance (nothing redeemed yet).
           await customStatement(
             'UPDATE customers SET points_balance = loyalty_points',
           );
         }
 
         if (from < 7) {
-          // Returns/refunds and the audit trail.
           await m.createTable(saleReturns);
           await m.createTable(saleReturnItems);
           await m.createTable(auditLogs);
         }
 
         if (from < 8) {
-          // Cashier shifts and cash movements.
           await m.createTable(cashShifts);
           await m.createTable(cashMovements);
         }
 
         if (from < 9) {
-          // Receipt branding settings.
           await m.addColumn(businessSettings, businessSettings.receiptHeader);
           await m.addColumn(businessSettings, businessSettings.receiptFooter);
           await m.addColumn(
@@ -138,66 +153,25 @@ class AppDatabase extends _$AppDatabase {
         }
 
         if (from < 10) {
-          // Suppliers and purchase orders.
           await m.createTable(suppliers);
           await m.createTable(purchaseOrders);
           await m.createTable(purchaseOrderItems);
         }
 
         if (from < 11) {
-          // Customer credit / accounts receivable.
           await m.createTable(customerCreditAccounts);
           await m.createTable(customerCreditTransactions);
         }
 
         if (from < 12) {
-          // Local staff accounts (PIN-based operator identification).
           await m.createTable(staffAccounts);
         }
 
         if (from < 13) {
-          // Phase D: optional startup PIN login. Default false so every
-          // existing installation keeps its current no-login behavior.
           await m.addColumn(businessSettings, businessSettings.loginRequired);
         }
 
         if (from < 14) {
-          // Phase E: staff attribution for accountable business operations.
-          // All columns are nullable so historical records keep working with
-          // null attribution; new records written through the repository
-          // layer capture the authenticated staff member.
-          //
-          // Each addition is guarded by a PRAGMA table_info check because
-          // some of these tables are created *within this migration ladder*
-          // (sale_returns at v7, cash shifts at v8, purchase orders at v10)
-          // from the current table definitions, which already include the
-          // attribution columns — a plain ADD COLUMN would crash with
-          // "duplicate column name" on upgrades from those older versions.
-          Future<void> addColumnIfMissing(
-            String table,
-            String column,
-            String ddl,
-          ) async {
-            // Skip tables that don't exist yet in this database — they may be
-            // created by a later migration gate, or may never have existed
-            // (e.g. older databases predating some tables).
-            final tableExists = await customSelect(
-              "SELECT name FROM sqlite_master "
-              "WHERE type = 'table' AND name = '$table'",
-            ).get();
-            if (tableExists.isEmpty) return;
-
-            final existing = await customSelect(
-              "SELECT name FROM pragma_table_info('$table') "
-              "WHERE name = '$column'",
-            ).get();
-            if (existing.isEmpty) {
-              await customStatement(
-                'ALTER TABLE "$table" ADD COLUMN "$column" $ddl',
-              );
-            }
-          }
-
           await addColumnIfMissing('sales', 'staff_id', 'TEXT');
           await addColumnIfMissing('sale_returns', 'staff_id', 'TEXT');
           await addColumnIfMissing('cash_shifts', 'opened_by_id', 'TEXT');
@@ -208,13 +182,6 @@ class AppDatabase extends _$AppDatabase {
         }
 
         if (from < 15) {
-          // Phase F: inactivity auto-lock timeout (minutes, default 0 = off).
-          //
-          // Guarded by a table-existence check for the same reason as the v14
-          // block: a database may not have a `business_settings` table at all
-          // (e.g. a hand-built or partially-created database), and a plain
-          // ADD COLUMN would fail with "no such table" and abort the whole
-          // migration. The column is also skipped when it already exists.
           final businessSettingsExists = await customSelect(
             "SELECT name FROM sqlite_master "
             "WHERE type = 'table' AND name = 'business_settings'",
@@ -231,6 +198,31 @@ class AppDatabase extends _$AppDatabase {
               );
             }
           }
+        }
+
+        if (from < 16) {
+          // Phase G: Aurora 2.0 feature extensions.
+          await addColumnIfMissing(
+            'products', 'product_image_url', 'TEXT',
+          );
+          await addColumnIfMissing(
+            'sale_items', 'expiry_date', 'TEXT',
+          );
+          await addColumnIfMissing(
+            'sale_items', 'batch_number', 'TEXT',
+          );
+          await addColumnIfMissing(
+            'business_settings', 'tax_rate', 'REAL NOT NULL DEFAULT 0',
+          );
+          await addColumnIfMissing(
+            'business_settings', 'tax_inclusive', 'INTEGER NOT NULL DEFAULT 0',
+          );
+          await addColumnIfMissing(
+            'sales', 'tax_amount', 'REAL NOT NULL DEFAULT 0',
+          );
+          await addColumnIfMissing(
+            'sales', 'payment_method_details', 'TEXT',
+          );
         }
       },
     );

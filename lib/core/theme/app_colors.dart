@@ -229,4 +229,36 @@ class AppColors {
   static const textPrimary = lightTextPrimary;
   static const textSecondary = lightTextSecondary;
   static const border = lightBorder;
+
+  // ─────────────────────────────────────────────
+  // Aurora 2.0 — evolved brand extensions
+  // Never renamed, only appended, so every screen
+  // can adopt the deeper brand look safely.
+  // ─────────────────────────────────────────────
+
+  // Signature "royal" gradient anchors (deeper than primary)
+  static const royalStart = Color(0xFF8460FF);
+  static const royalMid = Color(0xFF5B5BF7);
+  static const royalEnd = Color(0xFF4338CA);
+
+  // Aurora accent trio used for live/glow chrome
+  static const auroraTeal = Color(0xFF5EEAD4);
+  static const auroraBlue = Color(0xFF60A5FA);
+  static const auroraLilac = Color(0xFFC4B5FD);
+
+  // Photo-wash overlay colors (images under gradient glass)
+  static const photoInk = Color(0xFF0A0C1E);
+  static const photoWash = Color(0xFF191243);
+
+  // Section tint pairs — [soft, deep] — for per-section theming
+  static const posTint = [Color(0xFFEEF0FF), Color(0xFF4338CA)];
+  static const moneyTint = [Color(0xFFE6FBF7), Color(0xFF0E9F8C)];
+  static const stockTint = [Color(0xFFEFF6FF), Color(0xFF2563EB)];
+  static const growthTint = [Color(0xFFFFF4DE), Color(0xFFD97706)];
+  static const careTint = [Color(0xFFFCE7F3), Color(0xFFBE185D)];
+
+  // Warm contrast helpers used by photo heroes
+  static const onPhoto = Color(0xFFFFFFFF);
+  static const onPhotoMuted = Color(0xE6FFFFFF); // 90% white
+  static const onPhotoSoft = Color(0xB3FFFFFF); // 70% white
 }

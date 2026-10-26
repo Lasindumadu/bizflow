@@ -1,6 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:haptic_feedback/haptic_feedback.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/services/notification_store.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -20,6 +25,12 @@ import '../../../../models/sale_item.dart';
 import '../../../sales/presentation/screens/receipt_screen.dart';
 import '../utils/checkout_helpers.dart';
 import '../utils/parked_sales.dart';
+import '../widgets/cart_item.dart';
+import '../widgets/pos_search_field.dart';
+import '../widgets/barcode_scanner_sheet.dart';
+import '../widgets/quantity_button.dart';
+import '../widgets/redeem_config.dart';
+import '../widgets/tile_step.dart';
 
 class PosScreen extends StatefulWidget {
   final bool showAppBar;
@@ -57,15 +68,27 @@ class PosScreenState extends State<PosScreen> {
   List<Product> _products = [];
   List<Customer> _customers = [];
 
-  final List<_CartItem> _cart = [];
+  final List<CartItem> _cart = [];
 
   String _searchQuery = '';
+
+  /// Presentation-level category chip filter. Tapping a chip narrows the
+  /// grid on top of the existing search text (pure UI, no side effects).
+  String? _categoryFilter;
 
   bool _isLoading = true;
   bool _isLoadingSettings = true;
   bool _hasError = false;
 
   String _currency = 'USD';
+
+  /// Whether haptic feedback is enabled (stored in SharedPreferences).
+  /// Defaults to enabled until the stored preference is loaded.
+  bool _hapticFeedbackEnabled = true;
+
+  /// Phase G: tax / VAT settings read from business settings.
+  double? _taxRate;
+  bool _taxInclusive = false;
 
   String? _stockMessage;
 
@@ -77,6 +100,30 @@ class PosScreenState extends State<PosScreen> {
     _watchProducts();
     _watchCustomers();
     _loadBusinessSettings();
+    _loadHapticFeedbackSetting();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && parkedSalesStore.sales.isNotEmpty) {
+        _showRestoreHeldCartPrompt();
+      }
+    });
+  }
+
+  Future<void> _loadHapticFeedbackSetting() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _hapticFeedbackEnabled = prefs.getBool('haptic_feedback_enabled') ?? true;
+    });
+  }
+
+  void _hapticMedium() {
+    if (!_hapticFeedbackEnabled) return;
+    Haptics.vibrate(HapticsType.medium);
+  }
+
+  void _hapticHeavy() {
+    if (!_hapticFeedbackEnabled) return;
+    Haptics.vibrate(HapticsType.heavy);
   }
 
   void _onParkedSalesChanged() {
@@ -144,6 +191,8 @@ class PosScreenState extends State<PosScreen> {
 
       setState(() {
         _currency = settings.currency;
+        _taxRate = settings.taxRate;
+        _taxInclusive = settings.taxInclusive;
         _isLoadingSettings = false;
       });
     } catch (_) {
@@ -214,12 +263,19 @@ class PosScreenState extends State<PosScreen> {
 
   List<Product> get _filteredProducts {
     final query = _searchQuery.trim().toLowerCase();
+    final category = _categoryFilter;
+
+    final source = category == null || category.isEmpty
+        ? _products
+        : _products
+            .where((product) => product.category.trim() == category)
+            .toList();
 
     if (query.isEmpty) {
-      return _products;
+      return source;
     }
 
-    final matches = _products.where((product) {
+    final matches = source.where((product) {
       return product.name.toLowerCase().contains(query) ||
           product.sku.toLowerCase().contains(query) ||
           product.barcode.toLowerCase().contains(query) ||
@@ -280,7 +336,7 @@ class PosScreenState extends State<PosScreen> {
     return 0;
   }
 
-  void _addToCart(Product product) {
+  void _addToCart(Product product, {String? batchNumber, String? expiryDate}) {
     final existingIndex = _cart.indexWhere(
       (item) => item.product.id == product.id,
     );
@@ -289,6 +345,7 @@ class PosScreenState extends State<PosScreen> {
       final existingItem = _cart[existingIndex];
 
       if (existingItem.quantity >= product.stockQuantity) {
+        _hapticHeavy();
         setState(() {
           _stockMessage =
               'Not enough stock for ${product.name} '
@@ -299,6 +356,7 @@ class PosScreenState extends State<PosScreen> {
         return;
       }
 
+      _hapticMedium();
       setState(() {
         existingItem.quantity++;
         _stockMessage = null;
@@ -308,6 +366,7 @@ class PosScreenState extends State<PosScreen> {
     }
 
     if (product.stockQuantity <= 0) {
+      _hapticHeavy();
       setState(() {
         _stockMessage =
             '${product.name} (SKU: ${product.sku}) is out of stock.';
@@ -316,8 +375,16 @@ class PosScreenState extends State<PosScreen> {
       return;
     }
 
+    _hapticMedium();
     setState(() {
-      _cart.add(_CartItem(product: product, quantity: 1));
+      _cart.add(
+        CartItem(
+          product: product,
+          quantity: 1,
+          batchNumber: batchNumber,
+          expiryDate: expiryDate,
+        ),
+      );
       _stockMessage = null;
     });
   }
@@ -343,7 +410,7 @@ class PosScreenState extends State<PosScreen> {
     final product = matches.single;
     final previousQuantity = _getCartQuantity(product.id);
 
-    _addToCart(product);
+    _addProductToCart(product);
 
     final newQuantity = _getCartQuantity(product.id);
 
@@ -356,7 +423,127 @@ class PosScreenState extends State<PosScreen> {
     }
   }
 
-  void _increaseQuantity(_CartItem item) {
+  /// Launches the barcode scanner bottom sheet. On a successful scan, looks up
+  /// the product by barcode and adds it to the cart.
+  Future<void> _scanBarcode() async {
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      builder: (_) => const BarcodeScannerSheet(),
+    );
+
+    if (result == null || result.isEmpty || !mounted) return;
+
+    final barcode = result.trim();
+    final matches = _products
+        .where((product) => product.barcode.trim() == barcode)
+        .toList();
+
+    if (matches.length != 1) {
+      setState(() {
+        _stockMessage = matches.isEmpty
+            ? 'No product found for barcode: $barcode'
+            : 'Multiple products use barcode: $barcode';
+      });
+      return;
+    }
+
+    final product = matches.single;
+    final previousQuantity = _getCartQuantity(product.id);
+
+    _addProductToCart(product);
+
+    final newQuantity = _getCartQuantity(product.id);
+    if (newQuantity > previousQuantity) {
+      _searchController.clear();
+      setState(() {
+        _searchQuery = '';
+      });
+    }
+  }
+
+  /// Prompts the operator to optionally enter a batch number and expiry date
+  /// before adding an item to the cart. Returns null if skipped.
+  Future<Map<String, String>?> _promptBatchExpiry(Product product) async {
+    final batchController = TextEditingController();
+    final expiryController = TextEditingController();
+
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Batch & Expiry'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Add traceability for ${product.name}',
+                style: Theme.of(dialogContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: AppDimensions.spacingMd),
+              TextField(
+                controller: batchController,
+                decoration: const InputDecoration(
+                  labelText: 'Batch number',
+                  hintText: 'e.g. BATCH-2024-001',
+                  prefixIcon: Icon(Icons.label_outlined),
+                ),
+              ),
+              const SizedBox(height: AppDimensions.spacingSm),
+              TextField(
+                controller: expiryController,
+                decoration: const InputDecoration(
+                  labelText: 'Expiry date',
+                  hintText: 'YYYY-MM-DD',
+                  prefixIcon: Icon(Icons.event_outlined),
+                ),
+                keyboardType: TextInputType.datetime,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(null),
+              child: const Text('Skip'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop({
+                'batchNumber': batchController.text.trim().isEmpty
+                    ? null
+                    : batchController.text.trim(),
+                'expiryDate': expiryController.text.trim().isEmpty
+                    ? null
+                    : expiryController.text.trim(),
+              }),
+              child: const Text('Add'),
+            ),
+          ],
+        );
+      },
+    );
+
+    batchController.dispose();
+    expiryController.dispose();
+
+    if (!mounted) return null;
+    return result;
+  }
+
+  /// Adds a product to the cart after an optional batch/expiry prompt.
+  Future<void> _addProductToCart(Product product) async {
+    final batchInfo = await _promptBatchExpiry(product);
+    if (!mounted) return;
+
+    _addToCart(
+      product,
+      batchNumber: batchInfo?['batchNumber'],
+      expiryDate: batchInfo?['expiryDate'],
+    );
+  }
+
+  void _increaseQuantity(CartItem item) {
     if (item.quantity >= item.product.stockQuantity) {
       setState(() {
         _stockMessage =
@@ -374,7 +561,7 @@ class PosScreenState extends State<PosScreen> {
     });
   }
 
-  void _decreaseQuantity(_CartItem item) {
+  void _decreaseQuantity(CartItem item) {
     if (item.quantity <= 1) {
       setState(() {
         _cart.remove(item);
@@ -390,7 +577,7 @@ class PosScreenState extends State<PosScreen> {
     });
   }
 
-  void _removeFromCart(_CartItem item) {
+  void _removeFromCart(CartItem item) {
     setState(() {
       _cart.remove(item);
       _stockMessage = null;
@@ -484,12 +671,12 @@ class PosScreenState extends State<PosScreen> {
         if (product == null) continue;
         final existingIndex = _cart.indexWhere((item) => item.product.id == parked.productId);
         if (existingIndex >= 0) {
-          _cart[existingIndex] = _CartItem(
+          _cart[existingIndex] = CartItem(
             product: product,
             quantity: _cart[existingIndex].quantity + parked.qty,
           );
         } else {
-          _cart.add(_CartItem(product: product, quantity: parked.qty));
+          _cart.add(CartItem(product: product, quantity: parked.qty));
         }
       }
     });
@@ -607,7 +794,7 @@ class PosScreenState extends State<PosScreen> {
                                   }
 
                                   _cart.add(
-                                    _CartItem(
+                                    CartItem(
                                       product: product,
                                       quantity: parked.qty,
                                     ),
@@ -630,6 +817,232 @@ class PosScreenState extends State<PosScreen> {
         );
       },
     );
+  }
+
+  /// Shows a one-time prompt on POS startup when there are held (parked) carts,
+  /// inviting the operator to restore the most recent one. Styled with BrandCard
+  /// and the royal brand gradient per the visual polish spec.
+  Future<void> _showRestoreHeldCartPrompt() async {
+    if (!mounted || parkedSalesStore.sales.isEmpty) return;
+
+    final sales = parkedSalesStore.sales;
+    final latest = sales.last;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    final restore = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: BrandCard(
+            padding: const EdgeInsets.all(24),
+            radius: 24,
+            accent: AppColors.royalStart,
+            gradientBorder: true,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Royal gradient header band
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: AppDecor.royalGradient,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.35),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.20),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.schedule_rounded,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Restore held cart?',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${sales.length} held cart${sales.length == 1 ? '' : 's'} waiting',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.pause_circle_outlined,
+                            size: 16,
+                            color: Colors.white70,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              latest.label,
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          Text(
+                            '\$${latest.subtotal.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              color: AppColors.brandMint,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Resume this held sale and continue checkout? Items, quantities and pricing are preserved.',
+                  style: TextStyle(
+                    color: colorScheme.onSurface.withValues(alpha: 0.65),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          side: BorderSide(
+                            color: colorScheme.outline.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          'Not now',
+                          style: TextStyle(
+                            color: colorScheme.onSurface.withValues(alpha: 0.7),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: AppDecor.royalGradient,
+                          borderRadius: BorderRadius.circular(14),
+                          boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.30),
+                        ),
+                        child: ElevatedButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.transparent,
+                            foregroundColor: Colors.white,
+                            shadowColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.playlist_add_rounded, size: 18),
+                              SizedBox(width: 8),
+                              Text(
+                                'Restore cart',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || restore != true) return;
+
+    // Restore the most recently held cart into the current cart.
+    final recalled = parkedSalesStore.recall(sales.length - 1);
+    if (recalled == null) return;
+
+    setState(() {
+      _cart.clear();
+      for (final parked in recalled.items) {
+        final product = _products.where((p) => p.id == parked.productId).firstOrNull;
+        if (product == null) continue;
+        final existingIndex = _cart.indexWhere((item) => item.product.id == parked.productId);
+        if (existingIndex >= 0) {
+          _cart[existingIndex] = CartItem(
+            product: product,
+            quantity: _cart[existingIndex].quantity + parked.qty,
+          );
+        } else {
+          _cart.add(CartItem(product: product, quantity: parked.qty));
+        }
+      }
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Held cart restored — ${recalled.label}'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   // ===========================================================================
@@ -790,24 +1203,24 @@ class PosScreenState extends State<PosScreen> {
   /// so the checkout redemption control can be offered.
   Future<void> _loadRedeemConfig(
     String customerId,
-    void Function(_RedeemConfig) onLoaded,
+    void Function(RedeemConfig) onLoaded,
   ) async {
     try {
       final settings = await _businessSettingsRepository.getSettings();
       if (!settings.loyaltyEnabled) {
-        onLoaded(const _RedeemConfig(balance: 0, redeemValue: 0));
+        onLoaded(const RedeemConfig(balance: 0, redeemValue: 0));
         return;
       }
 
       final customer = await _customerRepository.getCustomerById(customerId);
       onLoaded(
-        _RedeemConfig(
+        RedeemConfig(
           balance: customer?.pointsBalance ?? 0,
           redeemValue: settings.loyaltyRedeemValue,
         ),
       );
     } catch (_) {
-      onLoaded(const _RedeemConfig(balance: 0, redeemValue: 0));
+      onLoaded(const RedeemConfig(balance: 0, redeemValue: 0));
     }
   }
 
@@ -896,18 +1309,48 @@ class PosScreenState extends State<PosScreen> {
 
     final discountController = TextEditingController(text: '0.00');
 
-    final paidAmountController = TextEditingController(
-      text: _subtotal.toStringAsFixed(2),
-    );
+    // ── Phase G: split payments ──
+    // A single cash line is the default (backward compatible). Additional
+    // lines let the customer split the amount due across multiple methods.
+    final taxRate = _taxRate ?? 0.0;
+    final taxInclusive = _taxInclusive;
+    final initialTaxable = _subtotal.clamp(0.0, double.infinity);
+    final initialTax = taxInclusive
+        ? initialTaxable * taxRate / (100 + taxRate)
+        : initialTaxable * taxRate / 100;
+    final initialTotal = taxInclusive ? initialTaxable : initialTaxable + initialTax;
+
+    final paymentMethodMeta = <String, ({
+      IconData icon,
+      Color color,
+    })>{
+      'cash': (icon: Icons.payments_outlined, color: AppColors.moneyTint.last),
+      'card': (icon: Icons.credit_card_outlined, color: AppColors.primary),
+      'bank_transfer': (icon: Icons.account_balance_outlined,
+          color: AppColors.info),
+      'qr_payment': (icon: Icons.qr_code_rounded, color: AppColors.brandAmber),
+      'wallet': (icon: Icons.account_balance_wallet_outlined,
+          color: AppColors.brandMint),
+    };
+
+    final paymentMethodLabel = <String, String>{
+      'cash': 'Cash',
+      'card': 'Card',
+      'bank_transfer': 'Bank Transfer',
+      'qr_payment': 'QR Payment',
+      'wallet': 'Wallet',
+    };
+
+    List<_SplitLine> splitLines = [
+      _SplitLine(method: 'cash', amount: initialTotal),
+    ];
 
     final result = await showDialog<String>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) {
         double discount = 0.0;
-        double paidAmount = _subtotal;
 
-        String paymentMethod = 'cash';
         String? selectedCustomerId;
         bool isPercentMode = false;
 
@@ -924,14 +1367,23 @@ class PosScreenState extends State<PosScreen> {
           builder: (context, setDialogState) {
             final theme = Theme.of(context);
             final colorScheme = theme.colorScheme;
+            final isDark = theme.brightness == Brightness.dark;
 
             final loyaltyDiscount =
                 LoyaltyService.redeemValue(redeemPoints, redeemValue: redeemValue);
-            final total = (_subtotal - discount - loyaltyDiscount).clamp(
-              0.0,
-              double.infinity,
-            );
+            final taxable = (_subtotal - discount - loyaltyDiscount)
+                .clamp(0.0, double.infinity);
 
+            // Phase G: tax / VAT.
+            final taxAmount = taxInclusive
+                ? taxable * taxRate / (100 + taxRate)
+                : taxable * taxRate / 100;
+            final total = taxInclusive ? taxable : taxable + taxAmount;
+
+            final paidAmount = splitLines.fold<double>(
+              0.0,
+              (sum, line) => sum + line.amount,
+            );
             final change = paidAmount - total;
 
             void updateDiscount(String value) {
@@ -985,15 +1437,6 @@ class PosScreenState extends State<PosScreen> {
               });
             }
 
-            void updatePaidAmount(String value) {
-              final parsed = double.tryParse(value) ?? 0.0;
-
-              setDialogState(() {
-                paidAmount = parsed < 0 ? 0.0 : parsed;
-                validationMessage = null;
-              });
-            }
-
             Future<void> completeCheckout() async {
               final rawDiscount =
                   double.tryParse(discountController.text.trim()) ?? 0.0;
@@ -1003,9 +1446,6 @@ class PosScreenState extends State<PosScreen> {
                 rawDiscount,
                 isPercentMode,
               );
-
-              final parsedPaidAmount =
-                  double.tryParse(paidAmountController.text.trim()) ?? 0.0;
 
               if (rawDiscount < 0) {
                 setDialogState(() {
@@ -1036,12 +1476,44 @@ class PosScreenState extends State<PosScreen> {
                 redeemPoints,
                 redeemValue: redeemValue,
               );
-              final finalTotal = (_subtotal - parsedDiscount - loyaltyDiscount)
+              final taxable = (_subtotal - parsedDiscount - loyaltyDiscount)
                   .clamp(0.0, double.infinity);
 
-              if (parsedPaidAmount < finalTotal) {
+              // Phase G: tax / VAT.
+              final taxAmount = taxInclusive
+                  ? taxable * taxRate / (100 + taxRate)
+                  : taxable * taxRate / 100;
+              final finalTotal = taxInclusive ? taxable : taxable + taxAmount;
+
+              // Split payment validation.
+              final paidAmount = splitLines.fold<double>(
+                0.0,
+                (sum, line) => sum + line.amount,
+              );
+
+              for (final line in splitLines) {
+                if (line.amount <= 0) {
+                  setDialogState(() {
+                    validationMessage =
+                        'Each payment amount must be greater than 0.';
+                  });
+                  return;
+                }
+              }
+
+              if (paidAmount < finalTotal) {
                 setDialogState(() {
                   validationMessage = 'Amount received is less than the total.';
+                });
+
+                return;
+              }
+
+              if (splitLines.length > 1 &&
+                  (paidAmount - finalTotal).abs() > 0.005) {
+                setDialogState(() {
+                  validationMessage =
+                      'Split payment amounts must equal the total due.';
                 });
 
                 return;
@@ -1078,10 +1550,28 @@ class PosScreenState extends State<PosScreen> {
                       saleId: saleId,
                       productId: item.product.id,
                       productName: item.product.name,
-                      quantity: item.quantity,
+                      quantity: item.quantity.toDouble(),
                       unitPrice: item.product.sellingPrice,
                       purchasePrice: item.product.purchasePrice,
+                      batchNumber: item.batchNumber,
+                      expiryDate: item.expiryDate,
                     ),
+                  );
+                }
+
+                final paymentMethod =
+                    splitLines.length == 1
+                        ? splitLines.first.method
+                        : 'split';
+                String? paymentMethodDetails;
+                if (splitLines.length > 1) {
+                  paymentMethodDetails = jsonEncode(
+                    splitLines
+                        .map((line) => <String, dynamic>{
+                              'method': line.method,
+                              'amount': line.amount,
+                            })
+                        .toList(),
                   );
                 }
 
@@ -1091,7 +1581,9 @@ class PosScreenState extends State<PosScreen> {
                   subtotal: _subtotal,
                   discount: parsedDiscount + loyaltyDiscount,
                   total: finalTotal,
-                  paidAmount: parsedPaidAmount,
+                  taxAmount: taxAmount,
+                  paymentMethodDetails: paymentMethodDetails,
+                  paidAmount: paidAmount,
                   paymentMethod: paymentMethod,
                   createdAt: DateTime.now(),
                   items: items,
@@ -1129,6 +1621,7 @@ class PosScreenState extends State<PosScreen> {
                   return;
                 }
 
+                _hapticMedium();
                 setState(() {
                   _cart.clear();
                   _stockMessage = null;
@@ -1142,6 +1635,7 @@ class PosScreenState extends State<PosScreen> {
                   return;
                 }
 
+                _hapticHeavy();
                 setDialogState(() {
                   isProcessing = false;
 
@@ -1356,6 +1850,38 @@ class PosScreenState extends State<PosScreen> {
                               const SizedBox(height: AppDimensions.spacingMd),
                             ],
 
+                            // Phase G: tax / VAT breakdown.
+                            if (taxRate > 0) ...[
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      taxInclusive
+                                          ? 'Tax (included, '
+                                              '${taxRate.toStringAsFixed(0)}%)'
+                                          : 'Tax (+${taxRate.toStringAsFixed(0)}%)',
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '$_currency '
+                                        '${taxAmount.toStringAsFixed(2)}',
+                                    style: theme.textTheme.bodyMedium
+                                        ?.copyWith(
+                                      color: AppColors.moneyTint.last,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppDimensions.spacingMd),
+                            ],
+
                             Divider(
                               height: 1,
                               color: colorScheme.outlineVariant,
@@ -1363,35 +1889,62 @@ class PosScreenState extends State<PosScreen> {
 
                             const SizedBox(height: AppDimensions.spacingMd),
 
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Total',
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    color: colorScheme.onSurface,
-                                    fontWeight: FontWeight.w800,
+                            // Phase G: royal-tinted totals panel.
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppDimensions.spacingMd,
+                                vertical: AppDimensions.spacingSm,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? AppColors.posTint.last.withValues(
+                                        alpha: 0.14,
+                                      )
+                                    : AppColors.posTint.first,
+                                borderRadius: BorderRadius.circular(
+                                  AppDimensions.buttonRadius,
+                                ),
+                                border: Border.all(
+                                  color: AppColors.posTint.last.withValues(
+                                    alpha: isDark ? 0.55 : 0.35,
                                   ),
                                 ),
-                                const Spacer(),
-                                AnimatedSwitcher(
-                                  duration: const Duration(milliseconds: 180),
-                                  transitionBuilder: (child, animation) {
-                                    return FadeTransition(
-                                      opacity: animation,
-                                      child: child,
-                                    );
-                                  },
-                                  child: Text(
-                                    '$_currency ${total.toStringAsFixed(2)}',
-                                    key: ValueKey(total),
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      color: colorScheme.primary,
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Total',
+                                    style: theme.textTheme.titleMedium
+                                        ?.copyWith(
+                                      color: colorScheme.onSurface,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
-                                ),
-                              ],
+                                  const Spacer(),
+                                  AnimatedSwitcher(
+                                    duration: const Duration(
+                                      milliseconds: 180,
+                                    ),
+                                    transitionBuilder: (child, animation) {
+                                      return FadeTransition(
+                                        opacity: animation,
+                                        child: child,
+                                      );
+                                    },
+                                    child: Text(
+                                      '$_currency ${total.toStringAsFixed(2)}',
+                                      key: ValueKey(total),
+                                      style: theme.textTheme.titleLarge
+                                          ?.copyWith(
+                                        color: colorScheme.primary,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -1531,34 +2084,44 @@ class PosScreenState extends State<PosScreen> {
                             ),
                           ),
                           const Spacer(),
-                          SegmentedButton<bool>(
-                            showSelectedIcon: false,
-                            style: const ButtonStyle(
-                              visualDensity: VisualDensity.compact,
-                            ),
-                            segments: const [
-                              ButtonSegment(
-                                value: false,
-                                label: Text('Amount'),
+                          // Discount mode toggle styled as BrandPill.
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                onTap: isProcessing
+                                    ? null
+                                    : () {
+                                        setDialogState(() {
+                                          isPercentMode = false;
+                                          discountValidationMessage = null;
+                                        });
+                                        updateDiscount(discountController.text);
+                                      },
+                                child: BrandPill(
+                                  label: 'Amount',
+                                  color: AppColors.royalMid,
+                                  filled: !isPercentMode,
+                                ),
                               ),
-                              ButtonSegment(
-                                value: true,
-                                label: Text('Percent'),
+                              const SizedBox(width: 8),
+                              GestureDetector(
+                                onTap: isProcessing
+                                    ? null
+                                    : () {
+                                        setDialogState(() {
+                                          isPercentMode = true;
+                                          discountValidationMessage = null;
+                                        });
+                                        updateDiscount(discountController.text);
+                                      },
+                                child: BrandPill(
+                                  label: 'Percent',
+                                  color: AppColors.royalMid,
+                                  filled: isPercentMode,
+                                ),
                               ),
                             ],
-                            selected: {isPercentMode},
-                            onSelectionChanged: isProcessing
-                                ? null
-                                : (selection) {
-                                    setDialogState(() {
-                                      isPercentMode =
-                                          selection.first;
-                                      discountValidationMessage = null;
-                                    });
-                                    updateDiscount(
-                                      discountController.text,
-                                    );
-                                  },
                           ),
                         ],
                       ),
@@ -1614,6 +2177,20 @@ class PosScreenState extends State<PosScreen> {
                         ),
                       ),
 
+                      // Percentage discount calculation preview.
+                      if (isPercentMode && discount > 0 && _subtotal > 0) ...[
+                        const SizedBox(height: AppDimensions.spacingSm),
+                        Text(
+                          '${(discount * 100 / _subtotal).toStringAsFixed(0)}% of '
+                          '$_currency ${_subtotal.toStringAsFixed(2)} = '
+                          '$_currency ${discount.toStringAsFixed(2)}',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+
                       if (discountValidationMessage != null) ...[
                         const SizedBox(height: AppDimensions.spacingSm),
                         AnimatedSwitcher(
@@ -1664,10 +2241,10 @@ class PosScreenState extends State<PosScreen> {
                       const SizedBox(height: AppDimensions.spacingLg),
 
                       // ─────────────────────────────────────────────
-                      // PAYMENT METHOD
+                      // PAYMENT METHODS (split payments)
                       // ─────────────────────────────────────────────
                       Text(
-                        'Payment Method',
+                        'Payment Methods',
                         style: theme.textTheme.labelLarge?.copyWith(
                           color: colorScheme.onSurface,
                           fontWeight: FontWeight.w700,
@@ -1676,72 +2253,189 @@ class PosScreenState extends State<PosScreen> {
 
                       const SizedBox(height: AppDimensions.spacingSm),
 
-                      DropdownButtonFormField<String>(
-                        initialValue: paymentMethod,
-                        decoration: InputDecoration(
-                          hintText: 'Select payment method',
-                          prefixIcon: const Icon(Icons.payments_outlined),
-                          filled: true,
-                          fillColor: colorScheme.surface,
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'cash', child: Text('Cash')),
-                          DropdownMenuItem(value: 'card', child: Text('Card')),
-                          DropdownMenuItem(
-                            value: 'bank_transfer',
-                            child: Text('Bank Transfer'),
-                          ),
-                        ],
-                        onChanged: isProcessing
-                            ? null
-                            : (value) {
-                                if (value == null) {
-                                  return;
-                                }
+                      // Each split method is a premium row: icon tile + amount
+                      // input + remove button. Single cash line is the default.
+                      ...splitLines.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final line = entry.value;
+                        final meta = paymentMethodMeta[line.method]!;
+                        final canRemove = splitLines.length > 1;
 
-                                setDialogState(() {
-                                  paymentMethod = value;
-                                  validationMessage = null;
-                                });
-                              },
+                        return Container(
+                          margin: const EdgeInsets.only(
+                            bottom: AppDimensions.spacingSm,
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: AppDimensions.spacingMd,
+                            vertical: AppDimensions.spacingSm,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(
+                              AppDimensions.buttonRadius,
+                            ),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              BrandIconBadge(
+                                icon: meta.icon,
+                                color: meta.color,
+                                size: 40,
+                              ),
+                              const SizedBox(width: AppDimensions.spacingMd),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      paymentMethodLabel[line.method] ??
+                                          line.method,
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                        color: colorScheme.onSurface,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppDimensions
+                                        .spacingXs),
+                                    SizedBox(
+                                      width: 160,
+                                      child: TextField(
+                                        controller: line.controller,
+                                        enabled: !isProcessing,
+                                        keyboardType: const TextInputType
+                                            .numberWithOptions(decimal: true),
+                                        onChanged: (value) {
+                                          final parsed =
+                                              double.tryParse(value) ?? 0.0;
+                                          setDialogState(() {
+                                            line.amount =
+                                                parsed < 0 ? 0 : parsed;
+                                            validationMessage = null;
+                                          });
+                                        },
+                                        decoration: InputDecoration(
+                                          hintText: '0.00',
+                                          prefixText: '$_currency ',
+                                          filled: true,
+                                          fillColor: colorScheme.surface,
+                                          contentPadding: const EdgeInsets
+                                              .symmetric(
+                                            horizontal: 12,
+                                            vertical: 12,
+                                          ),
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (canRemove) ...[
+                                const SizedBox(width: AppDimensions
+                                    .spacingSm),
+                                GestureDetector(
+                                  onTap: isProcessing
+                                      ? null
+                                      : () {
+                                          setDialogState(() {
+                                            splitLines.removeAt(index);
+                                            line.controller.dispose();
+                                            validationMessage = null;
+                                          });
+                                        },
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.error
+                                          .withValues(alpha: 0.10),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.close_rounded,
+                                      size: 18,
+                                      color: colorScheme.error,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }),
+
+                      const SizedBox(height: AppDimensions.spacingSm),
+
+                      // "Add payment method" — royal gradient.
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: AppDecor.royalGradient,
+                          borderRadius: BorderRadius.circular(
+                            AppDimensions.buttonRadius,
+                          ),
+                          boxShadow: AppDecor.glow(
+                            AppColors.royalMid,
+                            alpha: 0.30,
+                          ),
+                        ),
+                        child: SizedBox(
+                          height: 40,
+                          child: FilledButton.icon(
+                            onPressed: isProcessing
+                                ? null
+                                : () {
+                                    setDialogState(() {
+                                      final used = splitLines
+                                          .map((l) => l.method)
+                                          .toSet();
+                                      final next = paymentMethodMeta.keys
+                                          .firstWhere(
+                                            (m) => !used.contains(m),
+                                            orElse: () => 'cash',
+                                          );
+                                      splitLines.add(
+                                        _SplitLine(method: next, amount: 0.0),
+                                      );
+                                      validationMessage = null;
+                                    });
+                                  },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppDimensions.spacingMd,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  AppDimensions.buttonRadius,
+                                ),
+                              ),
+                            ),
+                            icon: const Icon(
+                              Icons.add_rounded,
+                              size: 18,
+                            ),
+                            label: const Text(
+                              'Add payment method',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
 
                       const SizedBox(height: AppDimensions.spacingLg),
 
-                      // ─────────────────────────────────────────────
-                      // AMOUNT RECEIVED
-                      // ─────────────────────────────────────────────
-                      Text(
-                        'Amount Received',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-
-                      const SizedBox(height: AppDimensions.spacingSm),
-
-                      TextField(
-                        controller: paidAmountController,
-                        enabled: !isProcessing,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
-                        onChanged: updatePaidAmount,
-                        decoration: InputDecoration(
-                          hintText: '0.00',
-                          prefixText: '$_currency ',
-                          prefixIcon: const Icon(
-                            Icons.account_balance_wallet_outlined,
-                          ),
-                          filled: true,
-                          fillColor: colorScheme.surface,
-                        ),
-                      ),
-
-                      const SizedBox(height: AppDimensions.spacingSm),
-
-                      if (paymentMethod == 'cash' &&
+                      // Quick cash (only meaningful for a single cash tender).
+                      if (splitLines.length == 1 &&
+                          splitLines.first.method == 'cash' &&
                           CheckoutHelpers.quickCash(total).isNotEmpty) ...[
                         Text(
                           'Quick Cash',
@@ -1774,15 +2468,17 @@ class PosScreenState extends State<PosScreen> {
                                     : () {
                                         final text =
                                             amount.toStringAsFixed(2);
-                                        paidAmountController.text = text;
-                                        updatePaidAmount(text);
+                                        splitLines.first.controller.text =
+                                            text;
+                                        setDialogState(() {
+                                          splitLines.first.amount = amount;
+                                          validationMessage = null;
+                                        });
                                       },
                               ),
                           ],
                         ),
                       ],
-
-                      const SizedBox(height: AppDimensions.spacingLg),
 
                       // ─────────────────────────────────────────────
                       // CHANGE
@@ -1964,10 +2660,13 @@ class PosScreenState extends State<PosScreen> {
                   decoration: BoxDecoration(
                     gradient: isProcessing
                         ? null
-                        : AppDecor.moneyGradient,
+                        : AppDecor.royalGradient,
                     borderRadius: BorderRadius.circular(
                       AppDimensions.buttonRadius,
                     ),
+                    boxShadow: isProcessing
+                        ? null
+                        : AppDecor.glow(AppColors.royalMid, alpha: 0.30),
                   ),
                   child: FilledButton.icon(
                     onPressed: isProcessing ? null : completeCheckout,
@@ -1992,7 +2691,7 @@ class PosScreenState extends State<PosScreen> {
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: AuroraLoader(size: 18, strokeWidth: 2),
                           )
                         : const Icon(Icons.check_rounded, size: 19),
                     label: Text(
@@ -2009,7 +2708,9 @@ class PosScreenState extends State<PosScreen> {
     );
 
     discountController.dispose();
-    paidAmountController.dispose();
+    for (final line in splitLines) {
+      line.controller.dispose();
+    }
 
     return result;
   }
@@ -2112,31 +2813,38 @@ class PosScreenState extends State<PosScreen> {
             children: [
               const SizedBox(height: AppDimensions.spacingSm),
 
-              // Success icon
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0.75, end: 1.0),
-                duration: const Duration(milliseconds: 350),
-                curve: Curves.easeOutBack,
-                builder: (context, scale, child) {
-                  return Transform.scale(scale: scale, child: child);
-                },
+              // Success badge — sunset-aurora circle with a one-shot
+              // elastic scale-bounce and a warm glow. Plays once; never
+              // blocks input (dialog buttons appear immediately).
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.brandCoral.withValues(alpha: 0.35),
+                      blurRadius: 36,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
                 child: Container(
                   width: 88,
                   height: 88,
                   decoration: BoxDecoration(
-                    color: AppColors.successLight,
+                    gradient: AppDecor.sunsetGradient,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: AppColors.success.withValues(alpha: 0.18),
-                      width: 1.5,
-                    ),
                   ),
                   child: const Icon(
                     Icons.check_rounded,
                     size: 48,
-                    color: AppColors.success,
+                    color: Colors.white,
                   ),
-                ),
+                ).animate().scale(
+                  begin: const Offset(0.5, 0.5),
+                  end: const Offset(1, 1),
+                  duration: 700.ms,
+                  curve: Curves.elasticOut,
+                ).fadeIn(duration: 240.ms),
               ),
 
               const SizedBox(height: AppDimensions.spacingLg),
@@ -2207,20 +2915,38 @@ class PosScreenState extends State<PosScreen> {
               child: const Text('Done'),
             ),
 
-            FilledButton.icon(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
+            Container(
+              decoration: BoxDecoration(
+                gradient: AppDecor.royalGradient,
+                borderRadius: BorderRadius.circular(
+                  AppDimensions.buttonRadius,
+                ),
+                boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.28),
+              ),
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
 
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => ReceiptScreen(saleId: saleId),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ReceiptScreen(saleId: saleId),
+                    ),
+                  );
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppDimensions.buttonRadius,
+                    ),
                   ),
-                );
-              },
-              icon: const Icon(Icons.receipt_long_outlined, size: 19),
-              label: const Text(
-                'View Receipt',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                icon: const Icon(Icons.receipt_long_outlined, size: 19),
+                label: const Text(
+                  'View Receipt',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ],
@@ -2244,7 +2970,7 @@ class PosScreenState extends State<PosScreen> {
 
         return StatefulBuilder(
           builder: (context, setSheetState) {
-            void increaseItem(_CartItem item) {
+            void increaseItem(CartItem item) {
               if (item.quantity >= item.product.stockQuantity) {
                 setSheetState(() {
                   stockMessage =
@@ -2266,7 +2992,7 @@ class PosScreenState extends State<PosScreen> {
               });
             }
 
-            void decreaseItem(_CartItem item) {
+            void decreaseItem(CartItem item) {
               if (item.quantity <= 1) {
                 setState(() {
                   _cart.remove(item);
@@ -2290,7 +3016,7 @@ class PosScreenState extends State<PosScreen> {
               });
             }
 
-            void removeItem(_CartItem item) {
+            void removeItem(CartItem item) {
               setState(() {
                 _cart.remove(item);
                 _stockMessage = null;
@@ -2375,9 +3101,10 @@ class PosScreenState extends State<PosScreen> {
                             itemBuilder: (context, index) {
                               final item = _cart[index];
 
-                              return _CartItemTile(
+                              return CartItemTile(
                                 item: item,
                                 currency: _currency,
+                                enterIndex: index,
                                 onIncrease: () {
                                   increaseItem(item);
                                 },
@@ -2473,9 +3200,10 @@ class PosScreenState extends State<PosScreen> {
       itemBuilder: (context, index) {
         final item = _cart[index];
 
-        return _CartItemTile(
+        return CartItemTile(
           item: item,
           currency: _currency,
+          enterIndex: index,
           onIncrease: () {
             _increaseQuantity(item);
           },
@@ -2551,20 +3279,32 @@ class PosScreenState extends State<PosScreen> {
               gradient: LinearGradient(
                 colors: isDark
                     ? [
-                        AppColors.primary.withValues(alpha: 0.20),
-                        AppColors.brandMint.withValues(alpha: 0.08),
+                        AppColors.primary.withValues(alpha: 0.24),
+                        AppColors.auroraTeal.withValues(alpha: 0.10),
                       ]
                     : [
-                        AppColors.primary.withValues(alpha: 0.08),
-                        AppColors.brandMint.withValues(alpha: 0.08),
+                        AppColors.primary.withValues(alpha: 0.09),
+                        AppColors.auroraTeal.withValues(alpha: 0.12),
                       ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(15),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppColors.primary.withValues(alpha: 0.22),
+                color: AppColors.primary.withValues(
+                  alpha: isDark ? 0.30 : 0.22,
+                ),
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(
+                    alpha: isDark ? 0.14 : 0.08,
+                  ),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                  spreadRadius: -6,
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -2582,42 +3322,66 @@ class PosScreenState extends State<PosScreen> {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        '$_currency ${_subtotal.toStringAsFixed(2)}',
-                        style: TextStyle(
-                          fontFamily: AppTextStyles.displayFont,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.7,
-                          color: colorScheme.onSurface,
+                      // Hero total in Sora priceHero — counts up over a
+                      // lightweight 300ms tween whenever the totals change.
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(end: _subtotal),
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, value, child) => Text(
+                          '$_currency ${value.toStringAsFixed(2)}',
+                          style: AppTextStyles.priceHero.copyWith(
+                            fontSize: 24,
+                            color: colorScheme.onSurface,
+                          ),
                         ),
                       ),
                     ],
                   ),
                 ),
                 if (showCheckout)
-                  SizedBox(
-                    height: 42,
-                    child: FilledButton.icon(
-                      onPressed: _cart.isEmpty
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: _cart.isEmpty ? null : AppDecor.royalGradient,
+                      color: _cart.isEmpty
+                          ? colorScheme.onSurfaceVariant
+                          : null,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: _cart.isEmpty
                           ? null
-                          : () => _handleCheckout(
-                                closeAfterCheckout: closeAfterCheckout,
-                              ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 15),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(11),
+                          : AppDecor.glow(AppColors.royalMid, alpha: 0.30),
+                    ),
+                    child: SizedBox(
+                      height: 42,
+                      child: FilledButton.icon(
+                        onPressed: _cart.isEmpty
+                            ? null
+                            : () => _handleCheckout(
+                                  closeAfterCheckout: closeAfterCheckout,
+                                ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.transparent,
+                          disabledForegroundColor: colorScheme.onSurface
+                              .withValues(alpha: 0.5),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 15,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
-                      ),
-                      icon: const Icon(Icons.point_of_sale_rounded, size: 17),
-                      label: const Text(
-                        'Checkout',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                        icon: const Icon(
+                          Icons.point_of_sale_rounded,
+                          size: 17,
+                        ),
+                        label: const Text(
+                          'Checkout',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
@@ -2931,14 +3695,7 @@ class PosScreenState extends State<PosScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: CircularProgressIndicator(
-                      color: colorScheme.primary,
-                      strokeWidth: 3,
-                    ),
-                  ),
+                  const AuroraLoader(size: 48),
                   const SizedBox(height: AppDimensions.spacingMd),
                   Text(
                     'Loading products...',
@@ -2991,33 +3748,58 @@ class PosScreenState extends State<PosScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PageHero(
-            eyebrow: 'Checkout',
-            title: 'Point of sale',
-            subtitle: _searchQuery.trim().isEmpty
-                ? 'Tap a product to add it, or scan a barcode to jump straight in.'
-                : '${products.length} matching '
-                    '${products.length == 1 ? 'product' : 'products'} for your search.',
-            showIllustration: false,
-          ),
-          const SizedBox(height: AppDimensions.spacingLg),
-          _PosSearchField(
-            controller: _searchController,
-            onSubmitted: _handleBarcodeSubmitted,
-            onChanged: (value) {
-              setState(() {
-                _searchQuery = value;
-              });
-            },
-            onClear: () {
-              _searchController.clear();
+          _buildPosHeader(products),
+          const SizedBox(height: AppDimensions.spacingMd),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: PosSearchField(
+                  controller: _searchController,
+                  onSubmitted: _handleBarcodeSubmitted,
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                  onClear: () {
+                    _searchController.clear();
 
-              setState(() {
-                _searchQuery = '';
-              });
-            },
+                    setState(() {
+                      _searchQuery = '';
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(width: AppDimensions.spacingSm),
+              // Scan button — royal gradient icon tile that opens the camera
+              // barcode scanner bottom sheet.
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  gradient: AppDecor.royalGradient,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.30),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: _scanBarcode,
+                    child: const Icon(
+                      Icons.qr_code_scanner_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppDimensions.spacingLg),
+          const SizedBox(height: AppDimensions.spacingSm),
+          _buildCategoryChips(),
+          const SizedBox(height: AppDimensions.spacingMd),
           SectionHeading(
             title: 'Available products',
             subtitle: 'Tap to add · stock updates live',
@@ -3053,12 +3835,12 @@ class PosScreenState extends State<PosScreen> {
                           itemBuilder: (context, index) {
                             final product = products[index];
 
-                            return _ProductTile(
+                            final tile = _ProductTile(
                               product: product,
                               currency: _currency,
                               quantity: _getCartQuantity(product.id),
                               onAdd: () {
-                                _addToCart(product);
+                                _addProductToCart(product);
                               },
                               onIncrease: () {
                                 final item = _cart.firstWhere(
@@ -3075,6 +3857,22 @@ class PosScreenState extends State<PosScreen> {
                                 _decreaseQuantity(item);
                               },
                             );
+
+                            // Soft entrance for the first screenful only —
+                            // fades never delay a tap and don't replay on
+                            // cart-related rebuilds of existing tiles.
+                            if (index >= 12) {
+                              return tile;
+                            }
+
+                            return tile
+                                .animate(
+                                  delay: Duration(milliseconds: 60 * index),
+                                )
+                                .fadeIn(
+                                  duration: 350.ms,
+                                  curve: Curves.easeOutCubic,
+                                );
                           },
                         );
                       },
@@ -3082,6 +3880,279 @@ class PosScreenState extends State<PosScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Compact photo-accent header for the POS: the payment photo sits under
+  /// the brand wash, with the in-cart glanceable total on the right. Kept
+  /// short (~110px) so the search field and product grid stay above the fold.
+  Widget _buildPosHeader(List<Product> products) {
+    final theme = Theme.of(context);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 96),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: AppDecor.photoHero(
+                image: AppImages.posPayment,
+                imageAlignmentY: 0.45,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.point_of_sale_rounded,
+                              size: 13,
+                              color: Color(0xFF7DF3DF),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'CHECKOUT',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontFamily: AppTextStyles.bodyFont,
+                                  color: AppColors.onPhotoMuted,
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Point of sale',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.displayFont,
+                            color: AppColors.onPhoto,
+                            fontSize: theme.brightness == Brightness.dark
+                                ? 21
+                                : 22,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.6,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _searchQuery.trim().isEmpty
+                              ? 'Tap a product to add it, or scan a barcode.'
+                              : '${products.length} matching '
+                                  '${products.length == 1 ? 'product' : 'products'} for your search.',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.onPhotoSoft,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 13,
+                      vertical: 9,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.20),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _totalItems == 0
+                              ? 'CART'
+                              : '$_totalItems ITEM'
+                                  '${_totalItems == 1 ? '' : 'S'}',
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.bodyFont,
+                            color: AppColors.onPhotoSoft,
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 180),
+                          child: Text(
+                            '$_currency ${_subtotal.toStringAsFixed(2)}',
+                            key: ValueKey(_subtotal),
+                            style: TextStyle(
+                              fontFamily: AppTextStyles.displayFont,
+                              color: AppColors.onPhoto,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.4,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ),
+                        if (parkedSalesStore.sales.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              gradient: AppDecor.royalGradient,
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.35),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.pause_rounded,
+                                  size: 11,
+                                  color: Colors.white,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'HELD ${parkedSalesStore.sales.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Category shortcut chips under the search field. Selected chip carries
+  /// the royal (pos) tint; tapping is instant — it only narrows the visible
+  /// list, never blocks. Derived purely from the loaded products.
+  Widget _buildCategoryChips() {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final categories = <String>{
+      for (final product in _products) product.category.trim(),
+    }.where((category) => category.isNotEmpty).toList()..sort();
+
+    if (categories.length < 2) {
+      return const SizedBox.shrink();
+    }
+
+    final deep = AppColors.posTint.last;
+
+    Widget chip(String? value, String label) {
+      final selected = _categoryFilter == value;
+
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() {
+              _categoryFilter = selected ? null : value;
+            });
+          },
+          borderRadius: BorderRadius.circular(999),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+            decoration: BoxDecoration(
+              color: selected
+                  ? (isDark ? deep.withValues(alpha: 0.22) : AppColors.posTint.first)
+                  : (isDark
+                      ? Colors.white.withValues(alpha: 0.045)
+                      : Colors.white),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: selected
+                    ? deep.withValues(alpha: isDark ? 0.55 : 0.65)
+                    : (isDark
+                        ? Colors.white.withValues(alpha: 0.10)
+                        : AppColors.lightBorder),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  selected
+                      ? Icons.check_rounded
+                      : Icons.category_outlined,
+                  size: 13,
+                  color: selected
+                      ? deep
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    color: selected
+                        ? (isDark ? AppColors.primaryLight : deep)
+                        : theme.colorScheme.onSurface.withValues(alpha: 0.70),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final chipList = <Widget>[
+      chip(null, 'All'),
+      for (final category in categories) chip(category, category),
+    ];
+
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: chipList.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 7),
+        itemBuilder: (context, index) => chipList[index],
       ),
     );
   }
@@ -3158,37 +4229,45 @@ class PosScreenState extends State<PosScreen> {
   // ===========================================================================
 
   Widget _buildDesktopCart() {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(8, 12, 12, 12),
       padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        color: isDark
+            ? AppColors.darkSurface.withValues(alpha: 0.92)
+            : Colors.white.withValues(alpha: 0.92),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Theme.of(context).brightness == Brightness.dark
-              ? Colors.white.withValues(alpha: 0.07)
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
               : AppColors.lightBorder,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(
-              alpha: Theme.of(context).brightness == Brightness.dark
-                  ? 0.30
-                  : 0.05,
-            ),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-            spreadRadius: -8,
-          ),
-        ],
+        boxShadow: AppDecor.layeredShadow(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  gradient: AppDecor.royalGradient,
+                  borderRadius: BorderRadius.circular(9),
+                  boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.24),
+                ),
+                child: const Icon(
+                  Icons.receipt_rounded,
+                  size: 16,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 10),
               Text(
                 'Current sale',
                 style: TextStyle(
@@ -3243,148 +4322,6 @@ class PosScreenState extends State<PosScreen> {
     );
   }
 }
-
-// =============================================================================
-// POS SEARCH FIELD
-// =============================================================================
-
-class _PosSearchField extends StatefulWidget {
-  final TextEditingController controller;
-  final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
-  final ValueChanged<String> onSubmitted;
-
-  const _PosSearchField({
-    required this.controller,
-    required this.onChanged,
-    required this.onClear,
-    required this.onSubmitted,
-  });
-
-  @override
-  State<_PosSearchField> createState() => _PosSearchFieldState();
-}
-
-class _PosSearchFieldState extends State<_PosSearchField> {
-  late final FocusNode _focusNode;
-
-  bool _hasFocus = false;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _focusNode = FocusNode();
-    _focusNode.addListener(_handleFocusChange);
-  }
-
-  void _handleFocusChange() {
-    setState(() {
-      _hasFocus = _focusNode.hasFocus;
-    });
-  }
-
-  @override
-  void dispose() {
-    _focusNode.removeListener(_handleFocusChange);
-    _focusNode.dispose();
-
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
-        boxShadow: _hasFocus
-            ? [
-                BoxShadow(
-                  color: colorScheme.primary.withValues(alpha: 0.10),
-                  blurRadius: 0,
-                  spreadRadius: 2,
-                ),
-              ]
-            : null,
-      ),
-      child: TextField(
-        controller: widget.controller,
-        focusNode: _focusNode,
-        onChanged: widget.onChanged,
-        onSubmitted: widget.onSubmitted,
-        style: theme.textTheme.bodyLarge?.copyWith(
-          color: colorScheme.onSurface,
-        ),
-        decoration: InputDecoration(
-          hintText: 'Search by name, SKU, barcode, or category',
-          hintStyle: theme.textTheme.bodyLarge?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-          ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            color: _hasFocus
-                ? colorScheme.primary
-                : colorScheme.onSurfaceVariant,
-          ),
-          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-            valueListenable: widget.controller,
-            builder: (context, value, child) {
-              if (value.text.isEmpty) {
-                return const SizedBox.shrink();
-              }
-
-              return IconButton(
-                tooltip: 'Clear search',
-                onPressed: widget.onClear,
-                icon: const Icon(Icons.close_rounded),
-              );
-            },
-          ),
-          filled: true,
-          fillColor: colorScheme.surface,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppDimensions.spacingLg,
-            vertical: 15,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
-            borderSide: BorderSide(color: colorScheme.outline),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
-            borderSide: BorderSide(color: colorScheme.outline),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppDimensions.buttonRadius),
-            borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// =============================================================================
-// CART ITEM MODEL
-// =============================================================================
-
-class _CartItem {
-  final Product product;
-
-  int quantity;
-
-  _CartItem({required this.product, required this.quantity});
-
-  double get total {
-    return product.sellingPrice * quantity;
-  }
-}
-
 // =============================================================================
 // PRODUCT TILE
 // =============================================================================
@@ -3458,36 +4395,49 @@ class _ProductTileState extends State<_ProductTile> {
     final out = widget.product.stockQuantity <= 0;
     final low = widget.product.isLowStock;
 
+    // Stock indicator rhythm: mint (healthy) → amber (low) → red (out).
+    final stockColor = out
+        ? AppColors.error
+        : low
+            ? AppColors.brandAmber
+            : (isDark ? AppColors.brandMint : AppColors.brandMintDeep);
+
+    final royal = AppColors.posTint.last;
+    final hovered = _hovered && !out;
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       cursor: out ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        transform: Matrix4.translationValues(0, _hovered && !out ? -2 : 0, 0),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.translationValues(0, hovered ? -3 : 0, 0),
         decoration: BoxDecoration(
           color: scheme.surface,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: _hovered && !out
-                ? scheme.primary.withValues(alpha: 0.40)
+            color: hovered
+                ? royal.withValues(alpha: isDark ? 0.55 : 0.45)
                 : (isDark
                     ? Colors.white.withValues(alpha: 0.07)
                     : AppColors.lightBorder),
           ),
-          boxShadow: _hovered && !out
+          boxShadow: hovered
               ? [
                   BoxShadow(
-                    color: scheme.primary.withValues(alpha: 0.10),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
+                    color: royal.withValues(
+                      alpha: isDark ? 0.16 : 0.10,
+                    ),
+                    blurRadius: 22,
+                    offset: const Offset(0, 10),
                     spreadRadius: -6,
                   ),
                 ]
               : null,
         ),
         child: AnimatedScale(
-          scale: _pressed && !out ? 0.96 : 1,
+          scale: _pressed && !out ? 0.95 : 1,
           duration: const Duration(milliseconds: 120),
           curve: Curves.easeOut,
           child: Material(
@@ -3502,30 +4452,40 @@ class _ProductTileState extends State<_ProductTile> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Container(
-                    width: 46,
-                    height: 46,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: out
-                            ? [
-                                Colors.grey.withValues(alpha: 0.35),
-                                Colors.grey.withValues(alpha: 0.18),
-                              ]
-                            : _colors,
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                  if (widget.product.productImageUrl != null &&
+                      widget.product.productImageUrl!.isNotEmpty &&
+                      !out)
+                    ClipRRect(
                       borderRadius: BorderRadius.circular(14),
+                      child: Image.file(
+                        File(widget.product.productImageUrl!),
+                        width: 46,
+                        height: 46,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _ProductTileIconSquircle(
+                          colors: out
+                              ? [
+                                  Colors.grey.withValues(alpha: 0.35),
+                                  Colors.grey.withValues(alpha: 0.18),
+                                ]
+                              : _colors,
+                          icon: _icon,
+                          out: out,
+                        ),
+                      ),
+                    )
+                  else
+                    _ProductTileIconSquircle(
+                      colors: out
+                          ? [
+                              Colors.grey.withValues(alpha: 0.35),
+                              Colors.grey.withValues(alpha: 0.18),
+                            ]
+                          : _colors,
+                      icon: _icon,
+                      out: out,
                     ),
-                    child: Icon(
-                      _icon,
-                      size: 22,
-                      color: out
-                          ? Colors.white.withValues(alpha: 0.5)
-                          : Colors.white,
-                    ),
-                  ),
                   const SizedBox(width: 11),
                   Expanded(
                     child: Column(
@@ -3560,14 +4520,47 @@ class _ProductTileState extends State<_ProductTile> {
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            Text(
-                              '${widget.currency} '
-                              '${widget.product.sellingPrice.toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontFamily: AppTextStyles.bodyFont,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
-                                color: scheme.onSurface,
+                            // Tinted squircle price chip.
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: out
+                                    ? scheme.onSurface
+                                        .withValues(alpha: 0.06)
+                                    : (isDark
+                                        ? royal.withValues(alpha: 0.20)
+                                        : AppColors.posTint.first),
+                                borderRadius: BorderRadius.circular(9),
+                                border: Border.all(
+                                  color: out
+                                      ? scheme.onSurface
+                                          .withValues(alpha: 0.10)
+                                      : royal.withValues(
+                                          alpha: isDark ? 0.42 : 0.30,
+                                        ),
+                                ),
+                              ),
+                              child: Text(
+                                '${widget.currency} '
+                                '${widget.product.sellingPrice.toStringAsFixed(2)}',
+                                style: TextStyle(
+                                  fontFamily: AppTextStyles.displayFont,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.2,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                  color: out
+                                      ? scheme.onSurface
+                                          .withValues(alpha: 0.45)
+                                      : (isDark
+                                          ? AppColors.primaryLight
+                                          : royal),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 7),
@@ -3577,11 +4570,7 @@ class _ProductTileState extends State<_ProductTile> {
                                   : low
                                       ? 'LOW ${widget.product.stockQuantity}'
                                       : '${widget.product.stockQuantity}',
-                              color: out
-                                  ? AppColors.error
-                                  : low
-                                      ? AppColors.brandAmber
-                                      : AppColors.brandMintDeep,
+                              color: stockColor,
                             ),
                           ],
                         ),
@@ -3594,14 +4583,14 @@ class _ProductTileState extends State<_ProductTile> {
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        gradient: out ? null : AppDecor.indigoGradient,
+                        gradient: out ? null : AppDecor.royalGradient,
                         color: out
                             ? scheme.onSurface.withValues(alpha: 0.06)
                             : null,
-                        borderRadius: BorderRadius.circular(11),
+                        borderRadius: BorderRadius.circular(12),
                         boxShadow: out
                             ? null
-                            : AppDecor.glow(AppColors.primary, alpha: 0.24),
+                            : AppDecor.glow(royal, alpha: 0.26),
                       ),
                       child: Icon(
                         Icons.add_rounded,
@@ -3616,7 +4605,7 @@ class _ProductTileState extends State<_ProductTile> {
                       height: 36,
                       decoration: BoxDecoration(
                         color: scheme.primary.withValues(alpha: 0.09),
-                        borderRadius: BorderRadius.circular(11),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: scheme.primary.withValues(alpha: 0.24),
                         ),
@@ -3624,7 +4613,7 @@ class _ProductTileState extends State<_ProductTile> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _TileStep(
+                          TileStep(
                             icon: Icons.remove_rounded,
                             onTap: widget.onDecrease,
                           ),
@@ -3641,7 +4630,7 @@ class _ProductTileState extends State<_ProductTile> {
                               ),
                             ),
                           ),
-                          _TileStep(
+                          TileStep(
                             icon: Icons.add_rounded,
                             onTap: widget.onIncrease,
                           ),
@@ -3659,67 +4648,67 @@ class _ProductTileState extends State<_ProductTile> {
   }
 }
 
-class _TileStep extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _TileStep({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(9),
-      child: SizedBox(
-        width: 26,
-        height: 34,
-        child: Icon(icon, size: 15, color: scheme.primary),
-      ),
-    );
-  }
-}
-
 // =============================================================================
 // CART ITEM TILE
 // =============================================================================
 
-class _CartItemTile extends StatelessWidget {
-  final _CartItem item;
+class CartItemTile extends StatefulWidget {
+  final CartItem item;
   final String currency;
 
   final VoidCallback onIncrease;
   final VoidCallback onDecrease;
   final VoidCallback onRemove;
 
-  const _CartItemTile({
+  /// 0-based index used for the staggered fade-slide entrance. Tiles beyond
+  /// the first screenful (or null) appear instantly and never re-animate.
+  final int? enterIndex;
+
+  const CartItemTile({
+    super.key,
     required this.item,
     required this.currency,
     required this.onIncrease,
     required this.onDecrease,
     required this.onRemove,
+    this.enterIndex,
   });
+
+  @override
+  State<CartItemTile> createState() => _CartItemTileState();
+}
+
+class _CartItemTileState extends State<CartItemTile> {
+  bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final item = widget.item;
+    final currency = widget.currency;
     final initial = item.product.name.trim().isEmpty
         ? '•'
         : item.product.name.trim().substring(0, 1).toUpperCase();
 
-    return Container(
+    final row = Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withValues(alpha: 0.035)
-            : const Color(0xFFF8F9FD),
+        color: _hovered
+            ? (isDark
+                ? Colors.white.withValues(alpha: 0.065)
+                : AppColors.posTint.first)
+            : (isDark
+                ? Colors.white.withValues(alpha: 0.035)
+                : const Color(0xFFF8F9FD)),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.065)
-              : AppColors.lightBorder,
+          color: _hovered
+              ? AppColors.primary.withValues(alpha: isDark ? 0.35 : 0.28)
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.065)
+                  : AppColors.lightBorder),
         ),
       ),
       child: Row(
@@ -3728,8 +4717,12 @@ class _CartItemTile extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              gradient: AppDecor.indigoGradient,
-              borderRadius: BorderRadius.circular(11),
+              gradient: AppDecor.royalGradient,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: AppDecor.glow(
+                AppColors.royalMid,
+                alpha: 0.22,
+              ),
             ),
             child: Center(
               child: Text(
@@ -3752,7 +4745,7 @@ class _CartItemTile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 12.5,
                     fontWeight: FontWeight.w700,
                     color: scheme.onSurface,
                   ),
@@ -3766,25 +4759,113 @@ class _CartItemTile extends StatelessWidget {
                     color: scheme.onSurface.withValues(alpha: 0.45),
                   ),
                 ),
+                if (item.batchNumber != null || item.expiryDate != null) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (item.batchNumber != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.royalMid.withValues(
+                              alpha: isDark ? 0.12 : 0.08,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.royalMid.withValues(
+                                alpha: isDark ? 0.30 : 0.20,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.label_outlined,
+                                size: 11,
+                                color: AppColors.royalMid,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Batch ${item.batchNumber}',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.royalMid,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      if (item.expiryDate != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 3,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.error.withValues(
+                              alpha: isDark ? 0.12 : 0.08,
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: AppColors.error.withValues(
+                                alpha: isDark ? 0.30 : 0.20,
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.event_outlined,
+                                size: 11,
+                                color: AppColors.error,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Exp ${item.expiryDate}',
+                                style: TextStyle(
+                                  fontSize: 9.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 5),
                 Row(
                   children: [
                     Container(
                       height: 27,
                       decoration: BoxDecoration(
-                        color: scheme.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(8),
+                        color: scheme.primary.withValues(
+                          alpha: isDark ? 0.12 : 0.08,
+                        ),
+                        borderRadius: BorderRadius.circular(9),
                         border: Border.all(
-                          color: scheme.primary.withValues(alpha: 0.18),
+                          color: scheme.primary.withValues(
+                            alpha: isDark ? 0.26 : 0.18,
+                          ),
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _QuantityButton(
+                          QuantityButton(
                             icon: Icons.remove_rounded,
                             tooltip: 'Decrease quantity',
-                            onPressed: onDecrease,
+                            onPressed: widget.onDecrease,
                           ),
                           SizedBox(
                             width: 22,
@@ -3799,10 +4880,10 @@ class _CartItemTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                          _QuantityButton(
+                          QuantityButton(
                             icon: Icons.add_rounded,
                             tooltip: 'Increase quantity',
-                            onPressed: onIncrease,
+                            onPressed: widget.onIncrease,
                           ),
                         ],
                       ),
@@ -3813,6 +4894,7 @@ class _CartItemTile extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w800,
+                        fontFeatures: const [FontFeature.tabularFigures()],
                         color: scheme.onSurface,
                       ),
                     ),
@@ -3823,7 +4905,7 @@ class _CartItemTile extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           IconButton(
-            onPressed: onRemove,
+            onPressed: widget.onRemove,
             tooltip: 'Remove item',
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
@@ -3831,53 +4913,108 @@ class _CartItemTile extends StatelessWidget {
             icon: Icon(
               Icons.close_rounded,
               size: 15,
-              color: scheme.onSurface.withValues(alpha: 0.35),
+              color: _hovered
+                  ? AppColors.error.withValues(alpha: 0.85)
+                  : scheme.onSurface.withValues(alpha: 0.35),
             ),
           ),
         ],
       ),
     );
+
+    final index = widget.enterIndex;
+    if (index == null || index >= 12) {
+      return MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        cursor: SystemMouseCursors.click,
+        child: row,
+      );
+    }
+
+    // Fade-slide entrance for the first screenful only; taps stay instant.
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      cursor: SystemMouseCursors.click,
+      child: row
+          .animate(delay: Duration(milliseconds: 60 * index))
+          .fadeIn(
+            duration: 350.ms,
+            curve: Curves.easeOutCubic,
+          )
+          .moveY(
+            begin: 14,
+            end: 0,
+            duration: 350.ms,
+            curve: Curves.easeOutCubic,
+          ),
+    );
   }
 }
 
-// =============================================================================
-// CART QUANTITY BUTTON
-// =============================================================================
-
-class _QuantityButton extends StatelessWidget {
+/// Gradient category squircle used by _ProductTile when no product image
+/// is available (or the image fails to load).
+class _ProductTileIconSquircle extends StatelessWidget {
+  final List<Color> colors;
   final IconData icon;
-  final String tooltip;
-  final VoidCallback onPressed;
+  final bool out;
 
-  const _QuantityButton({
+  const _ProductTileIconSquircle({
+    required this.colors,
     required this.icon,
-    required this.tooltip,
-    required this.onPressed,
+    required this.out,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SizedBox(
-      width: 27,
-      height: 27,
-      child: IconButton(
-        onPressed: onPressed,
-        tooltip: tooltip,
-        padding: EdgeInsets.zero,
-        constraints: const BoxConstraints(minWidth: 27, minHeight: 27),
-        icon: Icon(icon, size: 14, color: colorScheme.primary),
+    return Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: out
+              ? [
+                  Colors.grey.withValues(alpha: 0.35),
+                  Colors.grey.withValues(alpha: 0.18),
+                ]
+              : colors,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: out
+            ? null
+            : [
+                BoxShadow(
+                  color: colors.first.withValues(alpha: 0.22),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                  spreadRadius: -4,
+                ),
+              ],
+      ),
+      child: Icon(
+        icon,
+        size: 22,
+        color: out
+            ? Colors.white.withValues(alpha: 0.5)
+            : Colors.white,
       ),
     );
   }
 }
 
-/// Small value object holding the data needed by the checkout redemption
-/// control: the customer's spendable balance and the configured point value.
-class _RedeemConfig {
-  final int balance;
-  final double redeemValue;
+/// A single split-payment tender line used at POS checkout.
+///
+/// Holds the payment method, its amount input controller and the parsed
+/// amount. The controller is owned by the line and disposed when the line is
+/// removed or the checkout dialog closes.
+class _SplitLine {
+  final String method;
+  final TextEditingController controller;
+  double amount;
 
-  const _RedeemConfig({required this.balance, required this.redeemValue});
+  _SplitLine({required this.method, required this.amount})
+      : controller = TextEditingController(text: amount.toStringAsFixed(2));
 }

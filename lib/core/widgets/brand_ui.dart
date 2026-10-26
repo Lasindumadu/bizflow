@@ -13,6 +13,22 @@ class AppImages {
   static const backdrop = 'assets/images/brand_backdrop.jpg';
   static const hero = 'assets/images/hero_aurora.jpg';
   static const posIllustration = 'assets/images/pos_illustration.png';
+
+  // ── Aurora 2.0 photography set ────────────────────────────────
+  // Free Unsplash photography, downloaded into assets/images.
+  // Each major surface pairs with its own photo for a warm,
+  // human, "real shop" feel behind the gradient glass.
+  static const storeHero = 'assets/images/store_hero.jpg';
+  static const posPayment = 'assets/images/pos_payment.jpg';
+  static const analyticsHero = 'assets/images/analytics_hero.jpg';
+  static const warehouse = 'assets/images/warehouse.jpg';
+  static const auroraGlow = 'assets/images/aurora_glow.jpg';
+  static const purpleAbstract = 'assets/images/purple_abstract.jpg';
+  static const shoppingCustomers = 'assets/images/shopping_customers.jpg';
+  static const accounting = 'assets/images/accounting.jpg';
+  static const teamStaff = 'assets/images/team_staff.jpg';
+  static const retailShelves = 'assets/images/retail_shelves.jpg';
+  static const emptyStateIllustrationUndraw = 'assets/images/empty_state_illustration_undraw_empty_4zx0.png';
 }
 
 /// ─────────────────────────────────────────────────────────────
@@ -39,9 +55,10 @@ class BrandMark extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(size * 0.31),
         gradient: const LinearGradient(
-          colors: [Color(0xFF8B6CFF), Color(0xFF5B5BF7), Color(0xFF3F2BD6)],
+          colors: [Color(0xFF9B78FF), Color(0xFF5B5BF7), Color(0xFF3726C9)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
+          stops: [0.0, 0.55, 1.0],
         ),
         boxShadow: showShadow
             ? [
@@ -145,6 +162,15 @@ class BrandBackdrop extends StatelessWidget {
         ),
         if (showArtwork)
           Positioned(
+            top: 120,
+            left: -160,
+            child: _GlowOrb(
+              size: 380,
+              color: AppColors.accent.withValues(alpha: isDark ? 0.10 : 0.07),
+            ),
+          ),
+        if (showArtwork)
+          Positioned(
             top: -180,
             right: -120,
             child: _GlowOrb(
@@ -203,6 +229,7 @@ class PageHero extends StatelessWidget {
   final Widget? secondaryAction;
   final bool showIllustration;
   final List<Color>? gradient;
+  final String? image;
 
   const PageHero({
     super.key,
@@ -214,6 +241,7 @@ class PageHero extends StatelessWidget {
     this.secondaryAction,
     this.showIllustration = true,
     this.gradient,
+    this.image,
   });
 
   @override
@@ -227,7 +255,7 @@ class PageHero extends StatelessWidget {
             children: [
               Positioned.fill(
                 child: Image.asset(
-                  AppImages.hero,
+                  image ?? AppImages.hero,
                   fit: BoxFit.cover,
                   alignment: Alignment.centerRight,
                   opacity: const AlwaysStoppedAnimation(0.9),
@@ -758,6 +786,7 @@ class BrandEmptyState extends StatelessWidget {
   final VoidCallback? onAction;
   final IconData icon;
   final bool compact;
+  final String? image;
 
   const BrandEmptyState({
     super.key,
@@ -767,6 +796,7 @@ class BrandEmptyState extends StatelessWidget {
     this.onAction,
     this.icon = Icons.inbox_rounded,
     this.compact = false,
+    this.image,
   });
 
   @override
@@ -786,10 +816,29 @@ class BrandEmptyState extends StatelessWidget {
               if (!compact)
                 SizedBox(
                   height: 150,
-                  child: Image.asset(
-                    AppImages.posIllustration,
-                    fit: BoxFit.contain,
-                  ),
+                  child: image != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              Image.asset(image!, fit: BoxFit.cover),
+                              for (final g in AppDecor.photoWash())
+                                DecoratedBox(
+                                  decoration: BoxDecoration(gradient: g),
+                                ),
+                              Positioned.fill(
+                                child: Icon(icon,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                    size: 30),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Image.asset(
+                          AppImages.posIllustration,
+                          fit: BoxFit.contain,
+                        ),
                 )
               else
                 Container(
@@ -1419,7 +1468,7 @@ class BrandActionTile extends StatelessWidget {
               const SizedBox(
                 width: 18,
                 height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+                child: AuroraLoader(size: 18, strokeWidth: 2.2),
               )
             else
               Container(
@@ -1501,4 +1550,182 @@ class PageBody extends StatelessWidget {
       ),
     );
   }
+}
+
+/// ─────────────────────────────────────────────────────────────
+/// Aurora loader
+/// ─────────────────────────────────────────────────────────────
+
+/// The branded loading indicator: a rotating aurora comet arc with
+/// orbiting spark dots and a softly breathing gradient core.
+///
+/// Replaces the plain [CircularProgressIndicator] on every loading
+/// surface so "waiting" moments feel premium and on-brand. Visible on
+/// light, dark and photo-backed surfaces alike.
+class AuroraLoader extends StatefulWidget {
+  /// Outer diameter of the ring in logical pixels.
+  final double size;
+
+  /// Stroke width of the comet arc.
+  final double strokeWidth;
+
+  /// Set when the loader sits on a dark photo/brand panel so the
+  /// track and core stay legible against a busy background.
+  final bool onDarkSurface;
+
+  const AuroraLoader({
+    super.key,
+    this.size = 48,
+    this.strokeWidth = 3.4,
+    this.onDarkSurface = false,
+  });
+
+  @override
+  State<AuroraLoader> createState() => _AuroraLoaderState();
+}
+
+class _AuroraLoaderState extends State<AuroraLoader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) => CustomPaint(
+          size: Size.square(widget.size),
+          painter: _AuroraLoaderPainter(
+            progress: _controller.value,
+            strokeWidth: widget.strokeWidth,
+            onDarkSurface: widget.onDarkSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AuroraLoaderPainter extends CustomPainter {
+  _AuroraLoaderPainter({
+    required this.progress,
+    required this.strokeWidth,
+    required this.onDarkSurface,
+  });
+
+  final double progress;
+  final double strokeWidth;
+  final bool onDarkSurface;
+
+  static const _cometColors = <Color>[
+    Color(0x005B5BF7), // royal fading in
+    AppColors.royalMid,
+    AppColors.primary,
+    AppColors.auroraTeal,
+    AppColors.auroraBlue,
+  ];
+
+  static const _orbitColors = <Color>[
+    AppColors.royalMid,
+    AppColors.auroraTeal,
+    AppColors.auroraLilac,
+  ];
+
+  Color get _trackColor => onDarkSurface
+      ? Colors.white.withValues(alpha: 0.14)
+      : Colors.black.withValues(alpha: 0.08);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - strokeWidth * 2) / 2;
+
+    // 1) Soft pulsing gradient core behind the ring.
+    final pulse = 0.18 + 0.12 * math.sin(progress * math.pi * 2);
+    final coreRadius = radius * (0.34 + 0.05 * math.sin(progress * math.pi * 2));
+    final core = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          AppColors.primary.withValues(alpha: pulse),
+          AppColors.primary.withValues(alpha: 0),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: coreRadius))
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, coreRadius, core);
+
+    // 2) Subtle full track ring.
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..color = _trackColor
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius, track);
+
+    // 3) Comet arc — gradient aligned to the arc path so the head is
+    //    brightest (aurora teal) and the tail fades into the track.
+    final cometRect = Rect.fromCircle(center: center, radius: radius);
+    final rotation = progress * 2 * math.pi;
+    final sweep = math.pi * 1.35;
+    final start = -math.pi / 2 + rotation;
+
+    // Halo pass underneath for the aurora bloom.
+    final halo = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth * 2.6
+      ..strokeCap = StrokeCap.round
+      ..color = AppColors.primary.withValues(alpha: 0.26)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawArc(cometRect, start, sweep, false, halo);
+
+    // Crisp comet stroke above the halo.
+    final comet = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        startAngle: start,
+        endAngle: start + sweep,
+        colors: _cometColors,
+      ).createShader(cometRect);
+    canvas.drawArc(cometRect, start, sweep, false, comet);
+
+    // 4) Orbiting spark dots, staggered phases along the comet path.
+    final dotRadius = strokeWidth * 0.95;
+    for (var i = 0; i < _orbitColors.length; i++) {
+      final phase = (progress + i / _orbitColors.length) % 1.0;
+      final angle = start + sweep * phase;
+      final dotCenter =
+          center + Offset(math.cos(angle), math.sin(angle)) * radius;
+      final twinkle =
+          0.55 + 0.45 * math.sin(phase * math.pi * 2 + i * 2.1);
+      final dot = Paint()
+        ..style = PaintingStyle.fill
+        ..color = _orbitColors[i].withValues(alpha: twinkle.clamp(0.0, 1.0))
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.4);
+      canvas.drawCircle(dotCenter, dotRadius, dot);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_AuroraLoaderPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.onDarkSurface != onDarkSurface ||
+      oldDelegate.strokeWidth != strokeWidth;
 }

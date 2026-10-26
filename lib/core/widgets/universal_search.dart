@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 
@@ -234,71 +235,93 @@ class _UniversalSearchOverlayState extends State<UniversalSearchOverlay> {
             onTap: () {}, // swallow taps inside the palette
             child: Material(
               color: Colors.transparent,
-              child: Container(
-                margin: const EdgeInsets.only(top: 80, left: 24, right: 24),
-                constraints: const BoxConstraints(maxWidth: 640),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.darkSurface : Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: isDark
-                        ? Colors.white.withValues(alpha: 0.1)
-                        : AppColors.lightBorder,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.28),
-                      blurRadius: 44,
-                      offset: const Offset(0, 18),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Search field header
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 80, left: 24, right: 24),
+                    constraints: const BoxConstraints(maxWidth: 640),
+                    decoration: BoxDecoration(
+                      // Brighter frosted glass in both themes.
+                      color: (isDark ? AppColors.darkSurface : Colors.white)
+                          .withValues(alpha: isDark ? 0.78 : 0.86),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
                         color: isDark
-                            ? Colors.white.withValues(alpha: 0.04)
-                            : AppColors.lightSurfaceVariant,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(20),
-                        ),
+                            ? Colors.white.withValues(alpha: 0.12)
+                            : Colors.white.withValues(alpha: 0.9),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.search_rounded,
-                            color: scheme.primary,
-                            size: 22,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.28),
+                          blurRadius: 44,
+                          offset: const Offset(0, 18),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Search field header
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : AppColors.lightSurfaceVariant,
+                            borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(20),
+                            ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: TextField(
-                              controller: _queryController,
-                              focusNode: _focusNode,
-                              autofocus: true,
-                              onChanged: _onQueryChanged,
-                              style: AppTextStyles.titleMedium,
-                              decoration: InputDecoration.collapsed(
-                                hintText: 'Search products, customers, sales…',
-                                hintStyle: AppTextStyles.bodyMedium.copyWith(
-                                  color: scheme.onSurface.withValues(
-                                    alpha: 0.45,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(
+                                    alpha: isDark ? 0.16 : 0.10,
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppColors.primary.withValues(
+                                      alpha: isDark ? 0.26 : 0.18,
+                                    ),
+                                  ),
+                                ),
+                                child: Icon(
+                                  Icons.search_rounded,
+                                  color: scheme.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextField(
+                                  controller: _queryController,
+                                  focusNode: _focusNode,
+                                  autofocus: true,
+                                  onChanged: _onQueryChanged,
+                                  style: AppTextStyles.titleMedium,
+                                  decoration: InputDecoration.collapsed(
+                                    hintText:
+                                        'Search products, customers, sales…',
+                                    hintStyle: AppTextStyles.bodyMedium.copyWith(
+                                      color: scheme.onSurface.withValues(
+                                        alpha: 0.45,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
+                              _KbdHint(
+                                label: 'ESC',
+                                onTap: () => Navigator.pop(context),
+                              ),
+                            ],
                           ),
-                          _KbdHint(
-                            label: 'ESC',
-                            onTap: () => Navigator.pop(context),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ),
 
                     Flexible(
                       child: _results.isEmpty
@@ -366,11 +389,13 @@ class _UniversalSearchOverlayState extends State<UniversalSearchOverlay> {
                     ),
                   ],
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
+                ), // Container (panel)
+              ), // BackdropFilter
+            ), // ClipRRect
+          ), // Material
+        ), // GestureDetector (inner)
+      ), // Align (body)
+      ), // Scaffold
     );
   }
 
@@ -420,56 +445,107 @@ class _SearchRow extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    // Icon tiles lean on the Aurora section tint pairs — soft fill with a
+    // deep accent icon, matching the section each record belongs to.
+    final List<Color> tintPair = switch (result.category) {
+      SearchCategory.product => AppColors.stockTint,
+      SearchCategory.customer => AppColors.careTint,
+      SearchCategory.sale => AppColors.moneyTint,
+    };
+
+    final tile = Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: isDark
+            ? tintPair.last.withValues(alpha: 0.22)
+            : tintPair.first,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: tintPair.last.withValues(alpha: isDark ? 0.30 : 0.20),
+        ),
+        boxShadow: AppDecor.glow(tintPair.last, alpha: 0.18),
+      ),
+      child: Icon(result.icon, color: isDark ? tintPair.first : tintPair.last, size: 19),
+    );
+
     return MouseRegion(
       onEnter: (_) => onHover(),
-      child: InkWell(
-        onTap: onOpen,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-          color: highlighted
-              ? scheme.primary.withValues(alpha: isDark ? 0.18 : 0.08)
-              : Colors.transparent,
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  gradient: result.gradient,
-                  borderRadius: BorderRadius.circular(11),
-                  boxShadow: AppDecor.glow(
-                    result.gradient.colors.first,
-                    alpha: 0.25,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+        child: InkWell(
+          onTap: onOpen,
+          borderRadius: BorderRadius.circular(14),
+          hoverColor: AppColors.primary.withValues(
+            alpha: isDark ? 0.10 : 0.05,
+          ),
+          splashColor: AppColors.primary.withValues(alpha: 0.10),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 130),
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            decoration: BoxDecoration(
+              color: highlighted
+                  ? AppColors.primary.withValues(alpha: isDark ? 0.16 : 0.07)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: highlighted
+                    ? AppColors.primary.withValues(
+                        alpha: isDark ? 0.28 : 0.16,
+                      )
+                    : Colors.transparent,
+              ),
+            ),
+            child: Row(
+              children: [
+                tile,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        result.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.bodyLarge.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        result.subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTextStyles.labelSmall.copyWith(
+                          color: scheme.onSurface.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Icon(result.icon, color: Colors.white, size: 19),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      result.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w700,
+                AnimatedOpacity(
+                  duration: const Duration(milliseconds: 130),
+                  opacity: highlighted ? 1 : 0,
+                  child: Container(
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(
+                        alpha: isDark ? 0.18 : 0.10,
                       ),
+                      shape: BoxShape.circle,
                     ),
-                    Text(
-                      result.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTextStyles.labelSmall.copyWith(
-                        color: scheme.onSurface.withValues(alpha: 0.55),
-                      ),
+                    child: Icon(
+                      Icons.arrow_outward_rounded,
+                      size: 14,
+                      color: scheme.primary,
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

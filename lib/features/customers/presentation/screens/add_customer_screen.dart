@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/brand_ui.dart';
+import '../../../../core/widgets/modern_widgets.dart';
 import '../../../../data/database/app_database.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/customer_repository.dart';
@@ -153,6 +155,19 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
     return null;
   }
 
+  /// Royal focus ring applied on top of the base theme decoration.
+  InputDecoration _royalField(InputDecoration base) {
+    return base.copyWith(
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(
+          color: AppColors.royalMid,
+          width: 1.7,
+        ),
+      ),
+    );
+  }
+
   String get _initials {
     final name = _nameController.text.trim();
 
@@ -201,13 +216,23 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                               name: name.isEmpty ? 'New customer' : name,
                               phone: _phoneController.text.trim(),
                               isEditing: _isEditing,
-                            ),
+                            )
+                                .animate()
+                                .fadeIn(
+                                  duration: 380.ms,
+                                  curve: Curves.easeOutCubic,
+                                )
+                                .moveY(
+                                  begin: 14,
+                                  end: 0,
+                                  curve: Curves.easeOutCubic,
+                                ),
                             const SizedBox(height: 16),
                             BrandFormSection(
                               title: 'Identity',
                               subtitle: 'How this customer appears in BizFlow.',
                               icon: Icons.badge_outlined,
-                              accent: AppColors.primary,
+                              accent: AppColors.careTint[1],
                               child: Column(
                                 children: [
                                   TextFormField(
@@ -215,10 +240,12 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                                     textInputAction: TextInputAction.next,
                                     textCapitalization:
                                         TextCapitalization.words,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Full name',
-                                      hintText: 'e.g. Amara Okafor',
-                                      prefixIcon: Icon(Icons.person_outline),
+                                    decoration: _royalField(
+                                      const InputDecoration(
+                                        labelText: 'Full name',
+                                        hintText: 'e.g. Amara Okafor',
+                                        prefixIcon: Icon(Icons.person_outline),
+                                      ),
                                     ),
                                     validator: (value) {
                                       if (value == null ||
@@ -240,10 +267,12 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                                     controller: _phoneController,
                                     keyboardType: TextInputType.phone,
                                     textInputAction: TextInputAction.next,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Phone',
-                                      hintText: '+1 555 0100',
-                                      prefixIcon: Icon(Icons.phone_outlined),
+                                    decoration: _royalField(
+                                      const InputDecoration(
+                                        labelText: 'Phone',
+                                        hintText: '+1 555 0100',
+                                        prefixIcon: Icon(Icons.phone_outlined),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -255,7 +284,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                               subtitle:
                                   'Optional details for receipts and follow-ups.',
                               icon: Icons.alternate_email_rounded,
-                              accent: AppColors.cyan,
+                              accent: AppColors.royalEnd,
                               child: Column(
                                 children: [
                                   TextFormField(
@@ -263,10 +292,12 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                                     keyboardType: TextInputType.emailAddress,
                                     textInputAction: TextInputAction.next,
                                     validator: _validateEmail,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Email',
-                                      hintText: 'name@example.com',
-                                      prefixIcon: Icon(Icons.email_outlined),
+                                    decoration: _royalField(
+                                      const InputDecoration(
+                                        labelText: 'Email',
+                                        hintText: 'name@example.com',
+                                        prefixIcon: Icon(Icons.email_outlined),
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(
@@ -278,13 +309,15 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                                     textCapitalization:
                                         TextCapitalization.sentences,
                                     maxLines: 3,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Address',
-                                      hintText: 'Street, city, country',
-                                      prefixIcon: Icon(
-                                        Icons.location_on_outlined,
+                                    decoration: _royalField(
+                                      const InputDecoration(
+                                        labelText: 'Address',
+                                        hintText: 'Street, city, country',
+                                        prefixIcon: Icon(
+                                          Icons.location_on_outlined,
+                                        ),
+                                        alignLabelWithHint: true,
                                       ),
-                                      alignLabelWithHint: true,
                                     ),
                                   ),
                                 ],
@@ -297,7 +330,7 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                                 children: [
                                   const BrandIconBadge(
                                     icon: Icons.loyalty_outlined,
-                                    color: AppColors.brandAmber,
+                                    color: AppColors.brandMint,
                                     size: 34,
                                   ),
                                   const SizedBox(width: 11),
@@ -326,25 +359,16 @@ class _AddCustomerScreenState extends State<AddCustomerScreen> {
                 ),
               ),
               BrandStickyBar(
-                child: FilledButton.icon(
+                child: GradientButton(
+                  label: _isSaving
+                      ? 'Saving…'
+                      : _isEditing
+                      ? 'Save changes'
+                      : 'Add customer',
+                  icon: Icons.check_rounded,
+                  gradient: AppDecor.royalGradient.colors,
+                  isLoading: _isSaving,
                   onPressed: _isSaving ? null : _saveCustomer,
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(Icons.check_rounded, size: 19),
-                  label: Text(
-                    _isSaving
-                        ? 'Saving…'
-                        : _isEditing
-                        ? 'Save changes'
-                        : 'Add customer',
-                  ),
                 ),
               ),
             ],
@@ -374,11 +398,9 @@ class _ProfilePreview extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: AppDecor.heroGradient(
-          Theme.of(context).brightness == Brightness.dark,
-        ),
+        gradient: AppDecor.royalGradient,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: AppDecor.glow(AppColors.primary, alpha: 0.22),
+        boxShadow: AppDecor.glow(AppColors.royalMid, alpha: 0.26),
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(

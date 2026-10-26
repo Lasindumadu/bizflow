@@ -197,12 +197,7 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
           bottom: false,
           child: Column(
             children: [
-              BrandPageHeader(
-                eyebrow: 'Team',
-                title: 'Staff & access',
-                subtitle: 'Manage PIN accounts, roles and recovery.',
-                icon: Icons.badge_rounded,
-              ),
+              const _StaffHeader(),
               Expanded(
                 child: _isLoading
                     ? const AppLoadingState(message: 'Loading staff accounts…')
@@ -323,10 +318,13 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
                     ),
                   ),
                 ),
-                FilledButton.icon(
-                  onPressed: _createAccount,
-                  icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                  label: const Text('Add staff'),
+                GradientButton(
+                  label: 'Add staff',
+                  icon: Icons.person_add_alt_1_rounded,
+                  gradient: AppDecor.royalGradient.colors,
+                  expanded: false,
+                  height: 40,
+                  onPressed: _isOwner ? _createAccount : null,
                 ),
               ],
             ),
@@ -395,6 +393,165 @@ class _StaffManagementScreenState extends State<StaffManagementScreen> {
   }
 }
 
+/// Header with a photo micro-wash: [AppImages.teamStaff] sits faintly
+/// beneath the brand ink wash so the team page still carries imagery.
+class _StaffHeader extends StatelessWidget {
+  const _StaffHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: SizedBox(
+          height: 148,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.asset(
+                AppImages.teamStaff,
+                fit: BoxFit.cover,
+                alignment: const Alignment(0, 0.3),
+              ),
+              for (final g in AppDecor.photoWash())
+                DecoratedBox(decoration: BoxDecoration(gradient: g)),
+              Positioned(
+                right: -60,
+                top: -80,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 240,
+                    height: 240,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          AppColors.brandMint.withValues(alpha: 0.22),
+                          AppColors.brandMint.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 14, 16, 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _StaffHeaderIconButton(
+                      icon: Icons.arrow_back_rounded,
+                      tooltip: 'Back',
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.badge_rounded,
+                                size: 14,
+                                color: Color(0xFF7DF3DF),
+                              ),
+                              const SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'TEAM',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontFamily: AppTextStyles.bodyFont,
+                                    color: Color(0xFF9FE9DE),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.2,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 7),
+                          Text(
+                            'Staff & access',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontFamily: AppTextStyles.displayFont,
+                              color: Colors.white,
+                              fontSize: 23,
+                              fontWeight: FontWeight.w700,
+                              height: 1.15,
+                              letterSpacing: -0.7,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            'Manage PIN accounts, roles and recovery.',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 12.5,
+                              height: 1.4,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Header back affordance on the photo wash.
+class _StaffHeaderIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  const _StaffHeaderIconButton({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white.withValues(alpha: 0.13),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(icon, color: Colors.white, size: 19),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// A single staff account row with its admin actions.
 class _StaffRow extends StatelessWidget {
   final StaffAccountSummary account;
@@ -414,23 +571,53 @@ class _StaffRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    // Role tint pairing: owner=royal filled, manager=amber, cashier=mint.
+    final (roleColor, roleGradient, roleLabel) = switch (account.role) {
+      StaffRole.owner => (
+        AppColors.primary,
+        AppDecor.royalGradient.colors,
+        'OWNER',
+      ),
+      StaffRole.manager => (
+        AppColors.brandAmber,
+        AppDecor.amberGradient.colors,
+        'MANAGER',
+      ),
+      StaffRole.cashier => (
+        AppColors.brandMint,
+        AppDecor.moneyGradient.colors,
+        'CASHIER',
+      ),
+    };
 
     return Container(
       padding: const EdgeInsets.all(AppDimensions.spacingSm),
       decoration: BoxDecoration(
-        color: scheme.onSurface.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-        border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
+        color: scheme.onSurface.withValues(alpha: isDark ? 0.06 : 0.04),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : scheme.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: Row(
         children: [
+          // Gradient initial avatar ties the row to the role tint.
           Container(
-            width: 36,
-            height: 36,
+            width: 38,
+            height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              gradient: AppDecor.primaryGradient,
-              borderRadius: BorderRadius.circular(11),
+              gradient: LinearGradient(
+                colors: roleGradient,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+              boxShadow: AppDecor.glow(roleColor, alpha: 0.28),
             ),
             child: Text(
               account.username.isEmpty
@@ -439,7 +626,7 @@ class _StaffRow extends StatelessWidget {
               style: const TextStyle(
                 fontFamily: AppTextStyles.displayFont,
                 color: Colors.white,
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -459,11 +646,28 @@ class _StaffRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '${account.username} • ${account.role.name}'
-                  '${account.isActive ? '' : ' • deactivated'}',
+                  account.username,
                   style: AppTextStyles.bodySmall.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
+                ),
+                const SizedBox(height: 5),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    BrandPill(
+                      label: roleLabel,
+                      color: roleColor,
+                      filled: account.role == StaffRole.owner,
+                    ),
+                    if (!account.isActive)
+                      const BrandPill(
+                        label: 'Deactivated',
+                        color: AppColors.chartGray,
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -659,43 +863,151 @@ class _ResetPinDialogState extends State<_ResetPinDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Reset PIN'),
-      content: SizedBox(
-        width: 360,
-        child: Form(
-          key: _formKey,
+    final scheme = Theme.of(context).colorScheme;
+    return Dialog(
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.darkSurface
+          : Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      child: SingleChildScrollView(
+        child: SizedBox(
+          width: 380,
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              TextFormField(
-                controller: _pinController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'New PIN'),
-                validator: (value) =>
-                    StaffAccountRepository.validatePin(value?.trim() ?? ''),
+              // Auroral dialog crown with the step indicator.
+              Container(
+                padding: const EdgeInsets.all(AppDimensions.spacingMd),
+                decoration: const BoxDecoration(
+                  gradient: AppDecor.royalGradient,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.password_rounded,
+                          color: Colors.white,
+                          size: 17,
+                        ),
+                        const SizedBox(width: 7),
+                        Text(
+                          'RESET PIN · STEP 1 OF 1',
+                          style: const TextStyle(
+                            fontFamily: AppTextStyles.bodyFont,
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Reset PIN',
+                      style: const TextStyle(
+                        fontFamily: AppTextStyles.displayFont,
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    Text(
+                      'The staff member will use this PIN to sign in.',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.74),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: AppDimensions.spacingSm),
-              TextFormField(
-                controller: _confirmPinController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Confirm PIN'),
-                validator: (value) =>
-                    value?.trim() != _pinController.text.trim()
-                    ? 'The PINs do not match.'
-                    : null,
+              Padding(
+                padding: const EdgeInsets.all(AppDimensions.spacingLg),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: _pinController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'New PIN',
+                          prefixIcon: Icon(Icons.pin_outlined),
+                        ),
+                        validator: (value) =>
+                            StaffAccountRepository.validatePin(
+                              value?.trim() ?? '',
+                            ),
+                      ),
+                      const SizedBox(height: AppDimensions.spacingSm),
+                      TextFormField(
+                        controller: _confirmPinController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Confirm PIN',
+                          prefixIcon: Icon(Icons.lock_outline_rounded),
+                        ),
+                        validator: (value) =>
+                            value?.trim() != _pinController.text.trim()
+                            ? 'The PINs do not match.'
+                            : null,
+                      ),
+                      const SizedBox(height: AppDimensions.spacingSm),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.verified_user_outlined,
+                            size: 14,
+                            color: AppColors.brandMintDeep,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              'Owner-authorized action.',
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: scheme.onSurface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: _submit,
+                      child: const Text('Reset PIN'),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(onPressed: _submit, child: const Text('Reset PIN')),
-      ],
     );
   }
 }

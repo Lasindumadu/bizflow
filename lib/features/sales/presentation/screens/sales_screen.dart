@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dimensions.dart';
@@ -124,51 +125,140 @@ class SalesScreenState extends State<SalesScreen> {
   }
 
   Widget _buildNoMatchingSalesState() {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.search_off_rounded,
-                size: 30,
-                color: colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            const Text('No matching sales', style: AppTextStyles.heading2),
-            const SizedBox(height: AppDimensions.spacingXs),
-            const Text(
-              'Try another search or date filter.',
-              style: AppTextStyles.bodySecondary,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            OutlinedButton.icon(
-              onPressed: () {
-                _searchController.clear();
+      child: BrandEmptyState(
+        title: 'No matching sales',
+        message: 'Try another search or date filter.',
+        icon: Icons.search_off_rounded,
+        image: AppImages.posPayment,
+        actionLabel: 'Clear Filters',
+        onAction: () {
+          _searchController.clear();
 
-                setState(() {
-                  _searchQuery = '';
-                  _selectedDateFilter = 'All Sales';
-                });
-              },
-              icon: const Icon(Icons.clear_rounded),
-              label: const Text('Clear Filters'),
-            ),
-          ],
-        ),
+          setState(() {
+            _searchQuery = '';
+            _selectedDateFilter = 'All Sales';
+          });
+        },
       ),
+    );
+  }
+
+  /// Compact "today" summary row: revenue, transaction count and average
+  /// ticket — derived purely from the loaded sales for display.
+  Widget _buildTodaySummary(List<Sale> sales) {
+    final now = DateTime.now();
+
+    final todaySales = sales.where((sale) {
+      final date = sale.createdAt.toLocal();
+      return date.year == now.year &&
+          date.month == now.month &&
+          date.day == now.day;
+    }).toList();
+
+    final revenue = todaySales.fold<double>(0, (sum, sale) => sum + sale.total);
+    final avg = todaySales.isEmpty ? 0.0 : revenue / todaySales.length;
+
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final muted = theme.colorScheme.onSurface.withValues(alpha: 0.45);
+
+    Widget stat({
+      required String label,
+      required String value,
+      required IconData icon,
+      required Color soft,
+      required Color deep,
+      required Color darkDeep,
+    }) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: isDark
+                ? darkDeep.withValues(alpha: 0.22)
+                : soft,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: deep.withValues(alpha: isDark ? 0.35 : 0.28),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 15, color: isDark ? darkDeep : deep),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 8.5,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.0,
+                        color: muted,
+                      ),
+                    ),
+                    const SizedBox(height: 1),
+                    Text(
+                      value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: AppTextStyles.displayFont,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        color: isDark ? darkDeep : deep,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (todaySales.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Row(
+      children: [
+        stat(
+          label: 'TODAY REVENUE',
+          value: '$_currency ${revenue.toStringAsFixed(2)}',
+          icon: Icons.trending_up_rounded,
+          soft: AppColors.moneyTint.first,
+          deep: AppColors.brandMintDeep,
+          darkDeep: AppColors.brandMint,
+        ),
+        const SizedBox(width: 10),
+        stat(
+          label: 'TODAY SALES',
+          value: '${todaySales.length}',
+          icon: Icons.receipt_long_rounded,
+          soft: AppColors.posTint.first,
+          deep: AppColors.royalEnd,
+          darkDeep: AppColors.primaryLight,
+        ),
+        const SizedBox(width: 10),
+        stat(
+          label: 'AVG TICKET',
+          value: '$_currency ${avg.toStringAsFixed(2)}',
+          icon: Icons.speed_rounded,
+          soft: AppColors.moneyTint.first,
+          deep: AppColors.brandMintDeep,
+          darkDeep: AppColors.auroraTeal,
+        ),
+      ],
     );
   }
 
@@ -218,11 +308,9 @@ class SalesScreenState extends State<SalesScreen> {
                 'This Week',
                 'This Month',
               ])
-                ChoiceChip(
-                  label: Text(filter, style: const TextStyle(fontSize: 11)),
+                _DateFilterChip(
+                  label: filter,
                   selected: _selectedDateFilter == filter,
-                  showCheckmark: false,
-                  visualDensity: VisualDensity.compact,
                   onSelected: (selected) {
                     if (!selected) return;
                     setState(() {
@@ -271,12 +359,12 @@ class SalesScreenState extends State<SalesScreen> {
     return Scaffold(
       appBar: widget.showAppBar ? AppBar(title: const Text('Sales')) : null,
       body: _isLoadingSettings
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: AuroraLoader(size: 46))
           : StreamBuilder<List<Sale>>(
               stream: _salesStream,
               builder: (context, salesSnapshot) {
                 if (salesSnapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Center(child: AuroraLoader(size: 46));
                 }
 
                 if (salesSnapshot.hasError) {
@@ -294,7 +382,7 @@ class SalesScreenState extends State<SalesScreen> {
                   builder: (context, customerSnapshot) {
                     if (customerSnapshot.connectionState ==
                         ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
+                      return const Center(child: AuroraLoader(size: 46));
                     }
 
                     if (customerSnapshot.hasError) {
@@ -309,66 +397,108 @@ class SalesScreenState extends State<SalesScreen> {
 
                     final filteredSales = _filterSales(sales, customerMap);
 
-                    return Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                          child: PageHero(
-                            eyebrow: 'Transactions',
-                            title: 'Sales & receipts',
-                            subtitle:
-                                'Every sale, payment and refund in one clear timeline.',
-                            showIllustration: false,
+                    // Slivers instead of a pinned Column: the hero, summary
+                    // and filters scroll away with the content, so the sale
+                    // cards reclaim the full screen while scrolling.
+                    return CustomScrollView(
+                      slivers: [
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                            child: PageHero(
+                              eyebrow: 'Transactions',
+                              title: 'Sales & receipts',
+                              subtitle:
+                                  'Every sale, payment and refund in one '
+                                  'clear timeline.',
+                              showIllustration: false,
+                              image: AppImages.posPayment,
+                            ),
                           ),
                         ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-                          child: _buildSalesFilters(),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppDimensions.screenPadding,
-                            AppDimensions.spacingMd,
-                            AppDimensions.screenPadding,
-                            0,
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                            child: _buildTodaySummary(sales),
                           ),
-                          child: _buildResultsStrip(filteredSales),
                         ),
-                        Expanded(
-                          child: filteredSales.isEmpty
-                              ? _buildNoMatchingSalesState()
-                              : ListView.separated(
-                                  padding: const EdgeInsets.all(
-                                    AppDimensions.screenPadding,
-                                  ),
-                                  itemCount: filteredSales.length,
-                                  separatorBuilder: (context, index) {
-                                    return const SizedBox(
-                                      height: AppDimensions.spacingMd,
-                                    );
-                                  },
-                                  itemBuilder: (context, index) {
-                                    final sale = filteredSales[index];
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                            child: _buildSalesFilters(),
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppDimensions.screenPadding,
+                              AppDimensions.spacingMd,
+                              AppDimensions.screenPadding,
+                              0,
+                            ),
+                            child: _buildResultsStrip(filteredSales),
+                          ),
+                        ),
+                        if (filteredSales.isEmpty)
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: _buildNoMatchingSalesState(),
+                          )
+                        else
+                          SliverList.separated(
+                            itemCount: filteredSales.length,
+                            separatorBuilder: (context, index) {
+                              return const SizedBox(
+                                height: AppDimensions.spacingMd,
+                              );
+                            },
+                            itemBuilder: (context, index) {
+                              final sale = filteredSales[index];
 
-                                    return _SaleCard(
-                                      sale: sale,
-                                      currency: _currency,
-                                      customer: sale.customerId == null
-                                          ? null
-                                          : customerMap[sale.customerId!],
-                                      onTap: () {
-                                        Navigator.of(context).push(
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                SaleDetailsScreen(
-                                                  saleId: sale.id,
-                                                ),
-                                          ),
-                                        );
-                                      },
-                                    );
-                                  },
-                                ),
+                              final card = _SaleCard(
+                                sale: sale,
+                                currency: _currency,
+                                customer: sale.customerId == null
+                                    ? null
+                                    : customerMap[sale.customerId!],
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (context) => SaleDetailsScreen(
+                                        saleId: sale.id,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+
+                              // Staggered entrance for the first
+                              // screenful; rows below arrive instantly.
+                              if (index >= 12) {
+                                return card;
+                              }
+
+                              return card
+                                  .animate(
+                                    delay: Duration(
+                                      milliseconds: 60 * index,
+                                    ),
+                                  )
+                                  .fadeIn(
+                                    duration: 380.ms,
+                                    curve: Curves.easeOutCubic,
+                                  )
+                                  .moveY(
+                                    begin: 14,
+                                    end: 0,
+                                    duration: 380.ms,
+                                    curve: Curves.easeOutCubic,
+                                  );
+                            },
+                          ),
+                        // Breathing room under the last card.
+                        const SliverToBoxAdapter(
+                          child: SizedBox(height: AppDimensions.spacingXl),
                         ),
                       ],
                     );
@@ -385,18 +515,27 @@ class SalesScreenState extends State<SalesScreen> {
       (sum, sale) => sum + sale.total,
     );
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.08),
-            AppColors.brandMint.withValues(alpha: 0.06),
-          ],
+          colors: isDark
+              ? [
+                  AppColors.primary.withValues(alpha: 0.18),
+                  AppColors.auroraTeal.withValues(alpha: 0.08),
+                ]
+              : [
+                  AppColors.primary.withValues(alpha: 0.08),
+                  AppColors.auroraTeal.withValues(alpha: 0.10),
+                ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.14),
+          color: AppColors.primary.withValues(
+            alpha: isDark ? 0.24 : 0.14,
+          ),
         ),
       ),
       child: Row(
@@ -456,7 +595,8 @@ class SalesScreenState extends State<SalesScreen> {
                   fontFamily: AppTextStyles.displayFont,
                   fontSize: 15,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.primary,
+                  color: isDark ? AppColors.primaryLight : AppColors.primary,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ],
@@ -516,34 +656,87 @@ class SalesScreenState extends State<SalesScreen> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary
-                    .withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.receipt_long_outlined,
-                size: 36,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+      child: BrandEmptyState(
+        title: 'No sales yet',
+        message: 'Completed sales will appear here. Ring up your first '
+            'checkout on the POS screen and it lands in this timeline.',
+        icon: Icons.receipt_long_rounded,
+        image: AppImages.posPayment,
+      ),
+    );
+  }
+}
+
+/// Premium date-filter pill with the royal tint when selected.
+class _DateFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final ValueChanged<bool> onSelected;
+
+  const _DateFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final deep = AppColors.posTint.last;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => onSelected(true),
+        borderRadius: BorderRadius.circular(999),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected
+                ? (isDark
+                    ? deep.withValues(alpha: 0.24)
+                    : AppColors.posTint.first)
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.045)
+                    : Colors.white),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? deep.withValues(alpha: isDark ? 0.55 : 0.65)
+                  : (isDark
+                      ? Colors.white.withValues(alpha: 0.10)
+                      : AppColors.lightBorder),
             ),
-            const SizedBox(height: AppDimensions.spacingLg),
-            const Text('No sales yet', style: AppTextStyles.heading2),
-            const SizedBox(height: AppDimensions.spacingXs),
-            const Text(
-              'Completed sales will appear here.',
-              style: AppTextStyles.bodySecondary,
-              textAlign: TextAlign.center,
-            ),
-          ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                selected ? Icons.check_rounded : Icons.filter_list_rounded,
+                size: 13,
+                color: selected
+                    ? (isDark ? AppColors.primaryLight : deep)
+                    : Theme.of(
+                        context,
+                      ).colorScheme.onSurface.withValues(alpha: 0.45),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                  color: selected
+                      ? (isDark ? AppColors.primaryLight : deep)
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.70),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -629,6 +822,7 @@ class _SaleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final customerName = customer?.name ?? 'Walk-in customer';
     final statusColor = _statusColor(sale.status);
 
@@ -636,12 +830,13 @@ class _SaleCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       radius: 16,
       onTap: onTap,
+      accent: isDark ? AppColors.primaryLight : AppColors.royalMid,
       child: Row(
         children: [
           BrandIconBadge(
             icon: _paymentIcon(sale.paymentMethod),
             color: sale.status.toUpperCase() == 'COMPLETED'
-                ? AppColors.primary
+                ? (isDark ? AppColors.primaryLight : AppColors.royalMid)
                 : statusColor,
             size: 42,
           ),
@@ -697,6 +892,7 @@ class _SaleCard extends StatelessWidget {
                   fontSize: 13.5,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.2,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                   color: scheme.onSurface,
                 ),
               ),

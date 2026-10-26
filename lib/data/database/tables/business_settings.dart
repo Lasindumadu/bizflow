@@ -60,6 +60,13 @@ class BusinessSettings extends Table {
   IntColumn get inactivityTimeoutMinutes =>
       integer().withDefault(const Constant(0))();
 
+  /// Phase G: tax / VAT rate (e.g. 15.0 for 15%).
+  RealColumn get taxRate => real().withDefault(const Constant(0.0))();
+
+  /// When true, prices entered in the POS already include tax.
+  BoolColumn get taxInclusive =>
+      boolean().withDefault(const Constant(false))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

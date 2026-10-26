@@ -5,6 +5,7 @@ import '../../../../core/theme/app_decor.dart';
 import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/widgets/brand_ui.dart';
+import '../../../../core/widgets/modern_widgets.dart';
 import '../../../../data/database/app_database.dart';
 import '../../../../data/database/database_provider.dart';
 import '../../../../data/repositories/expense_repository.dart';
@@ -177,6 +178,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   Widget build(BuildContext context) {
     final amount = double.tryParse(_amountController.text.trim()) ?? 0;
     final category = _categoryController.text.trim();
+    final title = _titleController.text.trim();
 
     return Scaffold(
       body: BrandBackdrop(
@@ -187,8 +189,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
               BrandPageHeader(
                 eyebrow: 'Money out',
                 title: widget.isEditing ? 'Edit expense' : 'Log an expense',
-                subtitle:
-                    'Record spending so reports reflect true profit.',
+                subtitle: 'Record spending so reports reflect true profit.',
                 icon: Icons.receipt_long_rounded,
               ),
               Expanded(
@@ -211,9 +212,9 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                             BrandFormSection(
                               title: 'Expense details',
                               subtitle:
-                                  'What was paid for and how much it cost.',
+                                  'What was paid for and where it belongs.',
                               icon: Icons.shopping_bag_outlined,
-                              accent: AppColors.orange,
+                              accent: AppColors.warningDark,
                               child: Column(
                                 children: [
                                   TextFormField(
@@ -221,12 +222,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                     textInputAction: TextInputAction.next,
                                     textCapitalization:
                                         TextCapitalization.sentences,
-                                    decoration: const InputDecoration(
+                                    decoration: _inputDecoration(
                                       labelText: 'Title',
                                       hintText: 'e.g. Shop electricity bill',
-                                      prefixIcon: Icon(
-                                        Icons.receipt_long_outlined,
-                                      ),
+                                      icon: Icons.receipt_long_outlined,
+                                      valid: title.length >= 2,
                                     ),
                                     validator: (value) {
                                       if (value == null ||
@@ -249,12 +249,11 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                     textInputAction: TextInputAction.next,
                                     textCapitalization:
                                         TextCapitalization.words,
-                                    decoration: const InputDecoration(
+                                    decoration: _inputDecoration(
                                       labelText: 'Category',
                                       hintText: 'e.g. Rent, Utilities',
-                                      prefixIcon: Icon(
-                                        Icons.category_outlined,
-                                      ),
+                                      icon: Icons.category_outlined,
+                                      valid: category.isNotEmpty,
                                     ),
                                     validator: (value) {
                                       if (value == null ||
@@ -270,7 +269,8 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                     spacing: 7,
                                     runSpacing: 7,
                                     children: _categorySuggestions.map((label) {
-                                      final selected = category.toLowerCase() ==
+                                      final selected =
+                                          category.toLowerCase() ==
                                           label.toLowerCase();
 
                                       return _SuggestionChip(
@@ -282,73 +282,79 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                       );
                                     }).toList(),
                                   ),
-                                  const SizedBox(
-                                    height: AppDimensions.spacingMd,
-                                  ),
-                                  TextFormField(
-                                    controller: _amountController,
-                                    keyboardType:
-                                        const TextInputType.numberWithOptions(
-                                          decimal: true,
-                                        ),
-                                    textInputAction: TextInputAction.next,
-                                    style: const TextStyle(
-                                      fontFamily: AppTextStyles.displayFont,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -0.4,
-                                    ),
-                                    decoration: const InputDecoration(
-                                      labelText: 'Amount',
-                                      hintText: '0.00',
-                                      prefixIcon: Icon(
-                                        Icons.payments_outlined,
-                                      ),
-                                    ),
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Expense amount is required.';
-                                      }
-
-                                      final amount =
-                                          double.tryParse(value.trim());
-
-                                      if (amount == null) {
-                                        return 'Enter a valid amount.';
-                                      }
-
-                                      if (amount <= 0) {
-                                        return 'Amount must be greater than zero.';
-                                      }
-
-                                      return null;
-                                    },
-                                  ),
                                 ],
                               ),
                             ),
                             const SizedBox(height: 14),
                             BrandFormSection(
-                              title: 'When & notes',
+                              title: 'Amount',
                               subtitle:
-                                  'Date of payment and anything worth remembering.',
+                                  'What the cost came to — it feeds the '
+                                  'profit math directly.',
+                              icon: Icons.payments_outlined,
+                              accent: AppColors.brandMintDeep,
+                              child: TextFormField(
+                                controller: _amountController,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                textInputAction: TextInputAction.next,
+                                style: const TextStyle(
+                                  fontFamily: AppTextStyles.displayFont,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: -0.4,
+                                  fontFeatures: [FontFeature.tabularFigures()],
+                                ),
+                                decoration: _inputDecoration(
+                                  labelText: 'Amount',
+                                  hintText: '0.00',
+                                  icon: Icons.payments_outlined,
+                                  valid:
+                                      (double.tryParse(
+                                            _amountController.text.trim(),
+                                          ) ??
+                                          0) >
+                                      0,
+                                ),
+                                validator: (value) {
+                                  if (value == null || value.trim().isEmpty) {
+                                    return 'Expense amount is required.';
+                                  }
+
+                                  final amount = double.tryParse(value.trim());
+
+                                  if (amount == null) {
+                                    return 'Enter a valid amount.';
+                                  }
+
+                                  if (amount <= 0) {
+                                    return 'Amount must be greater than zero.';
+                                  }
+
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            BrandFormSection(
+                              title: 'When & notes',
+                              subtitle: 'Date of payment and anything worth remembering.',
                               icon: Icons.event_note_rounded,
-                              accent: AppColors.cyan,
+                              accent: AppColors.primary,
                               child: Column(
                                 children: [
                                   InkWell(
                                     onTap: _selectDate,
                                     borderRadius: BorderRadius.circular(14),
                                     child: InputDecorator(
-                                      decoration: const InputDecoration(
+                                      decoration: _inputDecoration(
                                         labelText: 'Date',
-                                        prefixIcon: Icon(
-                                          Icons.calendar_today_outlined,
-                                        ),
-                                        suffixIcon: Icon(
-                                          Icons.keyboard_arrow_down_rounded,
-                                        ),
+                                        hintText: '',
+                                        icon: Icons.calendar_today_outlined,
+                                        icon2:
+                                            Icons.keyboard_arrow_down_rounded,
                                       ),
                                       child: Row(
                                         children: [
@@ -356,9 +362,12 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                             _formatDate(_selectedDate),
                                             style: TextStyle(
                                               fontWeight: FontWeight.w600,
-                                              color: Theme.of(
-                                                context,
-                                              ).colorScheme.onSurface,
+                                              fontFeatures: const [
+                                                FontFeature.tabularFigures(),
+                                              ],
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .onSurface,
                                             ),
                                           ),
                                           const SizedBox(width: 8),
@@ -366,7 +375,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                                             label: _relativeDayLabel(
                                               _selectedDate,
                                             ),
-                                            color: AppColors.cyan,
+                                            color: AppColors.primary,
                                             icon: Icons.schedule_rounded,
                                           ),
                                         ],
@@ -400,30 +409,103 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
                 ),
               ),
               BrandStickyBar(
-                child: FilledButton.icon(
-                  onPressed: _isSaving ? null : _saveExpense,
-                  icon: _isSaving
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'RUNNING TOTAL',
+                            style: AppTextStyles.kpiLabel.copyWith(
+                              fontSize: 9.5,
+                              letterSpacing: 1.1,
+                              color: Theme.of(context).colorScheme.onSurface
+                                  .withValues(alpha: 0.5),
+                            ),
                           ),
-                        )
-                      : const Icon(Icons.check_rounded, size: 19),
-                  label: Text(
-                    _isSaving
-                        ? 'Saving…'
-                        : widget.isEditing
-                        ? 'Save changes'
-                        : 'Save expense',
-                  ),
+                          const SizedBox(height: 3),
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              amount > 0
+                                  ? amount.toStringAsFixed(2)
+                                  : 'Add an amount to save',
+                              style: TextStyle(
+                                fontFamily: AppTextStyles.displayFont,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures(),
+                                ],
+                                color: amount > 0
+                                    ? Theme.of(context).colorScheme.onSurface
+                                    : Theme.of(context).colorScheme.onSurface
+                                          .withValues(alpha: 0.4),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    GradientButton(
+                      label: _isSaving
+                          ? 'Saving…'
+                          : widget.isEditing
+                          ? 'Save changes'
+                          : 'Save expense',
+                      icon: Icons.check_rounded,
+                      isLoading: _isSaving,
+                      gradient: AppDecor.royalGradient.colors,
+                      expanded: false,
+                      onPressed: _isSaving ? null : _saveExpense,
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  InputDecoration _inputDecoration({
+    required String labelText,
+    required String hintText,
+    required IconData icon,
+    IconData? icon2,
+    bool valid = false,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final outline = isDark
+        ? AppColors.darkBorderStrong
+        : AppColors.lightBorderStrong;
+
+    return InputDecoration(
+      labelText: labelText,
+      hintText: hintText,
+      prefixIcon: Icon(icon),
+      suffixIcon: icon2 != null
+          ? Icon(icon2)
+          : (valid
+                ? Icon(
+                    Icons.check_circle_rounded,
+                    size: 19,
+                    color: AppColors.brandMint,
+                  )
+                : null),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: outline),
+      ),
+      // Royal focus ring per the Aurora brand ring.
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: AppColors.royalMid, width: 1.8),
       ),
     );
   }
@@ -447,7 +529,7 @@ class _AddExpenseScreenState extends State<AddExpenseScreen> {
   }
 }
 
-/// Live summary of the expense being typed.
+/// Live summary of the expense being typed — photo-backed hero card.
 class _ExpensePreview extends StatelessWidget {
   final double amount;
   final String category;
@@ -461,86 +543,133 @@ class _ExpensePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1B1436), Color(0xFF3A1F4D), Color(0xFF5B2A3B)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        boxShadow: AppDecor.glow(AppColors.orange, alpha: 0.22),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: Stack(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  gradient: AppDecor.orangeGradient,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.trending_down_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          Positioned.fill(
+            child: AppDecor.photoHero(
+              image: AppImages.auroraGlow,
+              anchor: 'left',
+              imageAlignmentY: 0.4,
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      category.isEmpty
-                          ? 'UNCATEGORISED'
-                          : category.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFFFFC48A),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.1,
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: AppDecor.amberGradient,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: AppDecor.glow(
+                          AppColors.brandAmber,
+                          alpha: 0.3,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.trending_down_rounded,
+                        color: Colors.white,
+                        size: 20,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Expense preview',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            category.isEmpty
+                                ? 'UNCATEGORISED'
+                                : category.toUpperCase(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Color(0xFFFFC48A),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Expense preview',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              amount.toStringAsFixed(2),
-              style: const TextStyle(
-                fontFamily: AppTextStyles.displayFont,
-                color: Colors.white,
-                fontSize: 34,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -1.2,
-              ),
+                const SizedBox(height: 14),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: CountUpText(
+                    amount,
+                    decimals: 2,
+                    style: const TextStyle(
+                      fontFamily: AppTextStyles.displayFont,
+                      color: Colors.white,
+                      fontSize: 34,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -1.2,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 11,
+                      color: Colors.white.withValues(alpha: 0.65),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      '${_formatDate(date)} · ${_relativeDayLabel(date)}',
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.75),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
+  }
+
+  String _relativeDayLabel(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final target = DateTime(date.year, date.month, date.day);
+    final diff = target.difference(today).inDays;
+
+    if (diff == 0) return 'Today';
+    if (diff == -1) return 'Yesterday';
+    return '${diff.abs()} days ${diff < 0 ? 'ago' : 'ahead'}';
   }
 }
 
@@ -558,32 +687,44 @@ class _SuggestionChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final preset = AppDecor.toneGradient(label.hashCode.abs());
 
-    return Material(
-      color: selected
-          ? AppColors.orange.withValues(alpha: 0.14)
-          : Colors.transparent,
-      shape: RoundedRectangleBorder(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        gradient: selected
+            ? LinearGradient(
+                colors: preset.colors,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        color: selected ? null : Colors.transparent,
         borderRadius: BorderRadius.circular(999),
-        side: BorderSide(
-          color: selected
-              ? AppColors.orange.withValues(alpha: 0.5)
-              : scheme.outline,
+        boxShadow: selected
+            ? AppDecor.glow(preset.colors.first, alpha: 0.28)
+            : null,
+        border: Border.all(
+          color: selected ? Colors.transparent : scheme.outline,
         ),
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: selected
-                  ? AppColors.orange
-                  : scheme.onSurface.withValues(alpha: 0.65),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: selected
+                    ? Colors.white
+                    : scheme.onSurface.withValues(alpha: 0.65),
+              ),
             ),
           ),
         ),

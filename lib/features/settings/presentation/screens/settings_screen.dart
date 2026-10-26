@@ -7,10 +7,14 @@ import '../../../../core/theme/app_dimensions.dart';
 import '../../../../core/theme/app_text_styles.dart';
 import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/widgets/brand_ui.dart';
+import '../widgets/settings_section_title.dart';
+import '../../../../core/session/session_authorization.dart';
+import '../../../../core/session/session_controller.dart';
 import '../../../../data/repositories/business_settings_repository.dart';
 import '../../../../data/services/backup_service.dart';
 import '../../../../data/services/csv_export_service.dart';
 import '../../../../data/demo/demo_data_service.dart';
+import '../../../../core/services/thermal_printer_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -26,12 +30,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       BusinessSettingsRepository();
   final DemoDataService _demoDataService = DemoDataService();
 
+  /// Thermal printer / cash drawer service.
+  final ThermalPrinterService _printerService = ThermalPrinterService();
+
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final TextEditingController _businessNameController = TextEditingController();
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
+
+  /// Printer device address (e.g. Bluetooth MAC) and optional display name.
+  final TextEditingController _printerAddressController =
+      TextEditingController();
+  final TextEditingController _printerNameController = TextEditingController();
 
   bool _isBackingUp = false;
   bool _isRestoring = false;
@@ -41,6 +53,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isLoadingDemoData = false;
   bool _isClearingDemoData = false;
   bool _isResettingData = false;
+
+  /// Whether a printer connection operation is in flight.
+  bool _isConnectingPrinter = false;
+  /// Whether a print / cash-drawer operation is in flight.
+  bool _isPrinterBusy = false;
+
+  /// Selected connection type.
+  PrinterConnectionType _printerConnectionType =
+      PrinterConnectionType.bluetooth;
 
   bool _loyaltyEnabled = true;
   final TextEditingController _loyaltyEarnRateController =
@@ -60,11 +81,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loginRequired = false;
   int _inactivityTimeoutMinutes = 0;
 
+  /// Phase G: tax / VAT settings.
+  final TextEditingController _taxRateController = TextEditingController();
+  bool _taxInclusive = false;
+
+  /// Whether the acting session is the owner (security/backup/reset).
+  bool get _isOwner => canPerform(
+        sessionController.current,
+        {StaffRole.owner},
+      );
+
+  /// Whether the acting session can manage owner+manager features.
+  bool get _canManage => canPerform(
+        sessionController.current,
+        {StaffRole.owner, StaffRole.manager},
+      );
+
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _appearanceKey = GlobalKey();
   final GlobalKey _businessKey = GlobalKey();
+  final GlobalKey _taxKey = GlobalKey();
   final GlobalKey _loyaltyKey = GlobalKey();
   final GlobalKey _receiptKey = GlobalKey();
+  final GlobalKey _printerKey = GlobalKey();
   final GlobalKey _dataKey = GlobalKey();
 
   @override
@@ -84,6 +123,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _receiptHeaderController.dispose();
     _receiptFooterController.dispose();
     _receiptNoteController.dispose();
+    _taxRateController.dispose();
+    _printerAddressController.dispose();
+    _printerNameController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -115,6 +157,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _receiptShowAddress = settings.receiptShowAddress;
         _loginRequired = settings.loginRequired;
         _inactivityTimeoutMinutes = settings.inactivityTimeoutMinutes;
+        _taxRateController.text = settings.taxRate.toStringAsFixed(2);
+        _taxInclusive = settings.taxInclusive;
         _isLoadingSettings = false;
       });
     } catch (error) {
@@ -239,6 +283,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         receiptShowAddress: _receiptShowAddress,
         loginRequired: _loginRequired,
         inactivityTimeoutMinutes: _inactivityTimeoutMinutes,
+        taxRate: double.tryParse(_taxRateController.text.trim()) ?? 0.0,
+        taxInclusive: _taxInclusive,
       );
 
       if (!mounted) {
@@ -1006,19 +1052,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildThemeSection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return BrandCard(
-      padding: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(AppDimensions.screenPadding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SectionHeading(
-              title: 'Appearance',
-              subtitle: 'Theme, type scale and motion for this device.',
-              icon: Icons.palette_outlined,
-            ),
-            const SizedBox(height: AppDimensions.spacingMd),
+    return BrandFormSection(
+      title: 'Appearance',
+      subtitle: 'Theme, type scale and motion for this device.',
+      icon: Icons.palette_outlined,
+      accent: AppColors.primary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
 
             // Theme Mode Selector
             AnimatedBuilder(
@@ -1164,15 +1205,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  value: themeController.animationsEnabled,
-                  onChanged: (v) => themeController.setAnimationsEnabled(v),
-                  activeThumbColor: colorScheme.primary,
-                  activeTrackColor: colorScheme.primary.withValues(alpha: 0.5),
-                );
-              },
-            ),
-          ],
-        ),
+                   value: themeController.animationsEnabled,
+                   onChanged: (v) => themeController.setAnimationsEnabled(v),
+                   activeThumbColor: colorScheme.primary,
+                   activeTrackColor: colorScheme.primary.withValues(alpha: 0.5),
+                 );
+               },
+             ),
+        ],
       ),
     );
   }
@@ -1208,22 +1248,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildReceiptSection(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionHeading(
-          title: 'Receipt branding',
-          subtitle: 'Control what appears on printed and PDF receipts.',
-          icon: Icons.receipt_long_outlined,
-        ),
-        const SizedBox(height: AppDimensions.spacingMd),
-        BrandCard(
-          padding: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimensions.screenPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+    return BrandFormSection(
+      title: 'Receipt branding',
+      subtitle: 'Control what appears on printed and PDF receipts.',
+      icon: Icons.receipt_long_outlined,
+      accent: AppColors.brandMint,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
                 TextFormField(
                   controller: _receiptHeaderController,
                   decoration: const InputDecoration(
@@ -1263,47 +1295,387 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (v) => setState(() => _receiptShowAddress = v),
                   title: const Text('Show address'),
                 ),
-                const SizedBox(height: AppDimensions.spacingSm),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.icon(
-                    onPressed: _isSavingSettings ? null : _saveBusinessSettings,
-                    icon: _isSavingSettings
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.save_rounded, size: 18),
-                    label: const Text('Save Receipt Settings'),
-                  ),
-                ),
+                 const SizedBox(height: AppDimensions.spacingSm),
+                 Align(
+                   alignment: Alignment.centerRight,
+                   child: FilledButton.icon(
+                     onPressed: _isSavingSettings ? null : _saveBusinessSettings,
+                     icon: _isSavingSettings
+                         ? const SizedBox(
+                             width: 16,
+                             height: 16,
+                             child: AuroraLoader(
+                               size: 16,
+                               strokeWidth: 2,
+                               onDarkSurface: true,
+                             ),
+                           )
+                         : const Icon(Icons.save_rounded, size: 18),
+                     label: const Text('Save Receipt Settings'),
+                   ),
+                 ),
               ],
+          ),
+        );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Thermal printer & cash drawer section
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Future<void> _connectPrinter() async {
+    if (_printerService.isConnected || _isConnectingPrinter) return;
+
+    final address = _printerAddressController.text.trim();
+    if (address.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a device address.')),
+      );
+      return;
+    }
+
+    _printerService.setConnectionType(_printerConnectionType);
+
+    setState(() => _isConnectingPrinter = true);
+    try {
+      await _printerService.connect(
+        address: address,
+        name: _printerNameController.text.trim().isEmpty
+            ? null
+            : _printerNameController.text.trim(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Connected to ${_printerService.deviceName ?? address}.'),
+          backgroundColor: AppColors.brandMint,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to connect: $error'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isConnectingPrinter = false);
+      }
+    }
+  }
+
+  Future<void> _disconnectPrinter() async {
+    if (!_printerService.isConnected) return;
+    setState(() => _isConnectingPrinter = true);
+    try {
+      await _printerService.disconnect();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Printer disconnected.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Disconnect failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isConnectingPrinter = false);
+      }
+    }
+  }
+
+  Future<void> _testPrint() async {
+    if (!_printerService.isConnected || _isPrinterBusy) return;
+
+    final data = _buildTestReceiptData();
+    final bytes = _printerService.formatReceipt(data: data);
+
+    setState(() => _isPrinterBusy = true);
+    try {
+      final result = await _printerService.printReceipt(bytes);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.success
+              ? 'Test print sent to printer.'
+              : 'Test print failed: ${result.message}'),
+          backgroundColor: result.success
+              ? AppColors.brandMint
+              : AppColors.error,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Test print failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isPrinterBusy = false);
+      }
+    }
+  }
+
+  Future<void> _openCashDrawer() async {
+    if (!_printerService.isConnected || _isPrinterBusy) return;
+
+    setState(() => _isPrinterBusy = true);
+    try {
+      final result = await _printerService.openCashDrawer();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.success
+              ? 'Cash drawer opened.'
+              : 'Cash drawer failed: ${result.message}'),
+          backgroundColor: result.success
+              ? AppColors.brandMint
+              : AppColors.error,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cash drawer failed: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isPrinterBusy = false);
+      }
+    }
+  }
+
+  ReceiptData _buildTestReceiptData() {
+    return ReceiptData(
+      businessName: _businessNameController.text.trim().isNotEmpty
+          ? _businessNameController.text.trim()
+          : 'BizFlow Store',
+      receiptHeader: _receiptHeaderController.text.trim(),
+      address: _addressController.text.trim(),
+      phone: _phoneController.text.trim(),
+      email: _emailController.text.trim(),
+      receiptId: 'TEST-${DateTime.now().millisecondsSinceEpoch}',
+      date: DateTime.now().toString(),
+      paymentMethod: 'Cash',
+      customerName: 'Walk-in Customer',
+      currency: _currency,
+      items: const [
+        ReceiptItem(name: 'Espresso', quantity: 2, unitPrice: 3.50, lineTotal: 7.00),
+        ReceiptItem(name: 'Croissant', quantity: 1, unitPrice: 4.25, lineTotal: 4.25),
+      ],
+      subtotal: 11.25,
+      discount: 0.0,
+      total: 11.25,
+      paidAmount: 11.25,
+      changeAmount: 0.0,
+      receiptFooter: _receiptFooterController.text.trim(),
+      receiptNote: _receiptNoteController.text.trim(),
+    );
+  }
+
+  Widget _buildPrinterSection(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return BrandFormSection(
+      title: 'Thermal printer',
+      subtitle: 'Connect a Bluetooth / USB / Network receipt printer and cash drawer.',
+      icon: Icons.print_outlined,
+      accent: AppColors.brandMint,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Connection type selector
+          Text(
+            'Connection type',
+            style: AppTextStyles.labelMedium.copyWith(
+              color: scheme.onSurfaceVariant,
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: AppDimensions.spacingSm),
+          Wrap(
+            spacing: AppDimensions.spacingSm,
+            runSpacing: AppDimensions.spacingSm,
+            children: PrinterConnectionType.values.map((type) {
+              final isSelected = _printerConnectionType == type;
+              return ChoiceChip(
+                label: Text(_printerTypeLabel(type)),
+                selected: isSelected,
+                onSelected: (_) {
+                  setState(() => _printerConnectionType = type);
+                },
+                selectedColor: AppColors.brandMint,
+                labelStyle: TextStyle(
+                  color: isSelected
+                      ? scheme.onPrimary
+                      : scheme.onSurface,
+                  fontWeight: isSelected
+                      ? FontWeight.w600
+                      : FontWeight.w500,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  side: BorderSide(
+                    color: isSelected
+                        ? AppColors.brandMint
+                        : scheme.outline,
+                    width: isSelected ? 0 : 1.5,
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: AppDimensions.spacingLg),
+
+          // Device address + name
+          TextFormField(
+            controller: _printerAddressController,
+            decoration: InputDecoration(
+              labelText: 'Device address',
+              hintText: 'e.g. 00:11:22:33:44:55 or 192.168.1.50',
+              prefixIcon: const Icon(Icons.bluetooth_outlined, size: 20),
+            ),
+          ),
+          const SizedBox(height: AppDimensions.spacingMd),
+          TextFormField(
+            controller: _printerNameController,
+            decoration: const InputDecoration(
+              labelText: 'Printer name (display)',
+              hintText: 'e.g. Main receipt printer',
+              prefixIcon: Icon(Icons.print),
+            ),
+          ),
+          const SizedBox(height: AppDimensions.spacingLg),
+
+          // Connect / disconnect
+          Row(
+            children: [
+              Expanded(
+                child: _isConnectingPrinter
+                    ? const SizedBox(
+                        height: 40,
+                        child: Center(
+                          child: AuroraLoader(size: 24, strokeWidth: 2),
+                        ),
+                      )
+                    : FilledButton.icon(
+                        onPressed: _printerService.isConnected
+                            ? null
+                            : _connectPrinter,
+                        icon: const Icon(
+                          Icons.bluetooth_rounded,
+                          size: 18,
+                        ),
+                        label: const Text('Connect Printer'),
+                      ),
+              ),
+              const SizedBox(width: AppDimensions.spacingMd),
+              Expanded(
+                child: _isConnectingPrinter
+                    ? const SizedBox.shrink()
+                    : OutlinedButton.icon(
+                        onPressed:
+                            _printerService.isConnected
+                                ? _disconnectPrinter
+                                : null,
+                        icon: const Icon(
+                          Icons.bluetooth_outlined,
+                          size: 18,
+                        ),
+                        label: const Text('Disconnect'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: scheme.error,
+                          side: BorderSide(color: scheme.error),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppDimensions.spacingSm),
+
+          // Connection status indicator
+          _PrinterStatusRow(
+            connected: _printerService.isConnected,
+            deviceName: _printerService.deviceName ??
+                _printerService.deviceAddress,
+            error: _printerService.lastError,
+          ),
+          const SizedBox(height: AppDimensions.spacingLg),
+
+          // Test print + cash drawer
+          Row(
+            children: [
+              Expanded(
+                child: _isPrinterBusy
+                    ? const SizedBox(
+                        height: 40,
+                        child: Center(
+                          child: AuroraLoader(size: 24, strokeWidth: 2),
+                        ),
+                      )
+                    : FilledButton.icon(
+                        onPressed: _printerService.isConnected
+                            ? _testPrint
+                            : null,
+                        icon: const Icon(
+                          Icons.receipt_long_rounded,
+                          size: 18,
+                        ),
+                        label: const Text('Test Print'),
+                      ),
+              ),
+              const SizedBox(width: AppDimensions.spacingMd),
+              Expanded(
+                child: _isPrinterBusy
+                    ? const SizedBox.shrink()
+                    : OutlinedButton.icon(
+                        onPressed:
+                            _printerService.isConnected
+                                ? _openCashDrawer
+                                : null,
+                        icon: const Icon(
+                          Icons.attach_money_rounded,
+                          size: 18,
+                        ),
+                        label: const Text('Open Cash Drawer'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.brandMint,
+                          side: BorderSide(color: AppColors.brandMint),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
+  }
+
+  String _printerTypeLabel(PrinterConnectionType type) {
+    switch (type) {
+      case PrinterConnectionType.bluetooth:
+        return 'Bluetooth';
+      case PrinterConnectionType.usb:
+        return 'USB';
+      case PrinterConnectionType.network:
+        return 'Network';
+    }
   }
 
   Widget _buildLoyaltySection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionHeading(
-          title: 'Loyalty programme',
-          subtitle: 'Reward repeat customers with points on every sale.',
-          icon: Icons.workspace_premium_outlined,
-        ),
-        const SizedBox(height: AppDimensions.spacingMd),
-        BrandCard(
-          padding: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimensions.screenPadding),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
+    return BrandFormSection(
+      title: 'Loyalty programme',
+      subtitle: 'Reward repeat customers with points on every sale.',
+      icon: Icons.workspace_premium_outlined,
+      accent: AppColors.tertiary,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
                 Row(
                   children: [
                     Container(
@@ -1383,39 +1755,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ? const SizedBox(
                             width: 16,
                             height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: AuroraLoader(
+                              size: 16,
+                              strokeWidth: 2,
+                              onDarkSurface: true,
+                            ),
                           )
                         : const Icon(Icons.save_rounded, size: 18),
                     label: const Text('Save Loyalty'),
                   ),
                 ),
               ],
-            ),
           ),
-        ),
-      ],
-    );
+        );
   }
 
   Widget _buildBusinessConfigurationSection(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionHeading(
-          title: 'Business configuration',
-          subtitle: 'Identity, contact details and currency.',
-          icon: Icons.storefront_outlined,
-        ),
-        const SizedBox(height: AppDimensions.spacingMd),
-        BrandCard(
-          padding: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.all(AppDimensions.screenPadding),
-            child: _isLoadingSettings
+    return BrandFormSection(
+      title: 'Business configuration',
+      subtitle: 'Identity, contact details and currency.',
+      icon: Icons.storefront_outlined,
+      accent: AppColors.primary,
+      child: _isLoadingSettings
                 ? const SizedBox(
                     height: 200,
-                    child: Center(child: CircularProgressIndicator()),
+                    child: Center(child: AuroraLoader(size: 46)),
                   )
                 : Form(
                     key: _formKey,
@@ -1552,9 +1917,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     ),
                                   ),
                                   value: _loginRequired,
-                                  onChanged: _isSavingSettings
-                                      ? null
-                                      : (value) async {
+                                  onChanged: _isOwner && !_isSavingSettings
+                                      ? (value) async {
                                           if (!value) {
                                             // Disabling login requires owner
                                             // authorization.
@@ -1574,7 +1938,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                             }
                                           }
                                           await _saveLoginRequired(value);
-                                        },
+                                        }
+                                      : null,
                                   activeThumbColor: colorScheme.primary,
                                   activeTrackColor: colorScheme.primary
                                       .withValues(alpha: 0.5),
@@ -1597,7 +1962,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
 
                         // Phase F: inactivity auto-lock timeout (owner-only).
-                        if (_loginRequired) ...[
+                        if (_isOwner && _loginRequired) ...[
                           const SizedBox(height: AppDimensions.spacingLg),
                           Card(
                             child: Padding(
@@ -1703,8 +2068,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ? const SizedBox(
                                   width: 18,
                                   height: 18,
-                                  child: CircularProgressIndicator(
+                                  child: AuroraLoader(
+                                    size: 18,
                                     strokeWidth: 2,
+                                    onDarkSurface: true,
                                   ),
                                 )
                               : const Icon(Icons.save_outlined),
@@ -1717,37 +2084,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                   ),
-          ),
-        ),
-      ],
-    );
+      );
   }
 
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    final colorScheme = Theme.of(context).colorScheme;
+  // ─────────────────────────────────────────────────────────────────────────
+  // Phase G: tax / VAT section
+  // ─────────────────────────────────────────────────────────────────────────
 
-    return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 2),
-      child: Row(
+  Widget _buildTaxSection(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final moneyDeep = AppColors.moneyTint.last;
+
+    return BrandFormSection(
+      title: 'Tax / VAT',
+      subtitle:
+          'Set the tax rate and whether prices already include tax (tax-inclusive).',
+      icon: Icons.payment_outlined,
+      accent: moneyDeep,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 22,
-            height: 3,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.gradientStart, AppColors.brandMint],
-              ),
-              borderRadius: BorderRadius.circular(999),
+          // Tax rate %
+          Text(
+            'Tax rate (%)',
+            style: AppTextStyles.labelMedium.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(width: 9),
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10.5,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 1.3,
-              color: colorScheme.onSurface.withValues(alpha: 0.55),
+          const SizedBox(height: AppDimensions.spacingSm),
+          TextFormField(
+            controller: _taxRateController,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: 'Tax rate',
+              hintText: 'e.g. 15.0',
+              prefixIcon: const Icon(Icons.percent_outlined),
+              suffixText: '%',
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
+                borderSide: const BorderSide(
+                  color: AppColors.royalMid,
+                  width: 2,
+                ),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(AppDimensions.inputRadius),
+                borderSide: BorderSide(
+                  color: colorScheme.outline,
+                  width: 1,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppDimensions.spacingLg),
+
+          // Tax inclusive toggle
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            title: Text(
+              'Tax inclusive',
+              style: AppTextStyles.bodyMedium.copyWith(
+                color: colorScheme.onSurface,
+              ),
+            ),
+            subtitle: Text(
+              _taxInclusive
+                  ? 'Prices already include tax — tax is shown as a breakdown.'
+                  : 'Tax is added on top of the subtotal at checkout.',
+              style: AppTextStyles.bodySmall.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            value: _taxInclusive,
+            onChanged: _isSavingSettings
+                ? null
+                : (value) => setState(() => _taxInclusive = value),
+            activeThumbColor: moneyDeep,
+            activeTrackColor: moneyDeep.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: AppDimensions.spacingLg),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton.icon(
+              onPressed: _isSavingSettings ? null : _saveBusinessSettings,
+              icon: _isSavingSettings
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: AuroraLoader(
+                        size: 16,
+                        strokeWidth: 2,
+                        onDarkSurface: true,
+                      ),
+                    )
+                  : const Icon(Icons.save_rounded, size: 18),
+              label: const Text('Save Tax Settings'),
             ),
           ),
         ],
@@ -1856,6 +2287,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final items = <(String, IconData, GlobalKey)>[
       ('Appearance', Icons.palette_outlined, _appearanceKey),
       ('Business', Icons.storefront_outlined, _businessKey),
+      ('Tax / VAT', Icons.payment_outlined, _taxKey),
       ('Loyalty', Icons.workspace_premium_outlined, _loyaltyKey),
       ('Receipts', Icons.receipt_long_outlined, _receiptKey),
       ('Data', Icons.storage_rounded, _dataKey),
@@ -1923,9 +2355,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Icons.delete_sweep_outlined: [Color(0xFFFB7185), Color(0xFFE11D48)],
     };
 
+    // Section tint pairing: data & backup = stock blue.
+    const dataBlue = [AppColors.infoLight, AppColors.info];
+    palette[Icons.backup_outlined] = dataBlue;
+    palette[Icons.restore_outlined] = dataBlue;
+    palette[Icons.inventory_2_outlined] = dataBlue;
+    palette[Icons.point_of_sale_outlined] = dataBlue;
+    palette[Icons.people_outline] = dataBlue;
+
     final destructive =
         icon == Icons.delete_sweep_outlined ||
         icon == Icons.warning_amber_outlined;
+
+    // Danger-zone actions render as outlined-error tiles.
+    if (destructive) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: _DangerActionTile(
+          icon: icon,
+          title: title,
+          subtitle: subtitle,
+          onTap: onTap,
+          isLoading: isLoading,
+        ),
+      );
+    }
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -1986,6 +2440,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           const SizedBox(height: AppDimensions.spacingXl),
 
                           KeyedSubtree(
+                            key: _taxKey,
+                            child: _buildTaxSection(context),
+                          ),
+
+                          KeyedSubtree(
                             key: _loyaltyKey,
                             child: _buildLoyaltySection(context),
                           ),
@@ -1997,13 +2456,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             child: _buildReceiptSection(context),
                           ),
 
+                          const SizedBox(height: AppDimensions.spacingXl),
+
+                          KeyedSubtree(
+                            key: _printerKey,
+                            child: _buildPrinterSection(context),
+                          ),
+
           const SizedBox(height: AppDimensions.spacingXl),
 
                           KeyedSubtree(
                             key: _dataKey,
-                            child: _buildSectionTitle(
-                              context,
-                              'Backup & Restore',
+                            child: const SettingsSectionTitle(
+                              title: 'Backup & Restore',
                             ),
                           ),
 
@@ -2016,12 +2481,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Save your BizFlow data as a backup file',
             isLoading: _isBackingUp,
             onTap:
-                _isBackingUp ||
-                    _isRestoring ||
-                    _isExporting ||
-                    _isSavingSettings
-                ? null
-                : _backupData,
+                !_isOwner ||
+                        _isBackingUp ||
+                        _isRestoring ||
+                        _isExporting ||
+                        _isSavingSettings
+                    ? null
+                    : _backupData,
           ),
 
           const SizedBox(height: AppDimensions.spacingMd),
@@ -2033,17 +2499,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Restore BizFlow data from a backup file',
             isLoading: _isRestoring,
             onTap:
-                _isBackingUp ||
-                    _isRestoring ||
-                    _isExporting ||
-                    _isSavingSettings
-                ? null
-                : _restoreData,
+                !_isOwner ||
+                        _isBackingUp ||
+                        _isRestoring ||
+                        _isExporting ||
+                        _isSavingSettings
+                    ? null
+                    : _restoreData,
           ),
 
           const SizedBox(height: AppDimensions.spacingXl),
 
-          _buildSectionTitle(context, 'Data Export'),
+          const SettingsSectionTitle(title: 'Data Export'),
 
           const SizedBox(height: AppDimensions.spacingMd),
 
@@ -2114,7 +2581,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: AppDimensions.spacingXl),
 
-          _buildSectionTitle(context, 'Development'),
+          const SettingsSectionTitle(title: 'Development'),
 
           const SizedBox(height: AppDimensions.spacingMd),
 
@@ -2125,13 +2592,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Load sample data for development and testing',
             isLoading: _isLoadingDemoData,
             onTap:
-                _isLoadingDemoData ||
-                    _isBackingUp ||
-                    _isRestoring ||
-                    _isExporting ||
-                    _isSavingSettings
-                ? null
-                : _loadDemoData,
+                !_canManage ||
+                        _isLoadingDemoData ||
+                        _isBackingUp ||
+                        _isRestoring ||
+                        _isExporting ||
+                        _isSavingSettings
+                    ? null
+                    : _loadDemoData,
           ),
 
           const SizedBox(height: AppDimensions.spacingMd),
@@ -2143,14 +2611,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Remove sample data without removing your real data',
             isLoading: _isClearingDemoData,
             onTap:
-                _isClearingDemoData ||
-                    _isLoadingDemoData ||
-                    _isBackingUp ||
-                    _isRestoring ||
-                    _isExporting ||
-                    _isSavingSettings
-                ? null
-                : _clearDemoData,
+                !_canManage ||
+                        _isClearingDemoData ||
+                        _isLoadingDemoData ||
+                        _isBackingUp ||
+                        _isRestoring ||
+                        _isExporting ||
+                        _isSavingSettings
+                    ? null
+                    : _clearDemoData,
           ),
 
           const SizedBox(height: AppDimensions.spacingMd),
@@ -2162,15 +2631,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: 'Permanently delete all data and start fresh',
             isLoading: _isResettingData,
             onTap:
-                _isResettingData ||
-                    _isLoadingDemoData ||
-                    _isClearingDemoData ||
-                    _isBackingUp ||
-                    _isRestoring ||
-                    _isExporting ||
-                    _isSavingSettings
-                ? null
-                : _resetAllData,
+                !_isOwner ||
+                        _isResettingData ||
+                        _isLoadingDemoData ||
+                        _isClearingDemoData ||
+                        _isBackingUp ||
+                        _isRestoring ||
+                        _isExporting ||
+                        _isSavingSettings
+                    ? null
+                    : _resetAllData,
           ),
                         ],
                       ),
@@ -2181,6 +2651,213 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Danger-zone action row — outlined error styling only.
+class _DangerActionTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final bool isLoading;
+
+  const _DangerActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    required this.isLoading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = onTap == null && !isLoading;
+
+    return Opacity(
+      opacity: muted ? 0.55 : 1,
+      child: MouseRegion(
+        cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
+        child: Material(
+          color: isDark
+              ? AppColors.darkSurface.withValues(alpha: 0.7)
+              : Colors.white.withValues(alpha: 0.85),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: BorderSide(
+              color: AppColors.error.withValues(
+                alpha: isDark ? 0.45 : 0.35,
+              ),
+            ),
+          ),
+          child: InkWell(
+            onTap: isLoading ? null : onTap,
+            borderRadius: BorderRadius.circular(18),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(
+                        alpha: (isDark ? 0.16 : 0.10),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.error.withValues(
+                          alpha: (isDark ? 0.30 : 0.22),
+                        ),
+                      ),
+                    ),
+                    child: Icon(
+                      icon,
+                      color: AppColors.error,
+                      size: 19,
+                    ),
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: TextStyle(
+                            fontFamily: AppTextStyles.bodyFont,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: scheme.error,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            height: 1.35,
+                            fontWeight: FontWeight.w500,
+                            color: scheme.onSurface.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (isLoading)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: AuroraLoader(size: 18, strokeWidth: 2.2),
+                    )
+                  else
+                    Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(
+                          alpha: (isDark ? 0.16 : 0.09),
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.arrow_forward_rounded,
+                        size: 14,
+                        color: AppColors.error,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Connection status indicator — mint when connected, error when disconnected.
+class _PrinterStatusRow extends StatelessWidget {
+  final bool connected;
+  final String? deviceName;
+  final String? error;
+
+  const _PrinterStatusRow({
+    required this.connected,
+    this.deviceName,
+    this.error,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final statusColor = connected ? AppColors.brandMint : AppColors.error;
+    final statusText = connected ? 'Connected' : 'Disconnected';
+    final detail = connected
+        ? (deviceName ?? 'Printer')
+        : (error ?? 'No printer connected');
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: statusColor.withValues(alpha: isDark ? 0.12 : 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: statusColor.withValues(alpha: isDark ? 0.35 : 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: statusColor,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: statusColor.withValues(alpha: 0.45),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$statusText${connected ? ' • $detail' : ''}',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                    color: statusColor,
+                  ),
+                ),
+                if (!connected && error != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    error!,
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      color: scheme.onSurface.withValues(alpha: 0.55),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
